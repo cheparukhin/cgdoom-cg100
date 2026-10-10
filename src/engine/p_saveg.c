@@ -720,9 +720,12 @@ void P_UnArchiveSpecials (void)
       save_p += sizeof(*floor);
       floor->sector = P_LoadSector ((intptr_t)floor->sector);
       floor->sector->specialdata = floor;
-      // CGDoom: the flat these floors leave when they stop (T_MoveFloor;
-      // the other types never set it)
-      if (floor->type == donutRaise || floor->type == lowerAndChange)
+      // CGDoom: the flat T_MoveFloor puts on the sector when the floor
+      // stops: a donut raised up or a floor lowered and changed. Only then:
+      // EV_BuildStairs leaves type and texture uninitialized (vanilla), so
+      // a valid save of moving stairs can hold any values there.
+      if ((floor->type == donutRaise && floor->direction == 1)
+          || (floor->type == lowerAndChange && floor->direction == -1))
         P_CheckFlat (floor->texture);
       floor->thinker.function = TT_MoveFloor;
       P_AddThinker (&floor->thinker,floor);

@@ -1508,7 +1508,6 @@ Vanilla trusted its savegames and demos: three memory-safety bugs, each reproduc
   fixedcolormap). Every player in the game needs a body after the thinkers. A violation is `I_Error("Bad savegame:
   ...")`, before any out-of-bounds access. `mobj->tracer` is cleared like `target` (vanilla kept a pointer of the
   saving session; every user accepts NULL), and the link pointers of MF_NOSECTOR/MF_NOBLOCKMAP things are cleared.
-  `P_RespawnSpecials` ignores a spawn point of unknown type (was `mobjinfo[NUMMOBJTYPES]`).
 - **Demos (`G_DoPlayDemo`, `G_ReadDemoTiccmd`):** the demo length is known (`W_LumpLength`, `M_ReadFile`'s result)
   and `demoplayend` ends playback exactly like the 0x80 marker. A demo shorter than its 13-byte header, with player
   flags other than 0/1, consoleplayer outside the game (vanilla indexed `players[]` with any byte), or without player
