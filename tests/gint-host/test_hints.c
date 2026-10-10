@@ -17,6 +17,10 @@ int main(void)
 	char const *d = gfatal_hint("Demo is from a different game version (110)", true);
 	CHECK(d && strstr(d, ".LMP"), "demo version hint");
 	CHECK(gfatal_hint("M_ReadFile: cannot open FRE0D03.LMP (-1)", true) == d, "demo read hint");
+	CHECK(gfatal_hint("Demo is damaged: too short (12)", true) == d, "damaged demo hint");
+	char const *s = gfatal_hint("Bad savegame: state 5000", true);
+	CHECK(s && strstr(s, ".DSG"), "savegame hint");
+	CHECK(gfatal_hint("Bad savegame", true) == s, "savegame marker hint");
 	CHECK(gfatal_hint("M_ReadFile: cannot open FOO.CFG (-1)", true) == NULL, "non-demo read: no hint");
 	char const *w = gfatal_hint("W_GetNumForName: map40 not found!", true);
 	CHECK(w && strstr(w, "WAD"), "missing lump hint");

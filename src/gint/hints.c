@@ -23,12 +23,18 @@ char const *gfatal_hint(char const *msg, bool cg100)
 			"older, enable 'Use experimental RAM' (Advanced); after an "
 			"earlier session, reset the calculator first.";
 	}
-	/* g_game.c: "Demo is from a different game version (%d)";
-	   m_misc.c: "M_ReadFile: cannot open %s (%d)" for a demo lump */
-	if(strstr(msg, "Demo is from") || (strstr(msg, "M_ReadFile")
-		&& (strstr(msg, ".LMP") || strstr(msg, ".lmp"))))
+	/* g_game.c: "Demo is from a different game version (%d)", "Demo is
+	   damaged: ..."; m_misc.c: "M_ReadFile: cannot open %s (%d)" for a
+	   demo lump */
+	if(strstr(msg, "Demo is from") || strstr(msg, "Demo is damaged")
+		|| (strstr(msg, "M_ReadFile") && (strstr(msg, ".LMP")
+		|| strstr(msg, ".lmp"))))
 		return "This demo cannot be played: delete the .LMP file "
 			"(Memory app) or record it again.";
+	/* g_game.c, p_saveg.c: "Bad savegame..." (G_DoLoadGame) */
+	if(strstr(msg, "Bad savegame"))
+		return "This savegame is damaged, or was made with another WAD "
+			"or version: delete its .DSG file (Memory app).";
 	/* w_wad.c: "W_GetNumForName: %s not found!" */
 	if(strstr(msg, "W_GetNumForName"))
 		return "A lump is missing: the WAD may be incomplete (copy it "
