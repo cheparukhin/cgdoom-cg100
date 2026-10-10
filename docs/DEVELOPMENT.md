@@ -2,7 +2,7 @@
 
 This guide covers how the port is built, how it is tested without hardware, what was measured, why the
 main design choices were made, and what to check on the first hardware run. For users, see
-[`../README.md`](../README.md).
+[`../README.md`](../README.md) and the [user guide](USER-GUIDE.md).
 
 Some notes are authoritative. Read them before you change the parts they cover:
 
@@ -207,8 +207,48 @@ path on purpose. The fx-CG50 does none of this.
 
 ## 3. Builds
 
+**Toolchain.** This needs cmake, libpng, libusb, ncurses and Python 3 with Pillow.
+`tools/build-toolchain.sh` was written for macOS with Homebrew (its library paths are Homebrew's; on Linux
+it may need adjusting). It builds sh-elf binutils 2.42, GCC 14.1, OpenLibm, fxlibc, gint (dev branch, which
+has the fx-CG100 support) and the fxSDK into `toolchain/`, from clones in `ref/`. `ref/`, `toolchain/`,
+`test-wads/` and the build directories are gitignored.
+
 ```sh
-export PATH=/path/to/casio_doom/toolchain/bin:$PATH   # after tools/build-toolchain.sh (+ "sim" step)
+tools/build-toolchain.sh            # everything (or one step: fxsdk binutils gcc openlibm fxlibc gint)
+tools/build-toolchain.sh sim        # optional: GDB's SH simulator, for the simulator tests
+tools/build-mpm.sh                  # optional: mpm.bin 1.1 from the pinned MPM commit -> build-mpm/mpm.bin
+```
+
+The release was built and tested against these upstream revisions. `tools/build-toolchain.sh` checks out
+the `dev` branch tip of fxsdk, gint and fxlibc, so check out these commits after cloning to reproduce it:
+
+| Path | Repository | Commit |
+|---|---|---|
+| `ref/fxsdk` | `git.planet-casio.com/Lephenixnoir/fxsdk` (dev) | `a6e46eb6df060dc4e6e931521205e516c92b6c7f` |
+| `ref/gint` | `git.planet-casio.com/Lephenixnoir/gint` (dev) | `463f180ffb71ccdcef05c928ad19f2a480b14bc1` |
+| `ref/fxlibc` | `git.planet-casio.com/Vhex-Kernel-Core/fxlibc` (dev) | `a6903066cf4777aa96556a6da9699d4704867185` |
+| `ref/OpenLibm` | `git.planet-casio.com/Lephenixnoir/OpenLibm` | `9828d2e3f265a882af6a5bba8ffe6a00c3eeb8d7` |
+| `ref/sh-elf-gcc` | `git.planet-casio.com/Lephenixnoir/sh-elf-gcc` | `fdbc1be7a84e88f45f9b768b7428ff33b77eb9bb` |
+| `ref/sh-elf-binutils` | `git.planet-casio.com/Lephenixnoir/sh-elf-binutils` | `a963554d12c0236ee10c7545daa4c422bf107de6` |
+| `ref/CGDoom` | `git.planet-casio.com/Lephenixnoir/CGDoom` (upstream engine) | `8516c16d9d3c65b45882433b74abdef171265c99` |
+| `ref/mpm` | `git.planet-casio.com/PlaneteCasio/mpm` | `cbd1a414d96b55e14adc20a88e2140f2c8723b5a` |
+
+**Test WADs.** The host and simulator tests use Freedoom 0.13.0 (BSD license):
+
+```sh
+mkdir -p test-wads/fd && cd test-wads/fd
+curl -fLO https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip
+unzip freedoom-0.13.0.zip && cd ../..
+```
+
+The demo-sync tests also need the shareware `doom1.wad` v1.9 in `$CGD_DOOM1_WAD`
+(`python3 tools/wadtool.py fetch-wad DOOM1.WAD --save-original doom1.wad` downloads it).
+`tools/demosync-oracle/build.sh` takes id Software's `linuxdoom-1.10` source tarball as its argument.
+
+**Build commands:**
+
+```sh
+export PATH=$PWD/toolchain/bin:$PATH   # after tools/build-toolchain.sh (+ "sim" step)
 fxsdk build-cg          # calculator: CGDoom.g3a + build-cg/cgdoom.bin + build-cg/cgdoom.map (must be warning-free)
 make host               # build-host/cgdoom-host (clang -O2 -g, RANGECHECK on)
 make host-asan          # build-host-asan/cgdoom-host (ASan + UBSan)
@@ -417,7 +457,7 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 13. In the game, check:
     - the picture is centered and has correct colors, and there is no garbage in the borders;
     - the FPS counter value, in a few places (record them);
-    - every action of the *Thumbs* preset, from the README table;
+    - every action of the *Thumbs* preset, from the [user guide](USER-GUIDE.md#fx-cg100--graph-math) table;
     - BACK opens the Doom menu, and EXE and OK select;
     - the *Detail* menu item, and the view-size keys;
     - Frameskip (TOOLS), Heap stats (sqrt), Run profiler (`)`); record the profiler line.
@@ -452,5 +492,5 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 - any fatal-error text, with its hint line;
 - whether a safe start changed anything.
 
-Use these results to update the "[G]" (guess) items in the research notes, and the README's performance
+Use these results to update the "[G]" (guess) items in the research notes, and the user guide's performance
 section.

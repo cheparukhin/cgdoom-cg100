@@ -9,7 +9,7 @@
 /toolchain/
 /toolchain-build/
 
-# Upstream clones (see "Pinned upstream revisions" in README.md)
+# Upstream clones (pinned revisions: docs/DEVELOPMENT.md, "3. Builds")
 /ref/
 
 # Test WADs (Freedoom 0.13.0; never commit id Software WADs)
