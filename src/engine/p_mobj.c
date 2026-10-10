@@ -669,6 +669,14 @@ void P_RespawnSpecials (void)
       break;
   }
 
+  // CGDoom: none (the spawn point came from a damaged savegame: the map's
+  // things have known types): vanilla used mobjinfo[NUMMOBJTYPES]
+  if (i == NUMMOBJTYPES)
+  {
+    iquetail = (iquetail+1)&(ITEMQUESIZE-1);
+    return;
+  }
+
   // spawn it
   if (mobjinfo[i].flags & MF_SPAWNCEILING)
     z = ONCEILINGZ;

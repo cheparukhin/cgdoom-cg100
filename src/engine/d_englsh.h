@@ -139,6 +139,7 @@
 //
 #define GGSAVED	"Save file will be created on exit"
 #define GGSAVEFAILED	"save failed: file not written!"
+#define GGSAVETOOBIG	"save failed: level too large!"
 
 //
 //	HU_stuff.C

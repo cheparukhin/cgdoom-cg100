@@ -971,6 +971,50 @@ void G_LoadGame (int slot)
 }
 
 #define VERSIONSIZE  16
+/* CGDoom: description, version, skill, episode, map, players, leveltime */
+#define SAVEHEADERSIZE (SAVESTRINGSIZE + VERSIONSIZE + 3 + MAXPLAYERS + 3)
+
+/* CGDoom: G_DoLoadGame checks the header before G_InitNew, which destroys
+   the current game: a skill, episode or map that G_InitNew would change (a
+   MAP33 save would load MAP32's level with MAP33's archive) or a map the
+   WAD does not have (a save of another WAD); player flags that are not 0
+   or 1, and player 0 (the only one this engine runs, renders and reads
+   commands for) and consoleplayer must be in the game. */
+static boolean G_ValidSaveHeader (int skill, int episode, int map,
+  const byte *ingame)
+{
+    char  lumpname[16];
+    int   lastepisode;
+    int   i;
+
+    if (skill < sk_baby || skill > sk_nightmare)
+        return false;
+
+    /* G_InitNew's limits */
+    if (gamemode == retail)
+        lastepisode = 4;
+    else if (gamemode == shareware)
+        lastepisode = 1;
+    else
+        lastepisode = 3;
+    if (episode < 1 || episode > lastepisode)
+        return false;
+    if (map < 1 || map > (gamemode == commercial ? 32 : 9))
+        return false;
+
+    /* P_SetupLevel's map name */
+    if (gamemode == commercial)
+        sprintf (lumpname, "map%02d", map);
+    else
+        sprintf (lumpname, "E%dM%d", episode, map);
+    if (W_CheckNumForName (lumpname) < 0)
+        return false;
+
+    for (i=0 ; i<MAXPLAYERS ; i++)
+        if (ingame[i] > 1)
+            return false;
+    return ingame[0] && ingame[consoleplayer];
+}
 
 void G_DoLoadGame (void) 
 {
@@ -979,6 +1023,8 @@ void G_DoLoadGame (void)
     int   a,b,c;
     char  vcheck[VERSIONSIZE];
     char  savename[64];
+    int   skill, episode, map;
+    byte  ingame[MAXPLAYERS];
 
     gameaction = ga_nothing;
 
@@ -995,14 +1041,18 @@ void G_DoLoadGame (void)
       I_ReinitAfterError();
     }
 
-    if (length < SAVESTRINGSIZE + VERSIONSIZE)
+    /* CGDoom: the whole header (vanilla only checked the description and
+       the version, then read on) */
+    if (length < SAVEHEADERSIZE)
     {
       if (length >= 0 && CGD_DelayedSaves[n].data == NULL)
         Z_Free (savebuffer);
+      PL_Log ("G_DoLoadGame: slot %d: no valid savegame\n", saveslotnumber);
       return;
     }
 
     save_p = savebuffer + SAVESTRINGSIZE;
+    save_end = savebuffer + length;
 
     // skip the description field
     memset (vcheck,0,sizeof(vcheck));
@@ -1011,15 +1061,32 @@ void G_DoLoadGame (void)
     {
         if (CGD_DelayedSaves[n].data == NULL)
             Z_Free (savebuffer);
+        PL_Log ("G_DoLoadGame: slot %d: no valid savegame\n", saveslotnumber);
         return;       // bad version
     }
     save_p += VERSIONSIZE;
 
-    gameskill = *save_p++;
-    gameepisode = *save_p++;
-    gamemap = *save_p++;
+    /* CGDoom: checked before G_InitNew (G_ValidSaveHeader) */
+    skill = *save_p++;
+    episode = *save_p++;
+    map = *save_p++;
     for (i=0 ; i<MAXPLAYERS ; i++)
-        playeringame[i] = *save_p++;
+        ingame[i] = *save_p++;
+    if (!G_ValidSaveHeader (skill, episode, map, ingame))
+    {
+        if (CGD_DelayedSaves[n].data == NULL)
+            Z_Free (savebuffer);
+        PL_Log ("G_DoLoadGame: slot %d: bad header (skill %d, episode %d, "
+            "map %d, players %d%d%d%d)\n", saveslotnumber, skill, episode, map,
+            ingame[0], ingame[1], ingame[2], ingame[3]);
+        return;
+    }
+
+    gameskill = skill;
+    gameepisode = episode;
+    gamemap = map;
+    for (i=0 ; i<MAXPLAYERS ; i++)
+        playeringame[i] = ingame[i];
 
     // load a base level
     G_InitNew (gameskill, gameepisode, gamemap);
@@ -1036,7 +1103,7 @@ void G_DoLoadGame (void)
     P_UnArchiveThinkers ();
     P_UnArchiveSpecials ();
 
-    if (*save_p != 0x1d)
+    if (save_p >= save_end || *save_p != 0x1d)
         I_Error ("Bad savegame");
 
     // done
@@ -1071,8 +1138,12 @@ void G_DoSaveGame (void)
     CGD_SaveFileName(name, savegameslot);
     description = savedescription;
 
-    /* CGDoom: dedicated buffer (was screens[0]) */
+    /* CGDoom: dedicated buffer (was screens[0]); the archive stops at its
+       end (save_overflow) instead of writing past it. The header always
+       fits. */
     save_p = savebuffer = Z_Malloc (SAVEGAMESIZE, PU_STATIC, 0);
+    save_end = savebuffer + SAVEGAMESIZE;
+    save_overflow = false;
 
     memcpy (save_p, description, SAVESTRINGSIZE);
     save_p += SAVESTRINGSIZE;
@@ -1095,21 +1166,29 @@ void G_DoSaveGame (void)
     P_ArchiveThinkers ();
     P_ArchiveSpecials ();
 
-    *save_p++ = 0x1d;   // consistancy marker
+    if (P_SaveRoom (1, false, 0))
+      *save_p++ = 0x1d;   // consistancy marker
 
     length = save_p - savebuffer;
-    if (length > SAVEGAMESIZE)
-      I_Error ("Savegame buffer overrun");
 
     int n = CGD_DELAYEDSAVES_SAVES + savegameslot;
     CGDoom_DelayedFileWrite *dfw = &CGD_DelayedSaves[n];
     boolean save_failed = false;
 
-    if (dfw->data)
-      Z_Free(dfw->data);
-    dfw->data = NULL;
+    /* CGDoom: a level too large for the buffer (vanilla wrote past it,
+       then failed with "Savegame buffer overrun"): nothing is written, and
+       the slot keeps its previous save, its file and any delayed copy */
+    if (!save_overflow) {
+      if (dfw->data)
+        Z_Free(dfw->data);
+      dfw->data = NULL;
+    }
 
-    if (CGD_Options.DelaySaves) {
+    if (save_overflow) {
+      PL_Log("G_DoSaveGame: %s not written (savegame larger than %d bytes)\n",
+        name, SAVEGAMESIZE);
+    }
+    else if (CGD_Options.DelaySaves) {
       /* Keep an exact-size copy until CGD_FlushDelayedWrites() */
       void *data = Z_Malloc(length, PU_STATIC, 0);
       memcpy(data, savebuffer, length);
@@ -1132,7 +1211,9 @@ void G_DoSaveGame (void)
     savedescription[0] = 0;
 
     static char msg[64];
-    if (save_failed) {
+    if (save_overflow)
+      sprintf(msg, "%s", GGSAVETOOBIG);
+    else if (save_failed) {
       PL_Log("G_DoSaveGame: %s not written\n", name);
       sprintf(msg, "%s", GGSAVEFAILED);
     }

@@ -42,6 +42,19 @@ void P_UnArchiveSpecials (void);
 
 extern byte*		save_p; 
 
+// CGDoom: the end of the savegame buffer, set by the caller with save_p.
+// The P_Archive* functions stop writing before it (save_overflow is set,
+// the savegame must be dropped); the P_UnArchive* functions fail (I_Error)
+// instead of reading past it or using an index out of range.
+extern byte*		save_end;
+extern boolean		save_overflow;
+
+// Room for a record of head bytes, the padding of the next PADSAVEP when
+// pad is set, and size bytes: archiving (false and save_overflow set if
+// it does not fit) and unarchiving (I_Error if it is not in the savegame)
+boolean P_SaveRoom (size_t head, boolean pad, size_t size);
+void P_LoadCheck (size_t head, boolean pad, size_t size);
+
 
 #endif
 //-----------------------------------------------------------------------------
