@@ -7,6 +7,7 @@
                [-rlimits small] [-lowdetail] [-viewsize N] [-flatfloors]
                [-autoframeskip N] [-rendercost T] [-ticcost T] [-realtime]
                [-slowwad] [-noasm] [-forcemap M]
+   cgdoom-host -savelayout
 
    Runs are deterministic: the platform clock advances one tic per presented
    frame, so the same command always renders the same frames. */
@@ -26,6 +27,7 @@
 #include "m_random.h"
 #include "hu_stuff.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,6 +85,9 @@ static void usage(void)
 "                        gamemap to M without G_InitNew's range limits (the\n"
 "                        engine's map tables must cope; tests/map-limit.sh)\n"
 "  -noasm                accepted for compatibility (host has no asm)\n"
+"  -savelayout           print this build's savegame record layout (struct\n"
+"                        sizes, index field offsets; tests/savetool.py) and\n"
+"                        exit\n"
 "builtin input scripts:\n");
     Input_ListBuiltins(stderr);
     exit(1);
@@ -243,6 +248,51 @@ static const char *wad_basename(const char *path)
         name[i] = b[i];
     name[i] = 0;
     return name;
+}
+
+/* -savelayout: the layout of the records p_saveg.c archives (they are memory
+   images of the structs, so it depends on the build), for tests/savetool.py,
+   which patches index fields of saves to test G_DoLoadGame */
+static void print_save_layout(void)
+{
+    /* the specials in the order of their class bytes (p_saveg.c) */
+    static const int special_size[] = {
+        sizeof(ceiling_t), sizeof(vldoor_t), sizeof(floormove_t),
+        sizeof(plat_t), sizeof(lightflash_t), sizeof(strobe_t),
+        sizeof(glow_t),
+    };
+    static const int special_sector[] = {
+        offsetof(ceiling_t, sector), offsetof(vldoor_t, sector),
+        offsetof(floormove_t, sector), offsetof(plat_t, sector),
+        offsetof(lightflash_t, sector), offsetof(strobe_t, sector),
+        offsetof(glow_t, sector),
+    };
+    FILE *f = stdout;
+
+#define F(name, type, field) \
+    fprintf(f, " %s.%s=%d", name, #field, (int)offsetof(type, field))
+    /* header: description, version, skill, episode, map, players,
+       leveltime (g_game.c) */
+    fprintf(f, "SAVELAYOUT ptr=%d align=%d endian=%s header=%d maxplayers=%d",
+        (int)sizeof(void *), (int)(sizeof(void *) > 4 ? sizeof(void *) : 4),
+        *(const unsigned char *)&(int){1} ? "little" : "big",
+        24 + 16 + 3 + MAXPLAYERS + 3, MAXPLAYERS);
+    fprintf(f, " player=%d pspdef=%d", (int)sizeof(player_t),
+        (int)sizeof(pspdef_t));
+    F("player", player_t, psprites); F("player", player_t, readyweapon);
+    F("player", player_t, pendingweapon); F("player", player_t, health);
+    F("player", player_t, fixedcolormap);
+    fprintf(f, " mobj=%d", (int)sizeof(mobj_t));
+    F("mobj", mobj_t, sprite); F("mobj", mobj_t, frame);
+    F("mobj", mobj_t, type); F("mobj", mobj_t, state);
+    F("mobj", mobj_t, flags); F("mobj", mobj_t, movedir);
+    F("mobj", mobj_t, player); F("mobj", mobj_t, lastlook);
+    for(int i = 0; i < (int)(sizeof special_size / sizeof *special_size);
+        i++)
+        fprintf(f, " special%d=%d special%d.sector=%d", i, special_size[i], i,
+            special_sector[i]);
+    fprintf(f, "\n");
+#undef F
 }
 
 static void print_stats(void)
@@ -430,6 +480,10 @@ int main(int argc, char **argv)
             force_map = atoi(argv[++i]);
         else if(!strcmp(a, "-noasm"))
             {}
+        else if(!strcmp(a, "-savelayout")) {
+            print_save_layout();
+            return 0;
+        }
         else {
             fprintf(stderr, "bad argument: %s\n", a);
             usage();

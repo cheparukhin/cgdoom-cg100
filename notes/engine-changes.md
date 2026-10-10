@@ -1492,3 +1492,57 @@ The oracle runs with `singletics` and draws nothing.
 - **Repeated `-fast` demos.** Vanilla's halving accumulates and is never undone outside nightmare. After two fast
   demos in a title loop, the `S_SARG_RUN*` tics reach 0, and `P_SetMobjState`'s zero-tic loop can then spin.
   CGDoom now shares this vanilla bug. No IWAD demo sets the fast flag.
+
+## Savegame and demo hardening (2026-10-10): bounded saves, checked loads and demos
+
+Vanilla trusted its savegames and demos: three memory-safety bugs, each reproduced under ASan first (reproductions:
+`tests/save-demo-robustness.sh`, 59 of its 68 cases fail on the previous engine).
+
+### What changed
+
+- **Saves (`G_DoSaveGame`, p_saveg.c):** the archive is bounded by `save_end`: `P_SaveRoom` checks every record
+  (players, the world block, each thinker and special with its class byte and padding, the end markers) before it is
+  written, and stops writing at the first one that does not fit (`save_overflow`). Vanilla wrote past the 0x2c000-byte
+  buffer and only then failed ("Savegame buffer overrun"): about 1100 things on the calculator (160-byte mobjs), 780
+  on the 64-bit host (232 bytes); Freedoom E3M3, E4M2 and MAP12 overflow on both (see below). Now nothing is written and the slot keeps its file
+  and any delayed copy (it used to be freed first); the HUD shows `GGSAVETOOBIG` ("save failed: level too large!").
+  The format of saves that fit is unchanged (compared with the previous engine, raw pointers and padding aside).
+- **Loads (`G_DoLoadGame`, p_saveg.c):** `save_end` = buffer + length. The header is read into locals and checked by
+  `G_ValidSaveHeader` before `G_InitNew` (bad skill, episode or map for the game mode, a map the WAD lacks, player
+  flags other than 0/1, player 0 or consoleplayer not in the game): the load is refused and the current game goes on.
+  After it, `P_LoadCheck` precedes every read and the indices are checked: states (mobjs, psprites), sprite frames the
+  renderer would draw (it checks them only with RANGECHECK), thing types, mobj player numbers (and in game),
+  `lastlook`, `movedir`, sectors of specials, flats and textures of the world block and of donut/lowerAndChange
+  floors, weapons, and the player fields the status bar or the renderer index with (health, damage and bonus counts,
+  fixedcolormap). Every player in the game needs a body after the thinkers. A violation is `I_Error("Bad savegame:
+  ...")`, before any out-of-bounds access. `mobj->tracer` is cleared like `target` (vanilla kept a pointer of the
+  saving session; every user accepts NULL), and the link pointers of MF_NOSECTOR/MF_NOBLOCKMAP things are cleared.
+  `P_RespawnSpecials` ignores a spawn point of unknown type (was `mobjinfo[NUMMOBJTYPES]`).
+- **Demos (`G_DoPlayDemo`, `G_ReadDemoTiccmd`):** the demo length is known (`W_LumpLength`, `M_ReadFile`'s result)
+  and `demoplayend` ends playback exactly like the 0x80 marker. A demo shorter than its 13-byte header, with player
+  flags other than 0/1, consoleplayer outside the game (vanilla indexed `players[]` with any byte), or without player
+  0 (the only player this engine runs, renders and reads ticcmds for; with no player, monsters looked for one
+  forever) is rejected before anything changes, like a demo of another version (`G_RejectDemo`: fatal in demo-only
+  mode, otherwise the title loop goes on; a lump is made purgeable again, a file buffer freed). The bodies of all
+  players are cleared before `G_InitNew`, and a player in the game whose start the map lacks is a fatal error.
+- **Demo ticcmds that save (`G_Ticker`):** `BTS_SAVEGAME` with slot 6 or 7, which only a damaged demo can carry, is
+  ignored (slot 6 was the recorded demo's delayed write, 7 past `CGD_DelayedSaves`).
+- **gint hints:** "Demo is damaged" gets the demo hint, "Bad savegame" a new one (delete the .DSG).
+
+### Tests
+
+- `make test-robust` (`tests/save-demo-robustness.sh`, in `test-unit`; `test-asan` runs it under ASan): see
+  docs/DEVELOPMENT.md §4. `tests/savetool.py` patches savegames using the layout printed by `cgdoom-host
+  -savelayout` (also for the 32-bit big-endian simulator build) and generates the test WADs.
+- Goldens, demo round trip and demo sync unchanged.
+
+### For later agents
+
+- A new archived field that indexes an array must be checked in its `P_UnArchive*` function, and a new record must
+  call `P_SaveRoom`/`P_LoadCheck` before it is written or read.
+- Known and left: `mobj->target` is still NULL after a load (vanilla), so `A_SpawnFly` (a boss cube in flight) can
+  dereference NULL after loading such a save (`A_Fire` now stops at the cleared tracer first); a save made by the
+  64-bit host is not loadable on the calculator (struct images; as before).
+- The buffer is too small for some stock levels: with the calculator's struct sizes (simulator, a 1 MiB buffer to
+  measure) Freedoom E3M3 needs 185,610 bytes at its start, E4M2 213,886 and Doom II MAP12 243,898 (MAP20 124,634,
+  MAP29 80,558). These saves are now refused ("level too large"); before, they wrote past the buffer.

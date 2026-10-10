@@ -5,7 +5,7 @@
 #   make golden      regenerate tests/golden/*.crc from tests/scenarios.txt
 #   make test-host   run all scenarios, compare with goldens (PASS/FAIL)
 #   make test-asan   run all scenarios under ASan/UBSan, also compared to goldens
-#                    (and the save-entry and demo-unbegun tests)
+#                    (and the save-entry, demo-unbegun, map-limit and robust tests)
 #   make test-fixed  FixedMul/FixedDiv vs vanilla exactness test (PASS/FAIL)
 #   make test-fixed-sim  the same test built for SH and run in the simulator
 #   make test-div    step-2 exact division helpers vs the C operators (host)
@@ -16,8 +16,12 @@
 #   make test-saveentry  save-name entry: pre-fill, typing, escape, load
 #   make test-demo-unbegun  a demo recording that never began (title, title
 #                    demos, I_Error in the first level load): no crash, no save
+#   make test-robust damaged, foreign and oversized savegames, damaged demos:
+#                    clean errors, no access outside a buffer (run under ASan
+#                    by test-asan; tests/save-demo-robustness.sh)
 #   make test-unit   test-fixed + test-div + test-names + test-roundtrip +
-#                    test-settings + test-saveentry + test-demo-unbegun
+#                    test-settings + test-saveentry + test-demo-unbegun +
+#                    test-robust
 #   make test-demosync  DEMO1-3 of the shareware doom1.wad given by
 #                    CGD_DOOM1_WAD play in sync (per-tic game-state traces vs
 #                    tests/demosync/*.ckpt, checked against linuxdoom-1.10);
@@ -40,7 +44,7 @@ ROOT        := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 all: host
 .PHONY: all host host-asan golden test-host test-asan test-fixed test-names \
         test-roundtrip test-unit check-sh clean test-settings test-saveentry \
-        test-demo-unbegun test-demosync
+        test-demo-unbegun test-demosync test-robust
 
 ENGINE_SRC  := $(wildcard $(ROOT)/src/engine/*.c)
 HOST_SRC    := $(wildcard $(ROOT)/src/host/*.c)
@@ -116,6 +120,10 @@ test-asan: host-asan
 	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
 	 sh $(ROOT)/tests/demo-unbegun.sh -bin $(ASAN_BUILD)/cgdoom-host \
 	   -out $(ASAN_BUILD)/tests/unbegun
+	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+	 sh $(ROOT)/tests/save-demo-robustness.sh -bin $(ASAN_BUILD)/cgdoom-host \
+	   -out $(ASAN_BUILD)/tests/robust
 
 test-fixed: $(HOST_BUILD)/fixed-exact
 	$(HOST_BUILD)/fixed-exact
@@ -135,7 +143,7 @@ $(HOST_BUILD)/div-exact: $(ROOT)/tests/div_exact.c $(ROOT)/src/engine/m_fixed.h
 
 # Small host tests that are not golden scenarios
 test-unit: test-fixed test-div test-names test-roundtrip test-settings \
-           test-saveentry test-demo-unbegun
+           test-saveentry test-demo-unbegun test-robust
 
 test-roundtrip: host
 	@sh $(ROOT)/tests/demo-roundtrip.sh -bin $(HOST_BUILD)/cgdoom-host
@@ -145,6 +153,9 @@ test-saveentry: host
 
 test-demo-unbegun: host
 	@sh $(ROOT)/tests/demo-unbegun.sh -bin $(HOST_BUILD)/cgdoom-host
+
+test-robust: host
+	@sh $(ROOT)/tests/save-demo-robustness.sh -bin $(HOST_BUILD)/cgdoom-host
 
 # Optional: needs CGD_DOOM1_WAD (the IWAD is not in the repository)
 test-demosync: host
