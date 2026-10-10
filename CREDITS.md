@@ -61,4 +61,17 @@ listed above:
 
 - **Freedoom** 0.13.0 (BSD license) is used for the host and simulator golden-frame tests. It is not
   distributed with this project, and it is too large for the calculator.
-- No id Software data is included. DOOM is a trademark of id Software.
+- The repository contains no id Software data. DOOM is a trademark of id Software.
+
+## Files bundled in the release zip
+
+The release zip's `calculator/` folder also carries two files that are not part of this project and are
+not covered by its GPL. They are included for convenience, and will be removed on request.
+
+- **`mpm.bin`**: MPM's add-in menu and loader, built unmodified from MPM commit `cbd1a41` ("bump minor
+  version to 1.1", `git.planet-casio.com/PlaneteCasio/mpm`) by `tools/build-mpm.sh`. The MPM repository
+  has no license file; all rights stay with the MPM authors.
+- **`DOOM1.WAD`**: the shareware DOOM v1.9 data, © 1994 id Software, packed by `tools/wadtool.py`. The
+  sound effects, music, GENMIDI/DMXGUS and ENDOOM were removed, and every other lump is unchanged. John
+  Carmack wrote in 1999 that "The DOOM shareware wad is freely distributable", as quoted in Debian's
+  `doom-wad-shareware` package. id's license text is in `licenses/DOOM1.WAD-license.txt` in the zip.

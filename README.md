@@ -57,8 +57,8 @@ the loaders' source, not from measurements.
   mpm.bin 1.1 or later.
 - The Advanced screen shows which loader was detected and how much RAM is free. For example, it shows
   `mpm.bin >= 1.1, <N> KiB free`.
-- MPM publishes no binary releases, so `mpm.bin` 1.1 has to be built from the MPM repository
-  (`git.planet-casio.com/PlaneteCasio/mpm`). `tools/build-mpm.sh` does this; see
+- MPM publishes no binary releases. The CGDoom release zip includes `mpm.bin` 1.1, built from the MPM
+  repository (`git.planet-casio.com/PlaneteCasio/mpm`) by `tools/build-mpm.sh`; see
   [Installing MPM](#installing-mpm).
 
 **fx-CG50 / Graph 90+E.** The g3a starts on the fx-CG50, with its own keymaps. This is a bonus target,
@@ -105,17 +105,19 @@ but nobody has confirmed it on Apple Silicon.
    the back with a pen.
 6. A final "USB device is no longer available" message on the PC is harmless.
 
-**3. Get `mpm.bin` 1.1.** Build it with `tools/build-mpm.sh` (needs the toolchain, see
-[Building from source](#building-from-source)). Copies from the forum or from other add-ins are usually
-older builds. They work, but leave CGDoom less RAM. KhiCAS and gpSP ship their own "dynload" `mpm.bin`.
-Whether they run under 1.1 has not been checked, so keep a copy of the `mpm.bin` you replace.
+**3. Get `mpm.bin` 1.1.** It is in the release zip's `calculator/` folder. From source, build it with
+`tools/build-mpm.sh` (needs the toolchain, see [Building from source](#building-from-source)). Copies
+from the forum or from other add-ins are usually older builds. They work, but leave CGDoom less RAM.
+KhiCAS and gpSP ship their own "dynload" `mpm.bin`. Whether they run under 1.1 has not been checked, so
+keep a copy of the `mpm.bin` you replace.
 
 Copying `mpm.bin`, add-ins and WADs only needs USB mass storage, which works from any OS.
 
 ## Getting a WAD
 
-CGDoom needs a DOOM data file (a WAD). **No WAD is included.** Use the shareware `doom1.wad` (version 1.9,
-4,196,020 bytes).
+CGDoom needs a DOOM data file (a WAD). The release zip's `calculator/` folder includes the shareware
+`DOOM1.WAD`, already packed (below), so you can skip this section if you use it. Otherwise, use the
+shareware `doom1.wad` (version 1.9, 4,196,020 bytes).
 
 **The easy way:** `tools/wadtool.py` (Python 3, no dependencies) can download it and pack it for the
 calculator in one step:
@@ -155,9 +157,9 @@ its storage budget of 4,050,000 bytes.
 ## Installing
 
 1. Connect the calculator to your PC with USB and choose the USB flash drive (mass storage) mode.
-2. Copy `CGDoom.g3a` and your packed `DOOM1.WAD` to the **root** of the storage memory (the top folder,
-   not `@MainMem` and not a subfolder). `mpm.bin` must already be there (see
-   [Installing MPM](#installing-mpm)).
+2. Copy `CGDoom.g3a`, your packed `DOOM1.WAD` and `mpm.bin` to the **root** of the storage memory (the
+   top folder, not `@MainMem` and not a subfolder). With the release zip, that is everything in its
+   `calculator/` folder. The MPM OS patch must already be installed (see [Installing MPM](#installing-mpm)).
 3. Eject the calculator safely and unplug it.
 4. On the HOME screen, press **TOOLS**. MPM's add-in grid opens. Move to **CGDoom** with the arrow keys
    and press **EXE**. (MPM's own menu starts an add-in on EXE; its source does not check for OK.)
@@ -547,4 +549,6 @@ Other credits:
   (CalcLoverHK's Ptune4), and the bounded key-release wait.
 - **Chocolate Doom:** the corrected low-detail drawing.
 - **GBADoom:** a column-drawer technique (`COLEXTRABITS`).
-- DOOM is a trademark of id Software. No id Software data is included.
+- DOOM is a trademark of id Software. The repository contains no id Software data. The release zip bundles
+  the shareware `DOOM1.WAD` (packed) and MPM's `mpm.bin`, which are not covered by this project's GPL; see
+  [CREDITS.md](CREDITS.md#files-bundled-in-the-release-zip).
