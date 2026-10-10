@@ -411,30 +411,17 @@ static void WI_slamBackground(void)
   V_MarkRect (0, 0, SCREENWIDTH, SCREENHEIGHT);
 }
 
-/* CGDoom: the level-name patch of map n (0 based), or NULL when n is not one
-   of the maps loaded by WI_loadData (Doom II: 32, Doom: 9). G_InitNew limits
-   the map; this keeps the intermission safe whatever sets gamemap. */
-static const patch_t* WI_levelName(int n)
-{
-  if (n < 0 || n >= ((gamemode == commercial) ? NUMCMAPS : NUMMAPS))
-    return NULL;
-  return lnames[n];
-}
-
 // Draws "<Levelname> Finished!"
 static void WI_drawLF(void)
 {
   int y = WI_TITLEY;
-  const patch_t* lname = WI_levelName(wbs->last);
 
   // draw <LevelName> 
-  if (lname)
-  {
-    V_DrawPatch((SCREENWIDTH - SHORT(lname->width))/2,y, FB, lname);
-    y += (5*SHORT(lname->height))/4;
-  }
+  V_DrawPatch((SCREENWIDTH - SHORT(lnames[wbs->last]->width))/2,y, FB, lnames[wbs->last]);
 
   // draw "Finished!"
+  y += (5*SHORT(lnames[wbs->last]->height))/4;
+
   V_DrawPatch((SCREENWIDTH - SHORT(finished->width))/2,y, FB, finished);
 }
 
@@ -444,18 +431,14 @@ static void WI_drawLF(void)
 static void WI_drawEL(void)
 {
   int y = WI_TITLEY;
-  const patch_t* lname = WI_levelName(wbs->next);
 
   // draw "Entering"
   V_DrawPatch((SCREENWIDTH - SHORT(entering->width))/2, y, FB, entering);
 
   // draw level
-  if (lname)
-  {
-    y += (5*SHORT(lname->height))/4;
+  y += (5*SHORT(lnames[wbs->next]->height))/4;
 
-    V_DrawPatch((SCREENWIDTH - SHORT(lname->width))/2, y, FB, lname);
-  }
+  V_DrawPatch((SCREENWIDTH - SHORT(lnames[wbs->next]->width))/2, y, FB, lnames[wbs->next]);
 
 }
 
@@ -468,11 +451,6 @@ static void WI_drawOnLnode( int n,const patch_t* c[] )
   int  right;
   int  bottom;
   boolean fits = false;
-
-  /* CGDoom: no map node for a map past the nine of the episode (see
-     WI_levelName) */
-  if (n < 0 || n >= NUMMAPS)
-    return;
 
   i = 0;
   do

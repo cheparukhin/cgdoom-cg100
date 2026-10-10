@@ -26,10 +26,8 @@
 #                    CGD_DOOM1_WAD play in sync (per-tic game-state traces vs
 #                    tests/demosync/*.ckpt, checked against linuxdoom-1.10);
 #                    skipped when CGD_DOOM1_WAD is not set
-#   make test-map-limit  maps past MAP32 (a Doom II WAD with MAP33/34 made at test time, needs
-#                    python3): a start is limited to MAP32, and the HU title, par time and
-#                    intermission names cope with any gamemap (-forcemap); also part of
-#                    test-unit, and test-asan runs it as test-map-limit-asan (under ASan)
+#   make test-map-limit  -warp 33 starts MAP32 (the engine's map tables end at 32);
+#                    also part of test-unit, and test-asan runs it under ASan
 #   make check-sh    compile every engine file with sh-elf-gcc (no link)
 #   make sim         build-sim/cgdoom-sim.elf (engine + src/engine/sh4 asm drawers + src/host for
 #                    sh-elf-run, src/sim/cgdoom.mk; CGSIM_SH4=0 for a C-only ELF)

@@ -208,8 +208,6 @@ void HU_Start(void)
 {
   int  a;
   const char* s;
-  /* CGDoom: title of a map outside the name tables */
-  static char untitled[24];
 
   if (headsupactive)
     HU_Stop();
@@ -247,15 +245,7 @@ void HU_Start(void)
     a = 9*(gameepisode-1) + gamemap - 1;
     if (CGD_SingleEpisodeUltimate)
       a = 9*(CGD_SingleEpisodeUltimate-1) + gamemap - 1;
-    /* CGDoom: the tables hold the maps the engine can start (G_InitNew); a
-       map past them gets its lump name instead of a read out of bounds */
-    if (a >= 0 && a < (int)(sizeof(mapnames)/sizeof(mapnames[0])))
-      s = mapnames[a];
-    else
-    {
-      snprintf(untitled, sizeof(untitled), "E%dM%d", gameepisode, gamemap);
-      s = untitled;
-    }
+    s = mapnames[a];
     break;
     /* FIXME
     case pack_plut:
@@ -270,14 +260,7 @@ void HU_Start(void)
   case commercial:
   default:
     a = gamemap-1;
-    /* CGDoom: MAP33 and up (see above) */
-    if (a >= 0 && a < (int)(sizeof(mapnames2)/sizeof(mapnames2[0])))
-      s =  mapnames2[a];
-    else
-    {
-      snprintf(untitled, sizeof(untitled), "MAP%02d", gamemap);
-      s = untitled;
-    }
+    s =  mapnames2[a];
     break;
   }
 

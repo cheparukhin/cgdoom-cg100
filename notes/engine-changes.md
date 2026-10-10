@@ -1177,23 +1177,14 @@ Full record: notes/final-review.md. Engine-side changes only:
 and `run_game` only checked that the lump exists. The engine is vanilla's and has per-map data for the 32 Doom II maps:
 `HU_Start` read `mapnames2[32]` at MAP33 (ASan: global-buffer-overflow, 0 bytes after `mapnames2`; the BFG/Unity
 `doom2.wad` has a MAP33), and leaving the level would have read `cpars[32]`, `lnames[]` and then loaded MAP34.
-- **Decision.** The engine supports MAP01-MAP32, like vanilla (and Doom maps 1-9, episodes 1-4).
 - **Launcher (`src/gint/main.c`).** The start map is limited to 1..`LAUNCH_MAP_MAX` (32) in the arrow and digit
   handling and when `launcher()` starts. It is not part of `CGDOOM.CFG`, so nothing else sets it. USER-GUIDE updated.
 - **`G_InitNew` (g_game.c).** A Doom II map above 32 is limited to 32, next to vanilla's clamp of a Doom map to 9.
-  Every start funnels through it: a launcher or `-warp` start, `G_DoLoadGame` and `G_DoPlayDemo`. Maps 1-32 and
-  every valid demo are unaffected; the goldens are unchanged.
-- **Defence in depth, for any `gamemap`/`gameepisode`.** `HU_Start` uses the lump name (`MAP33`, `E4M12`) as the title
-  of a map outside `mapnames[]`/`mapnames2[]`. `G_DoCompleted` gives par 0 outside `cpars[]`/`pars[][]`, and the
-  intermission skips a level-name patch (`WI_levelName`: `lnames[]` holds 32 or 9) or a map node (`WI_drawOnLnode`)
-  that does not exist. Maps 1-32 take the same paths as before.
-- **Host and test.** `-forcemap M` (host option, tests only) sets `gamemap` after the level started, past
-  `G_InitNew`, and calls `HU_Start`. `tests/map-limit.sh` (`make test-map-limit`, in `test-unit`, run under ASan by
-  `test-asan`) checks `-warp 33` on a Freedoom 2 copy with MAP33/34 (made by `tests/extra-maps-wad.py`) and the
-  forced maps 33, -3 and (Doom) 50 through the level exit and the intermission. Before the fixes each case failed in
-  ASan, one site after the other: `HU_Start`, the `cpars[]`/`pars[][]` lookup, `WI_drawLF`, and in Doom
-  `WI_drawEL` and `WI_drawOnLnode`. The zone-internal `lnames[]` read of `WI_drawEL` in Doom II is not reliably
-  caught by ASan (it reads the next zone block's header).
+  Every start funnels through it (launcher, `-warp`, `G_DoLoadGame`, `G_DoPlayDemo`), and level exits never lead
+  past MAP32, so `gamemap`/`gameepisode` stay inside every per-map table. Maps 1-32 and every valid demo are
+  unaffected; the goldens are unchanged.
+- **Test.** `tests/map-limit.sh` (`make test-map-limit`, in `test-unit`, run under ASan by `test-asan`): `-warp 33`
+  on `freedoom2.wad` starts MAP32.
 
 ## Demo sync (2026-10-10): id's v1.9 demos play tic for tic like vanilla
 

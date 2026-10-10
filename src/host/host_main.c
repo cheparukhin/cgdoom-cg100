@@ -6,7 +6,7 @@
                [-frameskip N] [-exitat T,...] [-demos] [-data <dir>] [-stats]
                [-rlimits small] [-lowdetail] [-viewsize N] [-flatfloors]
                [-autoframeskip N] [-rendercost T] [-ticcost T] [-realtime]
-               [-slowwad] [-noasm] [-forcemap M]
+               [-slowwad] [-noasm]
    cgdoom-host -savelayout
 
    Runs are deterministic: the platform clock advances one tic per presented
@@ -25,7 +25,6 @@
 #include "p_local.h"
 #include "info.h"
 #include "m_random.h"
-#include "hu_stuff.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -81,9 +80,6 @@ static void usage(void)
 "                        reproducible; host only)\n"
 "  -slowwad              PL_WadIsSlow() returns 1 (copy mapped lumps to the\n"
 "                        zone, precache levels; the output must not change)\n"
-"  -forcemap M           test only: once the first level has started, set\n"
-"                        gamemap to M without G_InitNew's range limits (the\n"
-"                        engine's map tables must cope; tests/map-limit.sh)\n"
 "  -noasm                accepted for compatibility (host has no asm)\n"
 "  -savelayout           print this build's savegame record layout (struct\n"
 "                        sizes, index field offsets; tests/savetool.py) and\n"
@@ -96,9 +92,6 @@ static void usage(void)
 /* -exitat: tics at which the current level is exited */
 static int exit_tics[16];
 static int exit_count = 0;
-
-/* -forcemap: a map number G_InitNew would not allow (tests/map-limit.sh) */
-static int force_map = 0;
 
 /* -gamelog: game events on stderr (level starts and completions, player
    deaths) and the final game state, to compare runs (e.g. demo sync) */
@@ -180,15 +173,6 @@ static void demotrace_tic(void)
 
 void Host_TicHook(int tic)
 {
-    /* -forcemap, once: the title, the level-name tables and the par times
-       must hold for any gamemap, whatever G_InitNew allowed (HU_Start runs
-       when a level starts; the intermission reads gamemap at the exit).
-       gamestate starts as GS_LEVEL; gamemap is 0 until a level is set up. */
-    if(force_map && gamestate == GS_LEVEL && gamemap > 0) {
-        gamemap = force_map;
-        force_map = 0;
-        HU_Start();
-    }
     for(int i = 0; i < exit_count; i++) {
         if(exit_tics[i] == tic && gamestate == GS_LEVEL && gameaction ==
             ga_nothing)
@@ -476,8 +460,6 @@ int main(int argc, char **argv)
         }
         else if(!strcmp(a, "-slowwad"))
             host.slow_wad = 1;
-        else if(!strcmp(a, "-forcemap") && is_number(next))
-            force_map = atoi(argv[++i]);
         else if(!strcmp(a, "-noasm"))
             {}
         else if(!strcmp(a, "-savelayout")) {

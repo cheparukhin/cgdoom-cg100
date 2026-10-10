@@ -891,17 +891,13 @@ void G_DoCompleted (void)
   wminfo.maxsecret = totalsecret; 
   wminfo.maxfrags = 0; 
 
-  /* CGDoom: par 0 (shown as 0:00) for a map past the par tables instead of
-     a read out of bounds; G_InitNew limits the map, this keeps the lookup
-     safe whatever sets gamemap */
   if ( gamemode == commercial )
-    wminfo.partime = (gamemap >= 1 && gamemap <= 32) ? 35*cpars[gamemap-1] : 0;
+    wminfo.partime = 35*cpars[gamemap-1]; 
   else if ( gameepisode < 4 )
-    wminfo.partime = (gameepisode >= 1 && gamemap >= 0 && gamemap <= 9) ?
-      35*pars[gameepisode][gamemap] : 0;
+    wminfo.partime = 35*pars[gameepisode][gamemap]; 
   else
     /* CGDoom: vanilla reads past pars[] into cpars[] for episode 4 */
-    wminfo.partime = (gamemap >= 0 && gamemap < 32) ? 35*cpars[gamemap] : 0;
+    wminfo.partime = 35*cpars[gamemap];
   wminfo.pnum = consoleplayer; 
 
   /*for (i=0 ; i<MAXPLAYERS ; i++) 
