@@ -32,7 +32,7 @@ src/engine/sh4/        SH4AL-DSP assembly: column/span drawers, palette expansio
 src/gint/              fx-CG100 / fx-CG50 platform on gint: launcher, video, input, time, files, WAD, memory, UTLB
 src/host/              headless macOS/clang platform; also compiled for the simulator with -DPL_SIM
 src/sim/               GDB SH simulator harness: crt0, linker script, trap syscalls, libc glue, profilers
-tools/                 build-toolchain.sh, wadtool.py
+tools/                 build-toolchain.sh, build-mpm.sh, wadtool.py
 tests/                 golden CRCs and scenarios, unit tests, tests/gint-host (platform logic on the host)
 assets/                g3a icons
 notes/                 design, research, reviews, change logs
@@ -372,9 +372,10 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 
 1. Calculator: fx-CG100 / Graph Math+, OS 02.00.0202 or 02.00.2202, MPM with **mpm.bin 1.1**. Note the
    OS from Settings → About, and the free storage from the Memory app.
-2. On the PC, run `python3 tools/wadtool.py pack doom1.wad DOOM1.WAD --drop-ends`, then
-   `python3 tools/wadtool.py verify doom1.wad DOOM1.WAD`.
-3. Copy `CGDoom.g3a` and `DOOM1.WAD` to the storage root.
+2. On the PC, run `python3 tools/wadtool.py fetch-wad DOOM1.WAD --save-original doom1.wad`, then
+   `python3 tools/wadtool.py verify doom1.wad DOOM1.WAD`. Build `mpm.bin` 1.1 with
+   `tools/build-mpm.sh`.
+3. Copy `mpm.bin`, `CGDoom.g3a` and `DOOM1.WAD` to the storage root.
 
 **Startup and launcher**
 

@@ -21,3 +21,7 @@
 *.log
 
 .DS_Store
+
+# Local staging for copying to a calculator (contains a WAD)
+/calculator/
+__pycache__/

@@ -7,6 +7,7 @@ Usage:
   wadtool.py align  <in> <out> [--align N]            (default N=4)
   wadtool.py pack   <in> <out> [--drop-demos] [--drop-ends] [--align N]
   wadtool.py verify <a> <b>
+  wadtool.py fetch-wad [<out>] [--drop-demos] [--save-original <path>]
 
 Commands
   info    Type, lump count, size, per-category breakdown (count and bytes) and the
@@ -30,12 +31,26 @@ Commands
   verify  Check that b is a (name, content)-identical ordered subset of a; report
           lumps of b that differ or do not exist in a, and the lumps dropped from a.
           Exit status 0 on success, 1 on any difference.
+  fetch-wad
+          Download the shareware doom1.wad v1.9 (from Debian's doom-wad-shareware
+          package, an unmodified copy), check its SHA-256, and pack it like
+          `pack --drop-ends` into <out> (default DOOM1.WAD), ready to copy to the
+          calculator. --save-original also keeps the unmodified doom1.wad.
 
 Note: lumps crossing a fragmented flash block boundary cannot be zero-copy mapped; the
 device-side PL_WadMap falls back to a RAM copy in that case, nothing to do here.
 """
+import hashlib
+import io
+import os
+import shutil
+import ssl
 import struct
+import subprocess
 import sys
+import tarfile
+import urllib.error
+import urllib.request
 
 STORAGE_BUDGET = 4_500_000
 ADDIN_BUDGET = 450_000
@@ -66,6 +81,10 @@ class Lump:
 def read_wad(path):
     with open(path, "rb") as f:
         buf = f.read()
+    return parse_wad(buf, path)
+
+
+def parse_wad(buf, path):
     if len(buf) < 12:
         die("%s: too short" % path)
     ident, n, diroff = struct.unpack_from("<4sii", buf, 0)
@@ -229,7 +248,7 @@ def write_wad(path, ident, lumps, align=4):
     return len(buf)
 
 
-def parse_opts(args, flags):
+def parse_opts(args, flags, values=()):
     pos, opt = [], {}
     i = 0
     while i < len(args):
@@ -239,6 +258,11 @@ def parse_opts(args, flags):
             if i >= len(args):
                 die("--align needs a value")
             opt["align"] = int(args[i], 0)
+        elif a in values:
+            i += 1
+            if i >= len(args):
+                die(a + " needs a value")
+            opt[a] = args[i]
         elif a in flags:
             opt[a] = True
         elif a.startswith("--"):
@@ -276,11 +300,96 @@ def cmd_pack(args):
     ident, lumps, size = read_wad(pos[0])
     kept = strip_lumps(lumps, "--drop-demos" in o, "--drop-ends" in o)
     n = write_wad(pos[1], ident, kept, o.get("align", 4))
-    print("pack: %d -> %d lumps" % (len(lumps), len(kept)))
+    report_pack(len(lumps), len(kept), size, n)
+    return 0
+
+
+def report_pack(nlumps, nkept, size, n):
+    print("pack: %d -> %d lumps" % (nlumps, nkept))
     print("size: before %d, after %d (saved %d, %.1f%%)" % (size, n, size - n, 100.0 * (size - n) / size))
     fits = n <= WAD_BUDGET
     print("budget: %d - %d = %d bytes: %s" % (STORAGE_BUDGET, ADDIN_BUDGET, WAD_BUDGET,
           "FITS (%d spare)" % (WAD_BUDGET - n) if fits else "DOES NOT FIT (%d over)" % (n - WAD_BUDGET)))
+
+
+# Shareware doom1.wad v1.9: 4,196,020 bytes, MD5 f0cefca49926d00903cf57551d901abe.
+SHAREWARE_SIZE = 4_196_020
+SHAREWARE_SHA256 = "1d7d43be501e67d927e415e0b8f3e29c3bf33075e859721816f652a526cac771"
+# Debian's doom-wad-shareware 1.9.fixed-5 ships it unmodified "other than decompressing it".
+# The snapshot.debian.org URL is addressed by the .deb's SHA-1 and does not expire.
+SHAREWARE_DEB_URLS = [
+    "https://deb.debian.org/debian/pool/non-free/d/doom-wad-shareware/doom-wad-shareware_1.9.fixed-5_all.deb",
+    "https://snapshot.debian.org/file/732562ea15f0a6623611bdb739a03af72d8dbaf1",
+    "https://mirrors.kernel.org/debian/pool/non-free/d/doom-wad-shareware/doom-wad-shareware_1.9.fixed-5_all.deb",
+]
+
+
+def download(url):
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r:
+            return r.read()
+    except urllib.error.URLError as e:
+        # python.org builds for macOS have no CA certificates until "Install Certificates.command"
+        # is run; curl uses the system store.
+        if isinstance(e.reason, ssl.SSLError) and shutil.which("curl"):
+            return subprocess.run(["curl", "-fsSL", "--max-time", "120", url],
+                                  check=True, capture_output=True).stdout
+        raise
+
+
+def deb_member(deb, prefix):
+    """Data of the first member of a .deb (an ar archive) whose name starts with prefix."""
+    if deb[:8] != b"!<arch>\n":
+        raise ValueError("not a .deb archive")
+    pos = 8
+    while pos + 60 <= len(deb):
+        name = deb[pos:pos + 16].decode("ascii", "replace").strip().rstrip("/")
+        size = int(deb[pos + 48:pos + 58])
+        if name.startswith(prefix):
+            return deb[pos + 60:pos + 60 + size]
+        pos += 60 + size + (size & 1)
+    raise ValueError("no %s member in the .deb" % prefix)
+
+
+def wad_from_deb(deb):
+    with tarfile.open(fileobj=io.BytesIO(deb_member(deb, "data.tar")), mode="r:*") as tar:
+        for m in tar.getmembers():
+            if m.isfile() and m.name.rsplit("/", 1)[-1].lower() == "doom1.wad":
+                return tar.extractfile(m).read()
+    raise ValueError("doom1.wad is not in the package")
+
+
+def cmd_fetch_wad(args):
+    pos, o = parse_opts(args, ("--drop-demos",), ("--save-original",))
+    if len(pos) > 1:
+        die("fetch-wad [<out>] [--drop-demos] [--save-original <path>]")
+    out = pos[0] if pos else "DOOM1.WAD"
+    wad = None
+    for url in SHAREWARE_DEB_URLS:
+        print("fetch: %s" % url)
+        try:
+            wad = wad_from_deb(download(url))
+        except Exception as e:  # any failure: try the next source
+            print("  failed: %s" % e)
+            continue
+        digest = hashlib.sha256(wad).hexdigest()
+        if len(wad) == SHAREWARE_SIZE and digest == SHAREWARE_SHA256:
+            break
+        print("  wrong file: %d bytes, SHA-256 %s" % (len(wad), digest))
+        wad = None
+    if wad is None:
+        die("could not download doom1.wad; get the v1.9 shareware WAD yourself and use `pack`")
+    print("fetch: doom1.wad v1.9 shareware, SHA-256 OK")
+    if "--save-original" in o:
+        with open(o["--save-original"], "wb") as f:
+            f.write(wad)
+    ident, lumps, size = parse_wad(wad, "doom1.wad")
+    kept = strip_lumps(lumps, "--drop-demos" in o, drop_ends=True)
+    if os.path.dirname(out):
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+    n = write_wad(out, ident, kept)
+    report_pack(len(lumps), len(kept), size, n)
+    print("wrote %s: copy it with CGDoom.g3a to the root of the calculator's storage memory" % out)
     return 0
 
 
@@ -342,6 +451,8 @@ def main(argv):
         return cmd_pack(a)
     elif c == "verify":
         return cmd_verify(a)
+    elif c == "fetch-wad":
+        return cmd_fetch_wad(a)
     else:
         die("bad command; see --help")
     return 0

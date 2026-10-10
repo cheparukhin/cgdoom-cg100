@@ -14,6 +14,7 @@ It adds a launcher, keymaps for the fx-CG100 keyboard, overclocking and SH4 asse
 ## Contents
 
 - [Requirements](#requirements)
+- [Installing MPM](#installing-mpm)
 - [Getting a WAD](#getting-a-wad)
 - [Installing](#installing)
 - [The launcher](#the-launcher)
@@ -56,8 +57,9 @@ the loaders' source, not from measurements.
   mpm.bin 1.1 or later.
 - The Advanced screen shows which loader was detected and how much RAM is free. For example, it shows
   `mpm.bin >= 1.1, <N> KiB free`.
-- For mpm.bin 1.1, use the MPM repository (`git.planet-casio.com/PlaneteCasio/mpm`), or a release that
-  says it is 1.1 or later.
+- MPM publishes no binary releases, so `mpm.bin` 1.1 has to be built from the MPM repository
+  (`git.planet-casio.com/PlaneteCasio/mpm`). `tools/build-mpm.sh` does this; see
+  [Installing MPM](#installing-mpm).
 
 **fx-CG50 / Graph 90+E.** The g3a starts on the fx-CG50, with its own keymaps. This is a bonus target,
 and it is untested. The game needs about 700 KiB of zone memory for `doom1.wad`. Without CGDoom's
@@ -69,11 +71,63 @@ and it is untested. The game needs about 700 KiB of zone memory for `doom1.wad`.
 Before a game starts, the launcher estimates the memory and warns you if it is too small. On the fx-CG50,
 [Lephenixnoir's original CGDoom](https://git.planet-casio.com/Lephenixnoir/CGDoom) is the proven build.
 
+## Installing MPM
+
+MPM has two parts: an **OS patch**, installed once from a PC, and **`mpm.bin`**, the add-in menu, which is a
+file at the root of the storage memory. The steps below come from the MPM topic on Planète Casio.
+
+**1. Check that your calculator is supported.**
+
+- Settings → About must show **02.00.0202** or **02.00.2202**.
+- On 02.10, 02.20 or 02.00.xx1x, check the bootcode date first:
+  1. With the calculator off, hold **HOME + ×10ˣ + AC** and press **ON**.
+  2. Press **SETTINGS**, then **9** (nothing is erased), then **4 (VERSION)**.
+  3. Read **DateA**. If it is `2017.0106.2008` (old display), you can downgrade to 02.00.0202 and then
+     install MPM. If it is `2025.0304.1404` (new display), MPM cannot be installed on this unit yet. Do not
+     downgrade: the screen stays black.
+- **Do not install Casio OS updates on an MPM calculator.** Any OS update removes the patch, and the
+  newer OS versions (2.10, 2.20) are not supported by the installer yet.
+
+**2. Install the OS patch (Windows only).**
+
+The installer is a closed-source Windows program. There is no macOS or Linux version. From a Mac, use a
+Windows PC, or a Windows VM with the calculator's USB device attached to it. MPM's instructions allow a VM,
+but nobody has confirmed it on Apple Silicon.
+
+1. Download and unzip
+   [`mpm-installer-1.0bw.exe`](https://www.planet-casio.com/storage/forums/mpm-installer-1.0bw-199064.zip).
+   It needs 64-bit Windows 8 or later.
+2. Connect the USB cable. On the calculator's popup, choose **OS Update**.
+3. In `cmd`, run `mpm-installer-1.0bw.exe`.
+4. When the PC shows "Communicating more...", the calculator shows "Press OK to continue". Press **OK**
+   within about 10 seconds.
+5. Follow the steps on the calculator (roughly TOOLS → SETTINGS → RESTART). Press the RESTART button on
+   the back with a pen.
+6. A final "USB device is no longer available" message on the PC is harmless.
+
+**3. Get `mpm.bin` 1.1.** Build it with `tools/build-mpm.sh` (needs the toolchain, see
+[Building from source](#building-from-source)). Copies from the forum or from other add-ins are usually
+older builds. They work, but leave CGDoom less RAM. KhiCAS and gpSP ship their own "dynload" `mpm.bin`.
+Whether they run under 1.1 has not been checked, so keep a copy of the `mpm.bin` you replace.
+
+Copying `mpm.bin`, add-ins and WADs only needs USB mass storage, which works from any OS.
+
 ## Getting a WAD
 
 CGDoom needs a DOOM data file (a WAD). **No WAD is included.** Use the shareware `doom1.wad` (version 1.9,
-4,196,020 bytes). It is freely distributed, so you can find it online, and it is also on the original
-shareware media.
+4,196,020 bytes).
+
+**The easy way:** `tools/wadtool.py` (Python 3, no dependencies) can download it and pack it for the
+calculator in one step:
+
+```sh
+python3 tools/wadtool.py fetch-wad DOOM1.WAD
+```
+
+It downloads an unmodified copy from Debian's `doom-wad-shareware` package (the WAD id Software made
+freely distributable), checks its SHA-256, and writes a packed `DOOM1.WAD`, described below. Add
+`--save-original doom1.wad` to keep the original too. If the download fails, get `doom1.wad` yourself
+(it is also on the original shareware media) and pack it as below.
 
 The fx-CG100 has only about **4.5 MB** of storage memory, and the add-in and `mpm.bin` also need room.
 That is why only shareware-sized IWADs fit:
@@ -83,8 +137,9 @@ That is why only shareware-sized IWADs fit:
 - CGDoom's split Ultimate Doom WADs (`doomu1.wad`–`doomu4.wad`) are recognized by the launcher. As
   distributed they are 5.2–6.6 MB each, and nobody has checked whether a packed one fits.
 
-**Pack the WAD on your PC first.** CGDoom has no sound, so `tools/wadtool.py` (Python 3, no dependencies)
-removes the sound effects, music and the ENDOOM text screen. It also aligns every lump to 4 bytes:
+**Pack the WAD on your PC first** (`fetch-wad` already did this). CGDoom has no sound, so
+`tools/wadtool.py` removes the sound effects, music and the ENDOOM text screen. It also aligns every lump
+to 4 bytes:
 
 ```sh
 python3 tools/wadtool.py pack doom1.wad DOOM1.WAD --drop-ends
@@ -101,7 +156,8 @@ its storage budget of 4,050,000 bytes.
 
 1. Connect the calculator to your PC with USB and choose the USB flash drive (mass storage) mode.
 2. Copy `CGDoom.g3a` and your packed `DOOM1.WAD` to the **root** of the storage memory (the top folder,
-   not `@MainMem` and not a subfolder). `mpm.bin` must already be there.
+   not `@MainMem` and not a subfolder). `mpm.bin` must already be there (see
+   [Installing MPM](#installing-mpm)).
 3. Eject the calculator safely and unplug it.
 4. On the HOME screen, press **TOOLS**. MPM's add-in grid opens. Move to **CGDoom** with the arrow keys
    and press **EXE**. (MPM's own menu starts an add-in on EXE; its source does not check for OK.)
@@ -421,6 +477,7 @@ export PATH=$PWD/toolchain/bin:$PATH
 
 fxsdk build-cg                      # -> CGDoom.g3a (and build-cg/cgdoom.bin)
 make test-host                      # host build, golden-frame tests (needs the Freedoom WADs)
+tools/build-mpm.sh                  # optional: mpm.bin 1.1 -> build-mpm/mpm.bin
 ```
 
 The host tests use Freedoom 0.13.0 (`test-wads/fd/freedoom-0.13.0/freedoom1.wad` and `freedoom2.wad`,
