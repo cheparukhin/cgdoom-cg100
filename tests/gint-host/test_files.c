@@ -66,10 +66,13 @@ static int fail_create = 0;
 static int fail_write_after = -1;
 static int fail_write_count = -1;
 static int fail_remove = 0;
+/* The next n create() calls fail but leave an empty entry behind */
+static int fail_create_entry = 0;
 /* Storage capacity in bytes (-1: unlimited): create() and writes that grow
    a file fail with -4 once the files would not fit */
 static int fs_capacity = -1;
 static int fs_used(void);
+static void add_file(char const *name, void const *data, int size);
 
 static void path_to_name(uint16_t const *p, char *out)
 {
@@ -125,6 +128,11 @@ static int s_create(uint16_t const *path, int type, int *size)
 	if(fail_create) return -4;   /* BFile_DeviceFull-like */
 	char n[64]; path_to_name(path, n);
 	if(find_file(n) >= 0) return -13;
+	if(fail_create_entry > 0) {
+		fail_create_entry--;
+		add_file(n, "", 0);
+		return -4;
+	}
 	if(fs_capacity >= 0 && fs_used() + *size > fs_capacity) return -4;
 	for(int i = 0; i < 32; i++) if(!fs[i].used) {
 		fs[i].used = true; strcpy(fs[i].name, n); fs[i].size = *size;
@@ -455,15 +463,26 @@ static void test_replace_rollback(void)
 	CHECK(gfs_failure_text(text, sizeof text, f) && strstr(text, "previous version was kept")
 		&& !strstr(text, "lost"), "rollback: write failure text: %s", text);
 
-	/* remove() fails: create() finds the old file still there, unchanged,
-	   and reported as kept */
+	/* remove() fails: nothing is created, the old file is still there,
+	   unchanged, and reported as kept with remove()'s error */
 	reset_failures();
 	fail_remove = 1;
 	PL_FileWrite("ROLL0_1.DSG", neu, sizeof neu);
 	f = gfs_flush();
 	fail_remove = 0;
+	CHECK(f == 1 && file_is("ROLL0_1.DSG", old, sizeof old) && gfs_flush_kept() == 1
+		&& gfs_last_failure(name, &rc) && rc == -7,
+		"rollback: remove failure (%d, kept %d, rc %d)", f, gfs_flush_kept(), rc);
+
+	/* create() fails but leaves an empty entry: the entry is removed and
+	   the previous version written back (not reported as kept because a
+	   file of that name exists) */
+	reset_failures();
+	fail_create_entry = 1;
+	PL_FileWrite("ROLL0_1.DSG", neu, sizeof neu);
+	f = gfs_flush();
 	CHECK(f == 1 && file_is("ROLL0_1.DSG", old, sizeof old) && gfs_flush_kept() == 1,
-		"rollback: remove failure (%d, kept %d)", f, gfs_flush_kept());
+		"rollback: create() left an entry (%d, kept %d)", f, gfs_flush_kept());
 
 	/* No memory for the backup: the replacement goes ahead without one,
 	   so saving still works when memory is short... */
@@ -495,21 +514,20 @@ static void test_replace_rollback(void)
 		"huge old file replaced without a backup (largest malloc %zu)", g_malloc_largest);
 	rm_file("HUGE.DAT");
 
-	/* Same size: in place as before (open, size, close, open, write,
-	   close), no backup */
+	/* Same size: in place (open, size, close, open, write, close), after
+	   the backup (open, read, close; one malloc) */
 	PL_FileWrite("ROLL0_1.DSG", old, sizeof old);
 	CHECK(gfs_flush() == 0, "same size: seed");
 	PL_FileWrite("ROLL0_1.DSG", same, sizeof same);
 	int calls = os_calls, mallocs = g_malloc_calls;
 	f = gfs_flush();
-	CHECK(f == 0 && file_is("ROLL0_1.DSG", same, sizeof same) && os_calls - calls == 6
-		&& g_malloc_calls == mallocs, "same size in place (%d os calls, %d mallocs)",
+	CHECK(f == 0 && file_is("ROLL0_1.DSG", same, sizeof same) && os_calls - calls == 9
+		&& g_malloc_calls == mallocs + 1, "same size in place (%d os calls, %d mallocs)",
 		os_calls - calls, g_malloc_calls - mallocs);
 
-	/* Same size, but the in-place write fails half-way: the file is a mix
-	   of both versions by then and is not restored as the old one. A
-	   replacement that works (one-off error) writes the new file; one
-	   that fails too leaves nothing */
+	/* Same size, but the in-place write fails half-way. A replacement
+	   that works (one-off error) writes the new file; one that fails too
+	   puts the previous version back from the backup */
 	static uint8_t big2[40 << 10];
 	memset(big2, 6, sizeof big2);
 	PL_FileWrite("ROLL0_2.DSG", big, sizeof big);
@@ -522,12 +540,27 @@ static void test_replace_rollback(void)
 	fail_write_count = -1;
 	CHECK(f == 0 && file_is("ROLL0_2.DSG", big2, sizeof big2), "in-place failure, then replaced (%d)", f);
 	reset_failures();
-	fail_write_after = 1;
+	fail_write_after = 1;              /* in place, then the replacement */
+	fail_write_count = 2;
 	PL_FileWrite("ROLL0_2.DSG", big, sizeof big);
 	f = gfs_flush();
 	fail_write_after = -1;
+	fail_write_count = -1;
+	CHECK(f == 1 && file_is("ROLL0_2.DSG", big2, sizeof big2) && gfs_flush_kept() == 1,
+		"in-place failure, replacement fails: previous version restored (%d)", f);
+
+	/* The same without memory for the backup: the file is a mix of both
+	   versions after the in-place write and is not restored as the old
+	   one; a replacement that fails too leaves nothing */
+	reset_failures();
+	PL_FileWrite("ROLL0_2.DSG", big, sizeof big);
+	fail_write_after = 1;
+	g_malloc_fail_over = 32 << 10;    /* the 40 KiB backup fails */
+	f = gfs_flush();
+	g_malloc_fail_over = -1;
+	fail_write_after = -1;
 	CHECK(f == 1 && find_file("ROLL0_2.DSG") < 0 && gfs_flush_kept() == 0,
-		"in-place failure, replacement fails: nothing left (%d)", f);
+		"in-place failure without a backup: nothing left (%d)", f);
 
 	/* Deletes: one remove() each, a missing file is no failure */
 	PL_FileDelete("ROLL0_1.DSG");

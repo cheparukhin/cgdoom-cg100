@@ -501,15 +501,6 @@ static bool backup_restore(uint16_t const *path, backup_t const *b)
 	return true;
 }
 
-static bool file_exists(uint16_t const *path)
-{
-	int fd = g_os.open(path, BFile_ReadOnly, 0);
-	if(fd < 0)
-		return false;
-	g_os.close(fd);
-	return true;
-}
-
 static int os_flush(void *arg)
 {
 	flush_ctx_t *c = arg;
@@ -538,8 +529,21 @@ static int os_flush(void *arg)
 			g_os.close(fd);
 		}
 
+		/* The previous version, kept in RAM until the new one is in
+		   storage, so that a replacement that fails does not lose it:
+		   it is written back below. Without a backup (file above
+		   GFS_BACKUP_MAX, no memory for it, or a read error) the
+		   replacement goes ahead anyway, as before this backup existed:
+		   saving keeps working when memory is short, but a failure then
+		   loses the old file. */
+		backup_t bk = { NULL, -1 };
+		if(existing >= 0) {
+			bk = backup_take(path, existing);
+			op->no_backup = (bk.size < 0);
+		}
+
 		/* Fast path: overwrite a file of the same size in place */
-		bool intact = true;     /* the existing file is unchanged */
+		bool intact = true;     /* the file in storage is the old version */
 		if(existing == op->size && op->size > 0) {
 			fd = g_os.open(path, BFile_WriteOnly, 0);
 			if(fd >= 0) {
@@ -547,6 +551,7 @@ static int os_flush(void *arg)
 				g_os.close(fd);
 				if(rc >= 0) {
 					op->result = 0;
+					free(bk.data);
 					continue;
 				}
 				/* Partly overwritten: a mix of both versions,
@@ -558,52 +563,41 @@ static int os_flush(void *arg)
 		/* Remove, create with the final size, write. The old file has to
 		   go first: storage is nearly full with the full WAD installed,
 		   and a temporary copy (create + rename) would need room for both
-		   files exactly when space is short (gint review round 1).
-		   So that a replacement that does not fit does not lose the old
-		   file too, the old file is first read into RAM. If create() or
-		   a write then fails, it is created again at its old size, in
-		   the space the remove has just freed, and written back. The
-		   failure is still reported by name at exit, with the note that
-		   the previous version was kept.
-		   Without a backup (file above GFS_BACKUP_MAX, no memory for
-		   it, a read error, or the in-place write above already changed
-		   the file) the replacement goes ahead anyway, as before this
-		   backup existed: saving keeps working when memory is short, but
-		   a failure then loses the old file. */
-		backup_t bk = { NULL, -1 };
+		   files exactly when space is short (gint review round 1). If
+		   create() or a write fails, the old file is created again at its
+		   old size, in the space the remove has just freed, from the
+		   backup. The failure is still reported by name at exit, with
+		   the note that the previous version was kept. */
 		if(existing >= 0) {
-			if(intact)
-				bk = backup_take(path, existing);
-			op->no_backup = (bk.size < 0);
-			g_os.remove(path);
+			int rm = g_os.remove(path);
+			if(rm < 0 && rm != BFile_EntryNotFound) {
+				/* The file is still there, unchanged unless the
+				   in-place write above failed */
+				op->result = rm;
+				op->kept = intact;
+				free(bk.data);
+				continue;
+			}
 		}
 		int size = op->size;
 		int rc = g_os.create(path, BFile_File, &size);
-		bool created = (rc >= 0);
-		if(created) {
+		if(rc >= 0) {
 			fd = g_os.open(path, BFile_WriteOnly, 0);
 			rc = (fd < 0) ? fd
 				: (op->size > 0) ? write_all(fd, op->data, op->size)
 				: 0;
 			if(fd >= 0)
 				g_os.close(fd);
-			if(rc < 0) {
-				/* Do not leave a full-size file of Fugue's
-				   preallocated contents (or a half-written one)
-				   behind: the next session would read it as a
-				   corrupt save or settings file */
-				g_os.remove(path);
-			}
 		}
 		op->result = (rc < 0) ? rc : 0;
-		if(rc < 0 && existing >= 0) {
-			/* create() fails while the file exists if remove()
-			   failed: the old file is then still there (unless the
-			   in-place write changed it); nothing to put back */
-			if(!created && file_exists(path))
-				op->kept = intact;
-			else
-				op->kept = backup_restore(path, &bk);
+		if(rc < 0) {
+			/* Do not leave a full-size file of Fugue's preallocated
+			   contents, a half-written one, or an entry that a failed
+			   create() made behind: the next session would read it as a
+			   corrupt save or settings file. Then put the previous
+			   version back. */
+			g_os.remove(path);
+			op->kept = backup_restore(path, &bk);
 		}
 		free(bk.data);
 	}
