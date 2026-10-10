@@ -138,6 +138,8 @@ byte*     demoend;
 static boolean demorecbegun;
 static byte*   demorecbuffer;
 #define DEMO_MAXSIZE 0x20000
+/* CGDoom: the end of the demo being played (demoend is the recording's) */
+static byte*   demoplayend;
 boolean   singledemo;             // quit after playing a demo from cmdline
 
 boolean          precache = false;        // if true, load all graphics at start
@@ -533,6 +535,13 @@ void G_Ticker (void)
         break; 
 
       case BTS_SAVEGAME: 
+        /* CGDoom: a demo's ticcmds come here too; its slot must be one of
+           the menu's (6 is the recorded demo's delayed write, 7 was past
+           CGD_DelayedSaves) */
+        if (((players[0].cmd.buttons & BTS_SAVEMASK)>>BTS_SAVESHIFT)
+          >= CGD_DELAYEDSAVES_DEMO - CGD_DELAYEDSAVES_SAVES)
+          break;
+
         if (!savedescription[0]) 
           strcpy(savedescription, "NET GAME");
 
@@ -1388,7 +1397,9 @@ void G_InitNew ( skill_t skill, int episode, int map )
 
 void G_ReadDemoTiccmd (ticcmd_t* cmd) 
 { 
-  if (*demo_p == DEMOMARKER) 
+  /* CGDoom: the end of the demo data counts as its marker (vanilla read on
+     past the end of a demo without one, or with a partial ticcmd) */
+  if (demoplayend - demo_p < 4 || *demo_p == DEMOMARKER) 
   {
     // end of demo data stream; the rest of this tic runs with the
     // locally built command in vanilla (none during playback), not with
@@ -1511,10 +1522,34 @@ void G_DeferedPlayDemoFile (char* name)
   gameaction = ga_playdemo;
 }
 
+/* CGDoom: version, skill, episode, map, deathmatch, respawn, fast,
+   nomonsters, consoleplayer, players (versions 108-110) */
+#define DEMOHEADERSIZE (9 + MAXPLAYERS)
+
+/* CGDoom: G_DoPlayDemo rejects a demo it cannot play like one of another
+   version (before anything changes): fatal in demo-only mode (nothing else
+   to show), otherwise the title loop goes on. The buffer is released as
+   G_CheckDemoStatus releases it at the end of a demo: a lump becomes
+   purgeable again (a lump mapped in place is no zone block: Z_ChangeTag
+   ignores it), the buffer of a file (demo-only mode) is freed. */
+static void G_RejectDemo (const char *why, int value)
+{
+  if (CGD_PlayDemoOnly)
+    I_Error ("Demo is %s (%d)", why, value);
+  if (defdemoname)
+    Z_ChangeTag (demobuffer, PU_CACHE);
+  else
+    Z_Free (demobuffer);
+  demobuffer = demo_p = demoplayend = NULL;
+  gameaction = ga_nothing;
+}
+
 void G_DoPlayDemo (void)
 {
   skill_t skill;
-  int i, episode, map;
+  int i, episode, map, length;
+  int dm, respawn, fast, nomon, console;
+  byte ingame[MAXPLAYERS];
 
   gameaction = ga_nothing;
   /* CGDoom: a demo played while a recording runs (End Game with title
@@ -1525,16 +1560,29 @@ void G_DoPlayDemo (void)
      writes went on past the lump), and to save from the lump at the end. */
   if (demorecording && demorecbegun && !demoplayback && !timingdemo)
     G_CheckDemoStatus ();
+  /* CGDoom: with its length (vanilla read the header and the ticcmds
+     whatever the length) */
+  demobuffer = demo_p = NULL;
+  length = 0;
   if (defdemoname)
   {
-    demobuffer = demo_p = (byte *)W_CacheLumpNameConst(defdemoname, PU_STATIC);
+    i = W_GetNumForName (defdemoname);
+    demobuffer = demo_p = (byte *)W_CacheLumpNumConst(i, PU_STATIC);
+    length = W_LumpLength (i);
   }
   else if (defdemofilename)
   {
     demobuffer = NULL;
-    M_ReadFile(defdemofilename, &demobuffer, 1);
+    length = M_ReadFile(defdemofilename, &demobuffer, 1);
     demo_p = demobuffer;
   }
+
+  if (length < DEMOHEADERSIZE)
+  {
+    G_RejectDemo ("damaged: too short", length);
+    return;
+  }
+  demoplayend = demobuffer + length;
 
   /* CGDoom: We have old WADs with demos at versions 108 and 109. The decoding
      work similarly, it's probably enemy position/AI that mess up */
@@ -1543,33 +1591,63 @@ void G_DoPlayDemo (void)
   {
     // fprintf( stderr, "Demo is from a different game version!\n");
     /* CGDoom: in demo-only mode there is nothing else to show */
-    if (CGD_PlayDemoOnly)
-      I_Error ("Demo is from a different game version (%d)", version);
-    gameaction = ga_nothing;
+    G_RejectDemo ("from a different game version", version);
     return;
   }
 
   skill = *demo_p++;
   episode = *demo_p++;
   map = *demo_p++;
-  deathmatch = *demo_p++;
-  respawnparm = *demo_p++;
-  fastparm = *demo_p++;
-  nomonsters = *demo_p++;
-  consoleplayer = *demo_p++;
+  dm = *demo_p++;
+  respawn = *demo_p++;
+  fast = *demo_p++;
+  nomon = *demo_p++;
+  console = *demo_p++;
+  for (i=0 ; i<MAXPLAYERS ; i++)
+    ingame[i] = *demo_p++;
+
+  /* CGDoom: players: flags 0 or 1, consoleplayer (vanilla indexed
+     players[] with any byte) in the game, and player 0 (this engine runs,
+     renders and reads ticcmds for player 0 only; without a player in the
+     game, monsters looked for one forever) */
+  for (i=0 ; i<MAXPLAYERS ; i++)
+    if (ingame[i] > 1)
+      break;
+  if (i < MAXPLAYERS || console >= MAXPLAYERS || !ingame[console]
+    || !ingame[0])
+  {
+    G_RejectDemo ("damaged: bad players, console player", console);
+    return;
+  }
+
+  deathmatch = dm;
+  respawnparm = respawn;
+  fastparm = fast;
+  nomonsters = nomon;
+  consoleplayer = console;
 
   for (i=0 ; i<MAXPLAYERS ; i++)
-    playeringame[i] = *demo_p++;
+    playeringame[i] = ingame[i];
   if (playeringame[1])
   {
     netgame = true;
     netdemo = true;
   }
 
+  /* CGDoom: P_SpawnPlayer sets the bodies of the players in the game; the
+     others keep none, not one of the previous level */
+  for (i=0 ; i<MAXPLAYERS ; i++)
+    players[i].mo = NULL;
+
   // don't spend a lot of time in loadlevel
   precache = false;
   G_InitNew (skill, episode, map);
   precache = true;
+
+  /* CGDoom: a player whose start the map lacks would have no body */
+  for (i=0 ; i<MAXPLAYERS ; i++)
+    if (playeringame[i] && !players[i].mo)
+      I_Error ("Demo is damaged: no start for player %d", i+1);
 
   usergame = false;
   demoplayback = true;
