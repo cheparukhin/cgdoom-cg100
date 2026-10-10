@@ -22,6 +22,10 @@
 #                    CGD_DOOM1_WAD play in sync (per-tic game-state traces vs
 #                    tests/demosync/*.ckpt, checked against linuxdoom-1.10);
 #                    skipped when CGD_DOOM1_WAD is not set
+#   make test-map-limit  maps past MAP32 (a Doom II WAD with MAP33/34 made at test time, needs
+#                    python3): a start is limited to MAP32, and the HU title, par time and
+#                    intermission names cope with any gamemap (-forcemap); also part of
+#                    test-unit, and test-asan runs it as test-map-limit-asan (under ASan)
 #   make check-sh    compile every engine file with sh-elf-gcc (no link)
 #   make sim         build-sim/cgdoom-sim.elf (engine + src/engine/sh4 asm drawers + src/host for
 #                    sh-elf-run, src/sim/cgdoom.mk; CGSIM_SH4=0 for a C-only ELF)
@@ -160,6 +164,20 @@ test-names: $(HOST_BUILD)/names-test
 $(HOST_BUILD)/names-test: $(ROOT)/tests/names_test.c $(ROOT)/src/engine/cgdoom-names.c $(ROOT)/src/engine/cgdoom.h
 	@mkdir -p $(dir $@)
 	$(HOST_CC) -std=gnu11 -O1 -g $(HOST_WARN) $(HOST_INC) $(ASAN_FLAGS) $(filter %.c,$^) -o $@
+
+# Maps past MAP32 (tests/map-limit.sh)
+.PHONY: test-map-limit test-map-limit-asan
+test-unit: test-map-limit
+test-asan: test-map-limit-asan
+
+test-map-limit: host
+	@sh $(ROOT)/tests/map-limit.sh -bin $(HOST_BUILD)/cgdoom-host
+
+test-map-limit-asan: host-asan
+	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+	 sh $(ROOT)/tests/map-limit.sh -bin $(ASAN_BUILD)/cgdoom-host \
+	   -out $(ASAN_BUILD)/tests/maplimit
 
 #---
 # Engine portability check with the SH compiler (big-endian, 32-bit)

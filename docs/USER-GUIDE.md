@@ -132,7 +132,7 @@ On the episode and map rows you can also type a digit.
 | *Play Doom (shareware)* (one row per WAD) | Starts the game with that WAD. The row text depends on the file name (`doom1.wad`, `doomu.wad`, `doom2.wad` and others); unknown names read "Play other WAD". | — |
 | Skill | Difficulty for a direct start. It is used only when *Title screen* is *Skip*; otherwise the Doom menu asks. | Hurt me plenty |
 | Start at episode | 1–4. Changing it switches *Title screen* to *Skip* for this launch. | 1 |
-| Start at map | 1–99. Changing it switches *Title screen* to *Skip* for this launch. If the WAD has no such map, you return to the launcher with a message. | 1 |
+| Start at map | 1–32 (Doom: 1–9). Changing it switches *Title screen* to *Skip* for this launch. If the WAD has no such map, you return to the launcher with a message. A map past MAP32 in a WAD (for example the MAP33 of the BFG edition's `doom2.wad`) cannot be started. | 1 |
 | Title screen | **Skip**: start the game directly. **No demos**: show the title screen, then use the Doom menu. **Full**: the title screen also plays the WAD's demos (the shareware `doom1.wad` demos play exactly like vanilla; some Freedoom demos cannot, see [Known limitations](#known-limitations)). | No demos |
 | Record demo on slot | None or 0–9. Recording forces a direct start for this launch. If the slot already holds a demo for this WAD, CGDoom asks before it is overwritten. | None |
 | Replay demo... | Only shown when `.lmp` files exist. Lists the demos with the WAD each one belongs to, and plays one. | — |

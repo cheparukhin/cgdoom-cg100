@@ -565,6 +565,11 @@ typedef struct {
 
 enum { TS_SKIP, TS_NODEMOS, TS_FULL };
 
+/* The last start map. The engine is vanilla's: HUD titles, par times and
+   intermission names exist for the 32 Doom II maps only, and no exit leads
+   past MAP32 (G_InitNew limits a start to it as well). */
+#define LAUNCH_MAP_MAX 32
+
 /* Recording a demo implies a direct start (vanilla's -record sets
    autostart) and no title demos (gint review round 3.3). Before the first
    game G_Ticker would not record, and G_CheckDemoStatus() on a quit from
@@ -603,7 +608,7 @@ static void launcher(gfs_entry_t *wads, int wad_count, gfs_entry_t *demos,
 	out->wad = -1;
 	out->demo = -1;
 	if(out->episode < 1) out->episode = 1;
-	if(out->map < 1) out->map = 1;
+	out->map = clampi(out->map, 1, LAUNCH_MAP_MAX);
 	out->title_pref = CGD_Options.AutoStart ? TS_SKIP
 		: CGD_Options.EnableDemos ? TS_FULL : TS_NODEMOS;
 	out->title = (out->start_set || out->record_slot >= 0) ? TS_SKIP
@@ -680,8 +685,9 @@ static void launcher(gfs_entry_t *wads, int wad_count, gfs_entry_t *demos,
 		}
 		else if(f == i_skill && d)
 			g_opt.skill = (g_opt.skill + d + 5) % 5;
-		/* Episodes 1..4 (the engine has no more); maps up to 99 (PWADs
-		   past MAP32). run_game() checks the map is in the WAD. */
+		/* Episodes 1..4 and maps 1..LAUNCH_MAP_MAX (the engine has no
+		   more; a PWAD's MAP33 and up cannot be played). run_game() checks
+		   the map is in the WAD. */
 		else if(f == i_ep && (d || digit > 0)) {
 			out->episode = clampi(digit > 0 ? digit : out->episode + d,
 				1, 4);
@@ -689,7 +695,8 @@ static void launcher(gfs_entry_t *wads, int wad_count, gfs_entry_t *demos,
 			out->start_set = true;
 		}
 		else if(f == i_map && (d || digit > 0)) {
-			out->map = digit > 0 ? digit : clampi(out->map + d, 1, 99);
+			out->map = clampi(digit > 0 ? digit : out->map + d, 1,
+				LAUNCH_MAP_MAX);
 			out->title = TS_SKIP;
 			out->start_set = true;
 		}

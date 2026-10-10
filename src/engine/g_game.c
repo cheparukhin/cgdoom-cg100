@@ -882,13 +882,17 @@ void G_DoCompleted (void)
   wminfo.maxsecret = totalsecret; 
   wminfo.maxfrags = 0; 
 
+  /* CGDoom: par 0 (shown as 0:00) for a map past the par tables instead of
+     a read out of bounds; G_InitNew limits the map, this keeps the lookup
+     safe whatever sets gamemap */
   if ( gamemode == commercial )
-    wminfo.partime = 35*cpars[gamemap-1]; 
+    wminfo.partime = (gamemap >= 1 && gamemap <= 32) ? 35*cpars[gamemap-1] : 0;
   else if ( gameepisode < 4 )
-    wminfo.partime = 35*pars[gameepisode][gamemap]; 
+    wminfo.partime = (gameepisode >= 1 && gamemap >= 0 && gamemap <= 9) ?
+      35*pars[gameepisode][gamemap] : 0;
   else
     /* CGDoom: vanilla reads past pars[] into cpars[] for episode 4 */
-    wminfo.partime = 35*cpars[gamemap];
+    wminfo.partime = (gamemap >= 0 && gamemap < 32) ? 35*cpars[gamemap] : 0;
   wminfo.pnum = consoleplayer; 
 
   /*for (i=0 ; i<MAXPLAYERS ; i++) 
@@ -1226,6 +1230,13 @@ void G_InitNew ( skill_t skill, int episode, int map )
 
   if ( (map > 9) && ( gamemode != commercial) )
     map = 9; 
+
+  /* CGDoom: like vanilla, the engine knows the 32 Doom II maps (HUD titles,
+     par times, intermission names, and a level exit never leads past MAP32).
+     A MAP33 in the WAD (the BFG/Unity doom2.wad has one) is not played: the
+     map is limited as above, for a launcher or -warp start, a save or a demo */
+  if ( (map > 32) && ( gamemode == commercial) )
+    map = 32;
 
   M_ClearRandom (); 
 

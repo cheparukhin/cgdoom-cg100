@@ -124,7 +124,11 @@ tests/golden/CHANGES.md has no new entry.
 
 - **Fix.**
   - The launcher caps the episode at 1..4 (the engine has no more).
-    Maps still go up to 99, because PWADs can go past MAP32.
+    Maps went up to 99, because PWADs can go past MAP32. That was
+    wrong: the engine has HUD titles, par times and intermission names
+    for MAP01-MAP32 only (MAP33 of the BFG doom2.wad read past
+    `mapnames2[]`), so the cap is now 32 (see `notes/engine-changes.md`,
+    "Maps past MAP32").
   - On a direct start, after `PL_WadOpen`, `run_game` asks the new
     wad.c `gwad_has_lump()` (a case-insensitive directory scan through
     `PL_WadRead`, in 128-entry chunks) for the lump the engine will
