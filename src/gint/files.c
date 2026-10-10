@@ -13,7 +13,9 @@
    - Files we create must have strict 8.3 names (the fx-CG100 Memory app
      truncates longer names).
    - Overwriting a file of the same size is done in place (fast path, gpSP);
-     otherwise remove + create(final size) + write.
+     otherwise remove + create(final size) + write, with the previous
+     version kept in RAM and written back if the new one does not fit, so
+     that a failed replacement keeps the old file (os_flush()).
    - Small files read with PL_FileSize()/PL_FileRead() are cached so that
      the size + read pair costs one world switch. */
 
@@ -31,6 +33,13 @@ char const *gfs_settings_name = NULL;
 #define GFS_MAX_PENDING   16
 #define GFS_CACHE_MAX     (16 << 10)
 #define GFS_WRITE_CHUNK   (32 << 10)
+/* Largest previous version that os_flush() keeps in RAM while it replaces
+   a file with one of another size. Every file CGDoom writes is smaller: a
+   savegame is at most 176 KiB (the engine's SAVEGAMESIZE, 0x2c000), a demo
+   at most 128 KiB (DEMO_MAXSIZE), and CGDOOM.CFG is about 2 KiB. A larger
+   file under one of these names was not written by CGDoom. It is replaced
+   without a backup, as before, and is not read into RAM. */
+#define GFS_BACKUP_MAX    (256 << 10)
 
 //---
 // Helpers
@@ -245,11 +254,18 @@ typedef struct {
 	bool owned;            /* data is our malloc'd copy */
 	bool del;
 	int result;
+	/* Set by os_flush(): */
+	bool kept;             /* failed write, but the previous version of the
+	                          file is still in storage */
+	bool no_backup;        /* an existing file was replaced without a RAM
+	                          backup (a failure lost it) */
 } pending_t;
 
 static pending_t g_pend[GFS_MAX_PENDING];
 static int g_npend = 0;
 static int g_flush_failures = 0;
+/* How many of g_flush_failures kept the previous version of their file */
+static int g_flush_kept = 0;
 static char g_fail_name[GFS_NAME_MAX];
 static int g_fail_result = 0;
 
@@ -283,6 +299,11 @@ int gfs_flush_failures(void)
 	return g_flush_failures;
 }
 
+int gfs_flush_kept(void)
+{
+	return g_flush_kept;
+}
+
 /* "savegame ", "demo ", ... for a file name (by extension) */
 static char const *file_kind(char const *name)
 {
@@ -306,7 +327,9 @@ bool gfs_failure_text(char *text, size_t size, int flush_result)
 	   (CGD_FlushDelayedWrites) drop the result. A negative or uncounted
 	   flush result (map live, unsupported OS) gets the generic text.
 	   Final review: the text says that the file is lost (the game is
-	   over when it is shown) and what to do. */
+	   over when it is shown) and what to do. A failed replacement puts
+	   the previous version back (os_flush()); the text then says that
+	   it was kept instead of calling the file lost. */
 	if(flush_result == 0 && g_flush_failures == 0)
 		return false;
 	if(g_flush_failures > 0 && g_fail_name[0]) {
@@ -320,17 +343,33 @@ bool gfs_failure_text(char *text, size_t size, int flush_result)
 			snprintf(reason, sizeof reason, "error %d, storage full?",
 				g_fail_result);
 		bool more = g_flush_failures > 1;
-		snprintf(text, size, "NOT SAVED: %s%s%s (%s). %s lost. %s",
+		/* What is left in storage. With a single failure, the kept
+		   count is the named file's. */
+		char fate[72];
+		if(g_flush_kept <= 0)
+			snprintf(fate, sizeof fate, "%s",
+				more ? "They are lost." : "It is lost.");
+		else if(g_flush_kept >= g_flush_failures)
+			snprintf(fate, sizeof fate, "%s", more
+				? "Their previous versions were kept."
+				: "The previous version was kept.");
+		else
+			snprintf(fate, sizeof fate, "%d of them kept their "
+				"previous version, the others are lost.",
+				g_flush_kept);
+		snprintf(text, size, "NOT SAVED: %s%s%s (%s). %s %s",
 			file_kind(g_fail_name), g_fail_name,
-			more ? " and other files" : "", reason,
-			more ? "They are" : "It is", nomem
+			more ? " and other files" : "", reason, fate, nomem
 			? "Set DelaySaves=1 in CGDOOM.CFG."
 			: "Free some storage space before playing again.");
 	}
-	else
-		snprintf(text, size, "Some files were NOT saved (storage full?) "
-			"and are lost. Free some storage space before playing "
-			"again.");
+	else {
+		/* No failure was counted: gfs_flush() refused to write at all
+		   (WAD map live, or no file access on this OS), so nothing in
+		   storage was touched */
+		snprintf(text, size, "Some files were NOT saved and are lost. "
+			"The files already in storage were not changed.");
+	}
 	return true;
 }
 
@@ -366,6 +405,8 @@ static pending_t *pending_slot(char const *name)
 		strcpy(p->name, name);
 	}
 	p->result = 0;
+	p->kept = false;
+	p->no_backup = false;
 	return p;
 }
 
@@ -391,6 +432,84 @@ static int write_all(int fd, uint8_t const *data, int size)
 	return 0;
 }
 
+/* The previous version of a file that os_flush() is replacing */
+typedef struct {
+	uint8_t *data;     /* heap copy; NULL when size <= 0 */
+	int size;          /* -1: no backup */
+} backup_t;
+
+/* Read the whole file (size bytes, as measured just before) into a new
+   heap buffer, inside os_flush()'s world switch. Only the size is known
+   there, so the buffer is allocated there too. That is safe: kmalloc is
+   plain code over RAM arenas, and os_flush() already uses heap memory (the
+   pending copies, the scratch area) in this world. The arenas make no OS
+   call on the fx-CG100, where "_os" refuses everything (no_osheap.c). On
+   the fx-CG50 the OS heap syscalls are valid in either world. malloc()
+   returns P1 memory, as for the read cache. */
+static backup_t backup_take(uint16_t const *path, int size)
+{
+	backup_t b = { NULL, -1 };
+	if(size < 0 || size > GFS_BACKUP_MAX)
+		return b;
+	if(size == 0) {
+		b.size = 0;
+		return b;
+	}
+	uint8_t *data = malloc(size);
+	if(!data)
+		return b;
+	int fd = g_os.open(path, BFile_ReadOnly, 0);
+	if(fd >= 0) {
+		int rc = g_os.read(fd, data, size, 0);
+		g_os.close(fd);
+		/* Only Fugue's "bytes read" counts. gfs_read_ok() also takes 0,
+		   the CASIOWIN "bytes remaining" result for a whole-file read,
+		   but 0 can also mean that nothing was read. Writing back a
+		   buffer that was never filled would turn a lost file into a
+		   corrupt one; without a backup the replacement works as
+		   before. */
+		if(rc == size) {
+			b.data = data;
+			b.size = size;
+			return b;
+		}
+	}
+	free(data);
+	return b;
+}
+
+/* Create the file again at its old size, in the space the remove freed,
+   and write the backup into it. Leaves nothing behind if that fails. */
+static bool backup_restore(uint16_t const *path, backup_t const *b)
+{
+	if(b->size < 0)
+		return false;
+	int size = b->size;
+	if(g_os.create(path, BFile_File, &size) < 0)
+		return false;
+	int rc = 0;
+	if(b->size > 0) {
+		int fd = g_os.open(path, BFile_WriteOnly, 0);
+		rc = (fd < 0) ? fd : write_all(fd, b->data, b->size);
+		if(fd >= 0)
+			g_os.close(fd);
+	}
+	if(rc < 0) {
+		g_os.remove(path);
+		return false;
+	}
+	return true;
+}
+
+static bool file_exists(uint16_t const *path)
+{
+	int fd = g_os.open(path, BFile_ReadOnly, 0);
+	if(fd < 0)
+		return false;
+	g_os.close(fd);
+	return true;
+}
+
 static int os_flush(void *arg)
 {
 	flush_ctx_t *c = arg;
@@ -398,6 +517,8 @@ static int os_flush(void *arg)
 
 	for(int i = 0; i < c->count; i++) {
 		pending_t *op = &c->ops[i];
+		op->kept = false;
+		op->no_backup = false;
 		if(!gfs_make_path(path, sizeof c->s->path / 2, op->name)) {
 			op->result = -1;
 			continue;
@@ -418,6 +539,7 @@ static int os_flush(void *arg)
 		}
 
 		/* Fast path: overwrite a file of the same size in place */
+		bool intact = true;     /* the existing file is unchanged */
 		if(existing == op->size && op->size > 0) {
 			fd = g_os.open(path, BFile_WriteOnly, 0);
 			if(fd >= 0) {
@@ -427,35 +549,63 @@ static int os_flush(void *arg)
 					op->result = 0;
 					continue;
 				}
+				/* Partly overwritten: a mix of both versions,
+				   which must not be presented as the old one */
+				intact = false;
 			}
 		}
 
 		/* Remove, create with the final size, write. The old file has to
 		   go first: storage is nearly full with the full WAD installed,
 		   and a temporary copy (create + rename) would need room for both
-		   files exactly when space is short (gint review round 1). If
-		   create() fails now, the new data does not fit even in the old
-		   file's space; the failure is reported by name at exit. */
-		if(existing >= 0)
+		   files exactly when space is short (gint review round 1).
+		   So that a replacement that does not fit does not lose the old
+		   file too, the old file is first read into RAM. If create() or
+		   a write then fails, it is created again at its old size, in
+		   the space the remove has just freed, and written back. The
+		   failure is still reported by name at exit, with the note that
+		   the previous version was kept.
+		   Without a backup (file above GFS_BACKUP_MAX, no memory for
+		   it, a read error, or the in-place write above already changed
+		   the file) the replacement goes ahead anyway, as before this
+		   backup existed: saving keeps working when memory is short, but
+		   a failure then loses the old file. */
+		backup_t bk = { NULL, -1 };
+		if(existing >= 0) {
+			if(intact)
+				bk = backup_take(path, existing);
+			op->no_backup = (bk.size < 0);
 			g_os.remove(path);
+		}
 		int size = op->size;
 		int rc = g_os.create(path, BFile_File, &size);
-		if(rc < 0) {
-			op->result = rc;
-			continue;
-		}
-		fd = g_os.open(path, BFile_WriteOnly, 0);
-		rc = (fd < 0) ? fd
-			: (op->size > 0) ? write_all(fd, op->data, op->size) : 0;
-		if(fd >= 0)
-			g_os.close(fd);
-		if(rc < 0) {
-			/* Do not leave a full-size file of Fugue's preallocated
-			   contents (or a half-written one) behind: the next session
-			   would read it as a corrupt save or settings file */
-			g_os.remove(path);
+		bool created = (rc >= 0);
+		if(created) {
+			fd = g_os.open(path, BFile_WriteOnly, 0);
+			rc = (fd < 0) ? fd
+				: (op->size > 0) ? write_all(fd, op->data, op->size)
+				: 0;
+			if(fd >= 0)
+				g_os.close(fd);
+			if(rc < 0) {
+				/* Do not leave a full-size file of Fugue's
+				   preallocated contents (or a half-written one)
+				   behind: the next session would read it as a
+				   corrupt save or settings file */
+				g_os.remove(path);
+			}
 		}
 		op->result = (rc < 0) ? rc : 0;
+		if(rc < 0 && existing >= 0) {
+			/* create() fails while the file exists if remove()
+			   failed: the old file is then still there (unless the
+			   in-place write changed it); nothing to put back */
+			if(!created && file_exists(path))
+				op->kept = intact;
+			else
+				op->kept = backup_restore(path, &bk);
+		}
+		free(bk.data);
 	}
 	return 0;
 }
@@ -473,21 +623,27 @@ int gfs_flush(void)
 	flush_ctx_t ctx = { .ops = g_pend, .count = g_npend, .s = gfs_scratch() };
 	gfs_os_call(os_flush, &ctx);
 
-	int failures = 0;
+	int failures = 0, kept = 0;
 	for(int i = 0; i < g_npend; i++) {
-		if(g_pend[i].result < 0) {
+		pending_t *p = &g_pend[i];
+		if(p->result < 0) {
 			if(failures == 0) {
-				strcpy(g_fail_name, g_pend[i].name);
-				g_fail_result = g_pend[i].result;
+				strcpy(g_fail_name, p->name);
+				g_fail_result = p->result;
 			}
 			failures++;
-			PL_Log("gfs_flush: %s failed (%d)\n", g_pend[i].name,
-				g_pend[i].result);
+			kept += p->kept;
+			PL_Log("gfs_flush: %s failed (%d)%s\n", p->name, p->result,
+				p->kept ? ", previous version kept"
+				: p->no_backup ? ", no backup" : "");
 		}
-		pending_release(&g_pend[i]);
+		else if(p->no_backup)
+			PL_Log("gfs_flush: %s replaced without a backup\n", p->name);
+		pending_release(p);
 	}
 	g_npend = 0;
 	g_flush_failures += failures;
+	g_flush_kept += kept;
 	cache_invalidate(NULL);
 	return failures;
 }

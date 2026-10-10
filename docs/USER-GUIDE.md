@@ -325,6 +325,8 @@ shortened with a hash, for example `FRE0P` for `freedoom1.wad`.
   - When you quit, CGDoom shows "Writing N files... Do not turn off the calculator".
 - If a file cannot be written, for example because storage is full, the exit screen says **NOT SAVED** and
   names the file. Free some storage space before you play again.
+  - If the file was replacing an older one, for example when you save over a slot, CGDoom normally puts
+    the older one back. The screen then says that the previous version was kept.
 - A demo can be up to 128 KiB, which is about 15 minutes. Recording stops when the buffer is full, and the
   game goes on.
 - To replay a demo, use *Replay demo...*. If CGDoom cannot tell which WAD a demo belongs to, it asks (with
@@ -384,7 +386,7 @@ it with the Diagnostics pages.
 | "Not enough memory" / "Low memory" before a game (fx-CG50) | Follow what the dialog says: turn on experimental RAM, or reset the calculator. On OS 3.70+ the game cannot run. |
 | "Demo is from a different game version" | Delete that `.LMP` file or record it again. |
 | "W_GetNumForName: ... not found!" | The WAD is incomplete or not one CGDoom can play. Copy it again. |
-| "NOT SAVED" when leaving | Storage is full. Delete files to make room. The listed file is lost. |
+| "NOT SAVED" when leaving | Storage is full. Delete files to make room. The new version of the listed file is lost. The screen says whether its previous version was kept. |
 | The game is slow | See [Performance tips](#performance-tips). Check that the WAD is in RAM (Developer info). |
 | The game froze | Hold **SHIFT + 7 + 3 + AC/ON**. |
 | The calculator clock is late after playing | gint gives the OS back its clock at every file access and at exit. If the clock still drifts, please report it with your clock setting. |

@@ -326,6 +326,9 @@ extern int gfs_list_more;
 int gfs_flush(void);
 int gfs_pending_count(void);
 int gfs_flush_failures(void);
+/* How many of those failed writes left the previous version of their file
+   in storage (a replacement that does not fit puts it back) */
+int gfs_flush_kept(void);
 /* Text for the exit screen if any write failed during the session (or
    flush_result, the exit gfs_flush()'s result, is non-zero); false if
    there is nothing to report */

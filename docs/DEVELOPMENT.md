@@ -126,7 +126,7 @@ Rules:
 | `sys.c` | Model detection and a full 10-character OS-string check. Builds the BFile call table (gint API 2 for `02.00.0000`; experimental tables for `01.00.0000` / `02.10.0000`; syscalls on the fx-CG50) |
 | `memory.c` | Arena discovery for the mpm.bin variants (v1.1, Feb-2025, dynload, pre-Feb-2025). Removes the `_os` arena on the fx-CG100. fx-CG50 experimental RAM. `PL_GetZones` (malloc reserve: 768 KiB on the fx-CG100, 320 KiB on the fx-CG50) |
 | `wad.c` | `PL_Wad*`, three back-ends: **RAM image** (primary), **flash block map** (`Bfile_GetBlockAddress`, checked against the file at open), **BFile** reads (reference) |
-| `files.c` | World-switched BFile helpers (P1 bounce buffers), `PL_File*`, delayed writes flushed in one world switch at exit, failure reporting |
+| `files.c` | World-switched BFile helpers (P1 bounce buffers), `PL_File*`, delayed writes flushed in one world switch at exit (a replacement that does not fit puts the old file back from RAM), failure reporting |
 | `video.c` | Three presenters: async DMA from an SDRAM RGB565 frame (default), DMA strips through the X/Y on-chip banks, CPU writes. The 320x200 frame is centered in the 396x224 panel |
 | `input.c`, `keymaps.c` | Raw KEYSC reads only (never gint `getkey`). Launcher keys by physical position. fx-CG100 presets and key names. Rebind checks |
 | `time.c` | 35 Hz TMU tic. Microseconds from gint's profiler TMU. The quit chord and key activity sampled in the tic interrupt |
@@ -290,7 +290,7 @@ There is no hardware, so correctness rests on three things:
 | `make check-sh` | Every engine file compiles with sh-elf-gcc |
 | `make test-demosync` | Optional. DEMO1-3 of the shareware DOOM v1.9 `doom1.wad` named by `CGD_DOOM1_WAD` must play in sync: the per-tic game-state traces are compared with `tests/demosync/*.ckpt`, which were checked tic by tic against linuxdoom-1.10. Skipped when the variable is not set. `make test-demosync-sim` runs it in the simulator. |
 | `make -C src/engine/sh4/test run` | Asm vs the C reference: randomized and bit-exact, with stray-write, stack-canary and calling-convention checks; `asmcheck` |
-| `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: expand, files (delayed writes, RAM image, packed images, refusal counting), hints, input, keymaps, memory (arena discovery, experimental RAM), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
+| `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (arena discovery, experimental RAM), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
 | `make test-sim-full` | All 36 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
@@ -360,6 +360,7 @@ from frame 42 to the end, with view size 10 and full detail. They exclude the ho
 | Renderer limits raised, arrays on the heap | Complex views overflowed vanilla limits; static RAM is the scarcest budget | design §8, step 2 |
 | Copy the WAD to RAM (minus sounds), with the block map as fallback | NOR line fills are much slower than SDRAM, and the overclock does not speed them up | critique §C1, `wad.c` |
 | All storage writes deferred to exit; `PL_WadClose` first | A write moves flash records and invalidates the block map | critique §B2, `cgdoom.h` |
+| A file of another size is replaced by remove + create + write. The old file is kept in RAM and written back if the new one does not fit | create + rename would need room for both copies when storage is nearly full, and `BFile_Rename` would be one more OS entry point never tested on hardware. Without memory for the backup, the replacement still goes ahead, so a failure then loses the old file | `files.c` (`os_flush`) |
 | Block map checked against the file at open | A wrong pointer would make the game read garbage; on a mismatch, CGDoom uses BFile reads instead | final review §16 |
 | Full OS-string check before any OS call | gint matches only `02.00`, which wrongly accepts 02.00.0010; 02.10 would reach the dead fx-CG50 gate | critique §B6, `sys.c` |
 | Arena discovery per mpm.bin build; `_os` removed | The builds give 2 to 5.5 MiB in different places; out-of-memory must return NULL, not call the OS | critique §B3, `memory.c` |

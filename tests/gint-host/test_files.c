@@ -5,7 +5,11 @@
    first failure is reported by name (gfs_last_failure).
    gint review round 2: files.c is #included with malloc interposed, to
    drive PL_FileWrite()'s no-memory path; every failure of the session is
-   reported at exit (gfs_failure_text), not only the exit flush's. */
+   reported at exit (gfs_failure_text), not only the exit flush's.
+   A replacement with a file of another size that fails (storage full, write
+   error) puts the previous version back from a RAM backup, and the exit
+   text says so (test_replace_rollback, test_flush_mixed); the simulated
+   storage has a capacity for that. */
 #include "cgd_gint.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,10 +17,16 @@
 #include <ctype.h>
 #include <stdarg.h>
 
-/* malloc() of files.c fails above this size (-1: never) */
+/* malloc() of files.c fails above this size (-1: never); every call is
+   counted, with the largest size asked for */
 static int g_malloc_fail_over = -1;
+static int g_malloc_calls = 0;
+static size_t g_malloc_largest = 0;
 static void *t_malloc(size_t n)
 {
+	g_malloc_calls++;
+	if(n > g_malloc_largest)
+		g_malloc_largest = n;
 	if(g_malloc_fail_over >= 0 && n > (size_t)g_malloc_fail_over)
 		return NULL;
 	return malloc(n);
@@ -49,9 +59,17 @@ static sfile_t fs[32];
 typedef struct { int file; int pos; bool open; int mode; } sfd_t;
 static sfd_t fds[16];
 static int os_calls;
-/* Failure injection: create() fails / write() fails after n successes */
+/* Failure injection: create() fails; write() fails after n successes
+   (fail_write_after), fail_write_count times (-1: from then on); remove()
+   fails and leaves the file */
 static int fail_create = 0;
 static int fail_write_after = -1;
+static int fail_write_count = -1;
+static int fail_remove = 0;
+/* Storage capacity in bytes (-1: unlimited): create() and writes that grow
+   a file fail with -4 once the files would not fit */
+static int fs_capacity = -1;
+static int fs_used(void);
 
 static void path_to_name(uint16_t const *p, char *out)
 {
@@ -89,9 +107,15 @@ static int s_write(int fd, void const *buf, int size)
 	os_calls++;
 	sfd_t *d = &fds[fd-3]; sfile_t *f = &fs[d->file];
 	if(!(d->mode & BFile_WriteOnly)) return -8;
-	if(fail_write_after == 0) return -5;
+	if(fail_write_after == 0) {
+		if(fail_write_count > 0 && --fail_write_count == 0) fail_write_after = -1;
+		return -5;
+	}
 	if(fail_write_after > 0) fail_write_after--;
-	if(d->pos + size > f->size) { f->data = realloc(f->data, d->pos + size); f->size = d->pos + size; }
+	if(d->pos + size > f->size) {
+		if(fs_capacity >= 0 && fs_used() + d->pos + size - f->size > fs_capacity) return -4;
+		f->data = realloc(f->data, d->pos + size); f->size = d->pos + size;
+	}
 	memcpy(f->data + d->pos, buf, size); d->pos += size;
 	return size;
 }
@@ -101,6 +125,7 @@ static int s_create(uint16_t const *path, int type, int *size)
 	if(fail_create) return -4;   /* BFile_DeviceFull-like */
 	char n[64]; path_to_name(path, n);
 	if(find_file(n) >= 0) return -13;
+	if(fs_capacity >= 0 && fs_used() + *size > fs_capacity) return -4;
 	for(int i = 0; i < 32; i++) if(!fs[i].used) {
 		fs[i].used = true; strcpy(fs[i].name, n); fs[i].size = *size;
 		fs[i].data = malloc(*size + 1); memset(fs[i].data, 0xff, *size); return 0; }
@@ -111,7 +136,14 @@ static int s_remove(uint16_t const *path)
 	os_calls++;
 	char n[64]; path_to_name(path, n);
 	int f = find_file(n); if(f < 0) return BFile_EntryNotFound;
+	if(fail_remove) return -7;
 	free(fs[f].data); fs[f].used = false; return 0;
+}
+static int fs_used(void)
+{
+	int u = 0;
+	for(int i = 0; i < 32; i++) if(fs[i].used) u += fs[i].size;
+	return u;
 }
 static char pat_ext[8]; static int pat_pos;
 static int next_match(uint16_t *found, struct BFile_FileInfo *info)
@@ -281,7 +313,30 @@ static void test_files(void)
 	printf("list: %d wad, %d lmp (%s)\n", nw, nd, nd ? d[0].name : "");
 }
 
-/* gint review round 1: os_flush() failure paths */
+static void rm_file(char const *name)
+{
+	int f = find_file(name);
+	if(f >= 0) { free(fs[f].data); fs[f].used = false; }
+}
+static bool file_is(char const *name, void const *data, int size)
+{
+	int f = find_file(name);
+	return f >= 0 && fs[f].size == size && !memcmp(fs[f].data, data, size);
+}
+/* Forget the failures of the session (files.c is #included), so that a test
+   can check the exact exit text */
+static void reset_failures(void)
+{
+	g_flush_failures = 0;
+	g_flush_kept = 0;
+	g_fail_name[0] = 0;
+	g_fail_result = 0;
+}
+
+/* gint review round 1: os_flush() failure paths. A replacement that does
+   not fit puts the previous version back (test_replace_rollback); these are
+   the failures where that cannot work either, and nothing may be left
+   behind. */
 static void test_flush_failures(void)
 {
 	char old[64], neu[200], name[GFS_NAME_MAX];
@@ -289,8 +344,9 @@ static void test_flush_failures(void)
 	memset(old, 1, sizeof old);
 	memset(neu, 2, sizeof neu);
 
-	/* An existing save of another size, then a write that fails after
-	   create(): no full-size 0xFF file may stay behind */
+	/* An existing save of another size, then every write fails, the new
+	   file's and the restored old one's alike: no full-size 0xFF file
+	   may stay behind, and nothing is reported as kept */
 	PL_FileWrite("FREE0_1.DSG", old, sizeof old);
 	CHECK(gfs_flush() == 0, "seed save");
 	CHECK(!gfs_last_failure(name, &rc), "no failure yet");
@@ -299,11 +355,12 @@ static void test_flush_failures(void)
 	int f = gfs_flush();
 	fail_write_after = -1;
 	CHECK(f == 1, "write failure counted (%d)", f);
-	CHECK(find_file("FREE0_1.DSG") < 0, "partial file removed after a failed write");
+	CHECK(find_file("FREE0_1.DSG") < 0, "no partial file after failed writes");
+	CHECK(gfs_flush_kept() == 0, "nothing kept when the restore fails too");
 	CHECK(gfs_last_failure(name, &rc) && !strcmp(name, "FREE0_1.DSG") && rc == -5,
 		"last failure %s %d", name, rc);
 
-	/* Multi-chunk write failing in the second chunk (> 32 KiB) */
+	/* Multi-chunk write of a new file failing in the second chunk */
 	static char big[40 << 10];
 	memset(big, 3, sizeof big);
 	fail_write_after = 1;
@@ -312,7 +369,8 @@ static void test_flush_failures(void)
 	fail_write_after = -1;
 	CHECK(f == 1 && find_file("BIG.DAT") < 0, "half-written file removed (%d)", f);
 
-	/* create() failing (storage full): reported by name, nothing left */
+	/* create() failing every time (not for lack of space): the old file
+	   cannot be created again either. Reported by name, nothing left */
 	PL_FileWrite("CGDOOM.CFG", old, 10);
 	CHECK(gfs_flush() == 0, "cfg seed");
 	fail_create = 1;
@@ -320,6 +378,7 @@ static void test_flush_failures(void)
 	f = gfs_flush();
 	fail_create = 0;
 	CHECK(f == 1, "create failure counted (%d)", f);
+	CHECK(find_file("CGDOOM.CFG") < 0 && gfs_flush_kept() == 0, "create failure: nothing left");
 	CHECK(gfs_last_failure(name, &rc) && !strcmp(name, "CGDOOM.CFG") && rc == -4,
 		"create failure name %s %d", name, rc);
 
@@ -332,21 +391,234 @@ static void test_flush_failures(void)
 	printf("flush failure paths: %d failures so far\n", gfs_flush_failures());
 }
 
+/* A replacement with a file of another size (remove, create, write) keeps
+   the previous version in RAM and writes it back when the new one does not
+   fit; before, both versions were lost */
+static void test_replace_rollback(void)
+{
+	static uint8_t old[64], neu[5000], big[40 << 10], small[24], same[64];
+	static uint8_t huge[GFS_BACKUP_MAX + 4096];
+	char name[GFS_NAME_MAX], text[256];
+	int rc = 0;
+	for(int i = 0; i < (int)sizeof old; i++) old[i] = (uint8_t)(i * 7 + 1);
+	memset(neu, 2, sizeof neu);
+	memset(big, 3, sizeof big);
+	memset(small, 4, sizeof small);
+	memset(same, 0x5a, sizeof same);
+	memset(huge, 5, sizeof huge);
+	reset_failures();
+
+	/* Growing: storage only has room for the new file once the old one
+	   is gone (a temporary copy + rename would not fit) */
+	PL_FileWrite("ROLL0_1.DSG", old, sizeof old);
+	CHECK(gfs_flush() == 0 && file_is("ROLL0_1.DSG", old, sizeof old), "rollback: seed");
+	fs_capacity = fs_used() + (int)sizeof neu - (int)sizeof old;
+	PL_FileWrite("ROLL0_1.DSG", neu, sizeof neu);
+	int f = gfs_flush();
+	fs_capacity = -1;
+	CHECK(f == 0 && file_is("ROLL0_1.DSG", neu, sizeof neu), "rollback: tight replacement written (%d)", f);
+	/* Shrinking */
+	PL_FileWrite("ROLL0_1.DSG", old, sizeof old);
+	CHECK(gfs_flush() == 0 && file_is("ROLL0_1.DSG", old, sizeof old), "rollback: shrinking replacement");
+	CHECK(gfs_flush_failures() == 0, "rollback: no failure so far");
+
+	/* create() fails: the new file does not fit even in the old one's
+	   space. The old one is created again and written back */
+	fs_capacity = fs_used() + 1000;
+	PL_FileWrite("ROLL0_1.DSG", neu, sizeof neu);
+	f = gfs_flush();
+	fs_capacity = -1;
+	CHECK(f == 1, "rollback: create failure counted (%d)", f);
+	CHECK(file_is("ROLL0_1.DSG", old, sizeof old), "rollback: previous version restored after create()");
+	CHECK(gfs_flush_kept() == 1, "rollback: kept counted (%d)", gfs_flush_kept());
+	CHECK(gfs_last_failure(name, &rc) && !strcmp(name, "ROLL0_1.DSG") && rc == -4,
+		"rollback: failure %s %d", name, rc);
+	CHECK(gfs_failure_text(text, sizeof text, f) && !strcmp(text, "NOT SAVED: savegame "
+		"ROLL0_1.DSG (error -4, storage full?). The previous version was kept. Free some "
+		"storage space before playing again."), "rollback: text: %s", text);
+	printf("rollback: %s\n", text);
+	CHECK(PL_FileSize("ROLL0_1.DSG") == (int)sizeof old, "rollback: size read back");
+
+	/* write() fails once, in the second 32 KiB chunk: partial file
+	   removed, previous version restored */
+	reset_failures();
+	fail_write_after = 1;
+	fail_write_count = 1;
+	PL_FileWrite("ROLL0_1.DSG", big, sizeof big);
+	f = gfs_flush();
+	fail_write_after = -1;
+	fail_write_count = -1;
+	CHECK(f == 1, "rollback: write failure counted (%d)", f);
+	CHECK(file_is("ROLL0_1.DSG", old, sizeof old), "rollback: previous version restored after write()");
+	CHECK(gfs_flush_kept() == 1 && gfs_last_failure(name, &rc) && rc == -5,
+		"rollback: write failure kept %d rc %d", gfs_flush_kept(), rc);
+	CHECK(gfs_failure_text(text, sizeof text, f) && strstr(text, "previous version was kept")
+		&& !strstr(text, "lost"), "rollback: write failure text: %s", text);
+
+	/* remove() fails: create() finds the old file still there, unchanged,
+	   and reported as kept */
+	reset_failures();
+	fail_remove = 1;
+	PL_FileWrite("ROLL0_1.DSG", neu, sizeof neu);
+	f = gfs_flush();
+	fail_remove = 0;
+	CHECK(f == 1 && file_is("ROLL0_1.DSG", old, sizeof old) && gfs_flush_kept() == 1,
+		"rollback: remove failure (%d, kept %d)", f, gfs_flush_kept());
+
+	/* No memory for the backup: the replacement goes ahead without one,
+	   so saving still works when memory is short... */
+	reset_failures();
+	PL_FileWrite("ROLL0_1.DSG", small, sizeof small);
+	g_malloc_fail_over = 32;           /* the 64-byte backup fails */
+	f = gfs_flush();
+	g_malloc_fail_over = -1;
+	CHECK(f == 0 && file_is("ROLL0_1.DSG", small, sizeof small), "no backup: replacement written");
+	/* ...but a failure then loses the old file (known limitation) */
+	PL_FileWrite("ROLL0_1.DSG", neu, sizeof neu);
+	fs_capacity = fs_used() + 1000;
+	g_malloc_fail_over = 16;           /* the 24-byte backup fails */
+	f = gfs_flush();
+	g_malloc_fail_over = -1;
+	fs_capacity = -1;
+	CHECK(f == 1 && find_file("ROLL0_1.DSG") < 0 && gfs_flush_kept() == 0,
+		"no backup: old file lost (%d)", f);
+	CHECK(gfs_failure_text(text, sizeof text, f) && !strcmp(text, "NOT SAVED: savegame "
+		"ROLL0_1.DSG (error -4, storage full?). It is lost. Free some storage space "
+		"before playing again."), "no backup: text: %s", text);
+
+	/* An old file above GFS_BACKUP_MAX is not read into RAM */
+	add_file("HUGE.DAT", huge, sizeof huge);
+	PL_FileWrite("HUGE.DAT", small, sizeof small);
+	g_malloc_largest = 0;
+	f = gfs_flush();
+	CHECK(f == 0 && file_is("HUGE.DAT", small, sizeof small) && g_malloc_largest < sizeof huge,
+		"huge old file replaced without a backup (largest malloc %zu)", g_malloc_largest);
+	rm_file("HUGE.DAT");
+
+	/* Same size: in place as before (open, size, close, open, write,
+	   close), no backup */
+	PL_FileWrite("ROLL0_1.DSG", old, sizeof old);
+	CHECK(gfs_flush() == 0, "same size: seed");
+	PL_FileWrite("ROLL0_1.DSG", same, sizeof same);
+	int calls = os_calls, mallocs = g_malloc_calls;
+	f = gfs_flush();
+	CHECK(f == 0 && file_is("ROLL0_1.DSG", same, sizeof same) && os_calls - calls == 6
+		&& g_malloc_calls == mallocs, "same size in place (%d os calls, %d mallocs)",
+		os_calls - calls, g_malloc_calls - mallocs);
+
+	/* Same size, but the in-place write fails half-way: the file is a mix
+	   of both versions by then and is not restored as the old one. A
+	   replacement that works (one-off error) writes the new file; one
+	   that fails too leaves nothing */
+	static uint8_t big2[40 << 10];
+	memset(big2, 6, sizeof big2);
+	PL_FileWrite("ROLL0_2.DSG", big, sizeof big);
+	CHECK(gfs_flush() == 0, "in-place failure: seed");
+	fail_write_after = 1;
+	fail_write_count = 1;
+	PL_FileWrite("ROLL0_2.DSG", big2, sizeof big2);
+	f = gfs_flush();
+	fail_write_after = -1;
+	fail_write_count = -1;
+	CHECK(f == 0 && file_is("ROLL0_2.DSG", big2, sizeof big2), "in-place failure, then replaced (%d)", f);
+	reset_failures();
+	fail_write_after = 1;
+	PL_FileWrite("ROLL0_2.DSG", big, sizeof big);
+	f = gfs_flush();
+	fail_write_after = -1;
+	CHECK(f == 1 && find_file("ROLL0_2.DSG") < 0 && gfs_flush_kept() == 0,
+		"in-place failure, replacement fails: nothing left (%d)", f);
+
+	/* Deletes: one remove() each, a missing file is no failure */
+	PL_FileDelete("ROLL0_1.DSG");
+	PL_FileDelete("NONE0_1.DSG");
+	calls = os_calls;
+	f = gfs_flush();
+	CHECK(f == 0 && find_file("ROLL0_1.DSG") < 0 && os_calls - calls == 2,
+		"deletes (%d, %d os calls)", f, os_calls - calls);
+}
+
+/* Several files in one flush: a replacement that does not fit is rolled
+   back and a new file that does not fit is lost, while the others are
+   written and the delete is done */
+static void test_flush_mixed(void)
+{
+	static uint8_t a[100], b_old[64], b_new[5000], c[32], d_old[48], d_new[48], e[50000];
+	char name[GFS_NAME_MAX], text[256];
+	int rc = 0;
+	memset(a, 0xa1, sizeof a);
+	for(int i = 0; i < (int)sizeof b_old; i++) b_old[i] = (uint8_t)(255 - i);
+	memset(b_new, 0xb2, sizeof b_new);
+	memset(c, 0xc3, sizeof c);
+	memset(d_old, 0xd4, sizeof d_old);
+	memset(d_new, 0xd5, sizeof d_new);
+	memset(e, 0xe6, sizeof e);
+	add_file("MIXB.DSG", b_old, sizeof b_old);
+	add_file("MIXC.DSG", c, sizeof c);
+	add_file("MIXD.DSG", d_old, sizeof d_old);
+	reset_failures();
+
+	PL_FileWrite("MIXA.DSG", a, sizeof a);
+	PL_FileWrite("MIXB.DSG", b_new, sizeof b_new);
+	PL_FileDelete("MIXC.DSG");
+	PL_FileWrite("MIXD.DSG", d_new, sizeof d_new);
+	PL_FileWrite("MIXE.LMP", e, sizeof e);
+	CHECK(gfs_pending_count() == 5, "mixed: 5 pending");
+	fs_capacity = fs_used() + (int)sizeof a + 1000;
+	int f = gfs_flush();
+	fs_capacity = -1;
+	CHECK(f == 2, "mixed: 2 failures (%d)", f);
+	CHECK(file_is("MIXA.DSG", a, sizeof a), "mixed: new file written");
+	CHECK(file_is("MIXB.DSG", b_old, sizeof b_old), "mixed: replacement rolled back");
+	CHECK(find_file("MIXC.DSG") < 0, "mixed: deleted");
+	CHECK(file_is("MIXD.DSG", d_new, sizeof d_new), "mixed: same size written in place");
+	CHECK(find_file("MIXE.LMP") < 0, "mixed: new file that does not fit leaves nothing");
+	CHECK(gfs_flush_failures() == 2 && gfs_flush_kept() == 1, "mixed: counts %d %d",
+		gfs_flush_failures(), gfs_flush_kept());
+	CHECK(gfs_last_failure(name, &rc) && !strcmp(name, "MIXB.DSG") && rc == -4,
+		"mixed: first failure %s %d", name, rc);
+	CHECK(gfs_failure_text(text, sizeof text, f) && !strcmp(text, "NOT SAVED: savegame "
+		"MIXB.DSG and other files (error -4, storage full?). 1 of them kept their previous "
+		"version, the others are lost. Free some storage space before playing again."),
+		"mixed: text: %s", text);
+	printf("mixed: %s\n", text);
+
+	/* Two replacements that do not fit: both rolled back */
+	reset_failures();
+	PL_FileWrite("MIXB.DSG", b_new, sizeof b_new);
+	PL_FileWrite("MIXD.DSG", b_new, sizeof b_new);
+	fs_capacity = fs_used() + 1000;
+	f = gfs_flush();
+	fs_capacity = -1;
+	CHECK(f == 2 && file_is("MIXB.DSG", b_old, sizeof b_old)
+		&& file_is("MIXD.DSG", d_new, sizeof d_new) && gfs_flush_kept() == 2,
+		"mixed: both rolled back (%d, kept %d)", f, gfs_flush_kept());
+	CHECK(gfs_failure_text(text, sizeof text, f) && strstr(text, " and other files ")
+		&& strstr(text, "Their previous versions were kept.") && !strstr(text, "lost"),
+		"mixed: all kept text: %s", text);
+	printf("mixed: %s\n", text);
+	rm_file("MIXA.DSG");
+	rm_file("MIXB.DSG");
+	rm_file("MIXD.DSG");
+}
+
 /* Round 2: what exit_path() shows */
 static void test_failure_text_clean(void)
 {
-	char text[160];
+	char text[256];   /* as exit_path() */
 	CHECK(gfs_flush_failures() == 0, "no failure yet");
 	CHECK(!gfs_failure_text(text, sizeof text, 0), "nothing to report");
-	CHECK(gfs_failure_text(text, sizeof text, -1) && strstr(text, "Some files"),
-		"refused flush: generic text");
+	/* A refused flush wrote nothing: storage is unchanged */
+	CHECK(gfs_failure_text(text, sizeof text, -1) && !strcmp(text, "Some files were NOT "
+		"saved and are lost. The files already in storage were not changed."),
+		"refused flush: generic text: %s", text);
 }
 
 /* Round 2: PL_FileWrite()'s no-memory path writes at once; a failure there
    leaves nothing pending but must still be reported at exit */
 static void test_nomem(void)
 {
-	char name[GFS_NAME_MAX], text[160];
+	char name[GFS_NAME_MAX], text[256];
 	int rc = 0;
 	static char save[100 << 10];
 	memset(save, 4, sizeof save);
@@ -554,6 +826,8 @@ int main(int argc, char **argv)
 	test_failure_text_clean();
 	test_files();
 	test_flush_failures();
+	test_replace_rollback();
+	test_flush_mixed();
 	test_nomem();
 	test_demo_exit();
 	test_refusal_counted();
