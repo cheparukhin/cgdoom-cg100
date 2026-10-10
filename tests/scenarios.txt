@@ -1,0 +1,69 @@
+# Golden-frame scenarios for cgdoom-host / cgdoom-sim (one per line).
+#
+#   <name> [golden=<other>] <arguments...>
+#
+# $WADS expands to the Freedoom 0.13 directory (absolute path). Each run also
+# gets "-crc <out>/<name>.crc"; tests/golden/<name>.crc holds the reference.
+# A line with golden=<other> is a variant that must reproduce <other>'s CRCs
+# exactly (WAD copy path, small/multiple zones); it has no golden of its own.
+# Runner: tests/run-scenarios.sh (make golden / make test-host / make test-asan).
+
+# Doom (Freedoom phase 1)
+e1m1        -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore
+e1m2        -iwad $WADS/freedoom1.wad -warp 1 2 -tics 900 -input builtin:noclip
+e1m3        -iwad $WADS/freedoom1.wad -warp 1 3 -tics 900 -input builtin:walk -skill 3
+e2m2        -iwad $WADS/freedoom1.wad -warp 2 2 -tics 600 -input builtin:noclip
+e3m4        -iwad $WADS/freedoom1.wad -warp 3 4 -tics 600 -input builtin:explore -skill 5
+e1m1-exit   -iwad $WADS/freedoom1.wad -warp 1 1 -tics 800 -input builtin:explore -exitat 150
+e1m8-finale -iwad $WADS/freedoom1.wad -warp 1 8 -tics 1000 -exitat 60
+title       -iwad $WADS/freedoom1.wad -tics 1200
+demo1       -iwad $WADS/freedoom1.wad -playdemo DEMO1 -tics 2000
+# Beyond vanilla's renderer limits (step 2, design B10): up to 251 visplanes,
+# 547 drawsegs and 179 vissprites per frame (vanilla: 128/256/128; the old
+# engine stopped with "R_FindPlane: no more visplanes")
+e2m4-limits -iwad $WADS/freedoom1.wad -warp 2 4 -tics 700 -input builtin:noclip
+
+# Doom II (Freedoom phase 2)
+map01       -iwad $WADS/freedoom2.wad -warp 1 -tics 900 -input builtin:explore
+map07       -iwad $WADS/freedoom2.wad -warp 7 -tics 700 -input builtin:noclip
+map30-cast  -iwad $WADS/freedoom2.wad -warp 30 -tics 1200 -exitat 40
+demo2-1     -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000
+
+# Step 3 optional renderer modes and frame pacing (default output unchanged;
+# these have their own goldens, see tests/golden/CHANGES.md)
+#   -lowdetail: low detail (160 columns, Chocolate Doom drawers)
+#   -viewsize N: screenblocks; -flatfloors: potato floors
+#   builtin:options: menu Options > Detail, view size keys 10..7..11..9,
+#     automap and menu over reduced and full-screen views
+#   -autoframeskip N with -rendercost/-ticcost: automatic frameskip against a
+#     deterministic virtual clock (a slow renderer); game state is unchanged
+e1m1-low     -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -lowdetail
+e3m4-low     -iwad $WADS/freedoom1.wad -warp 3 4 -tics 600 -input builtin:explore -skill 5 -lowdetail
+demo1-low    -iwad $WADS/freedoom1.wad -playdemo DEMO1 -tics 2000 -lowdetail
+map07-low    -iwad $WADS/freedoom2.wad -warp 7 -tics 700 -input builtin:noclip -lowdetail
+e1m1-options -iwad $WADS/freedoom1.wad -warp 1 1 -tics 1200 -input builtin:options
+e1m1-view7   -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -viewsize 7
+map01-flat   -iwad $WADS/freedoom2.wad -warp 1 -tics 900 -input builtin:explore -flatfloors
+e2m2-lowflat -iwad $WADS/freedoom1.wad -warp 2 2 -tics 600 -input builtin:noclip -lowdetail -flatfloors -viewsize 9
+e1m1-auto    -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -autoframeskip 3 -rendercost 2.5
+demo2-1-auto -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000 -autoframeskip 2 -rendercost 1.6 -ticcost 0.2
+# auto frameskip across a level exit, the intermission and the next level's
+# wipe (demo2-1-auto lost its mid-run wipe when DEMO1 started to play in sync)
+e1m1x-auto   -iwad $WADS/freedoom1.wad -warp 1 1 -tics 800 -input builtin:explore -exitat 150 -autoframeskip 2 -rendercost 1.6 -ticcost 0.2
+
+# Variants that must match an existing golden
+e1m1-frag4k  golden=e1m1  -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -fragment 4096
+e1m2-frag512 golden=e1m2  -iwad $WADS/freedoom1.wad -warp 1 2 -tics 900 -input builtin:noclip -fragment 512
+map01-frag1k golden=map01 -iwad $WADS/freedoom2.wad -warp 1 -tics 900 -input builtin:explore -fragment 1024
+e1m3-zones   golden=e1m3  -iwad $WADS/freedoom1.wad -warp 1 3 -tics 900 -input builtin:walk -skill 3 -fragment 4096 -zone 768,768,1536
+e1m2-poison  golden=e1m2  -iwad $WADS/freedoom1.wad -warp 1 2 -tics 900 -input builtin:noclip -fragment 256 -poison 0xff
+map07-poison golden=map07 -iwad $WADS/freedoom2.wad -warp 7 -tics 700 -input builtin:noclip -fragment 4096 -poison 0x5a -zone 1024,1024,2048
+# -rlimits small: renderer arrays start tiny and grow (visplane blocks,
+# drawsegs/vissprites doubling, one-wall openings blocks); same frames
+e2m4-rsmall  golden=e2m4-limits -iwad $WADS/freedoom1.wad -warp 2 4 -tics 700 -input builtin:noclip -rlimits small -fragment 4096 -poison 0xa5
+map01-rsmall golden=map01 -iwad $WADS/freedoom2.wad -warp 1 -tics 900 -input builtin:explore -rlimits small
+# -slowwad (step 3): mapped lumps copied into the zone while it keeps a
+# reserve, level precaching, purge at level start; same frames
+e1m1-slow    golden=e1m1 -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -slowwad
+demo2-1-slow golden=demo2-1 -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000 -slowwad
+e1m1x-slowz  golden=e1m1-exit -iwad $WADS/freedoom1.wad -warp 1 1 -tics 800 -input builtin:explore -exitat 150 -slowwad -zone 2560 -poison 0x33

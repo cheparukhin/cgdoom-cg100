@@ -1,0 +1,17 @@
+# Demo recording ended by a played demo (tests/demo-unbegun.sh, case "endgame").
+# Host keymap: MENU = Doom menu, D-pad down = "back", EXE = enter.
+# Two seconds of play, then Options > End Game > EXE (confirm): the title
+# starts and plays the WAD's demos, which ends the recording.
+70
+1 fwd
+1 menu
+3
+1 back
+3
+1 enter
+3
+1 enter
+3
+1 enter
+# idle until -tics ends the run (the script restarts when it runs out)
+100000

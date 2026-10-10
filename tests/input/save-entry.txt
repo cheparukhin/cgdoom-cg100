@@ -1,0 +1,78 @@
+# Save-name entry (tests/save-entry.sh, make test-saveentry). Host keymap:
+# CGD_Keymap_ThumbsOnly (arrows = D-pad), MENU = Doom menu, EXE = enter.
+# Text entry (cgdoom-kbd.c): letters without ALPHA (X,O,T = A, log = B,
+# sin = D), digits with ALPHA, "." = space, DEL = backspace.
+20
+# Slot 0: pick an empty slot and save the pre-filled map name at once.
+# Use and Weapon 1 are pressed together with EXE: the presses after the one
+# that starts the text entry must not be typed (follow-ups review: with
+# Interact on EXE, "E1M1" became "E1M1 ")
+1 menu
+3
+1 back
+3
+1 back
+3
+1 back
+3
+1 enter
+3
+1 enter use w1
+3
+1 enter
+6
+# Slot 1: the main menu remembers Save Game. Erase the pre-filled name and
+# type "A1 B0" (5 DELs: MAP01) (ALPHA released before 1: no 'U'; ALPHA+0 in one tic)
+1 menu
+3
+1 enter
+3
+1 back
+3
+1 enter
+3
+1 del
+2
+1 del
+2
+1 del
+2
+1 del
+2
+1 del
+2
+1 k:XOT
+2
+1 k:ALPHA
+1 k:ALPHA k:1
+1 k:1
+2
+1 k:DOT
+2
+1 k:LOG
+2
+1 k:ALPHA k:0
+2
+1 enter
+6
+# Slot 2: type a letter, then MENU (escape): nothing is saved
+1 menu
+3
+1 enter
+3
+1 back
+3
+1 enter
+3
+1 k:SIN
+2
+1 menu
+6
+1 menu
+3
+1 back
+3
+1 back
+3
+1 k:EXIT
+100000

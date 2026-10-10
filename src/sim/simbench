@@ -1,0 +1,51 @@
+#!/bin/bash
+# simbench - exact per-iteration cost of a benchmark kernel on the SH simulator.
+#
+#   simbench [-b BASELINE] prog.elf <bench-name> [N1 [N2]]      (default N1=200, N2=1000)
+#
+# Runs "prog.elf <bench-name> N1" and "prog.elf <bench-name> N2" with simrun --stats and prints
+#     bench=<name> iters=<N2-N1> insts/iter=.. cycles/iter=..  (fixed overhead: insts=.. cycles=..)
+# The program must run the kernel N times, N given as argv[2] (see test/bench_example.c).
+# Start-up, libc init and exit cost the same in both runs and cancel out.
+#
+# -b BASELINE: also measure the benchmark called BASELINE (e.g. "empty": the bare loop + call) and
+# subtract it, so the result is the cost of the kernel alone.
+#
+# "cycles" is the simulator's crude model: 1 per instruction + 2 per taken branch/jump/rts. It is NOT a
+# model of SH4A dual issue, load latencies or caches; use it for relative comparisons only.
+# With sh-elf-run64, "insts" includes delay-slot instructions (the stock simulator does not count them).
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+base=""
+if [ "${1:-}" = "-b" ]; then base="$2"; shift 2; fi
+[ $# -ge 2 ] || { echo "usage: simbench [-b BASELINE] prog.elf bench-name [N1 [N2]]" >&2; exit 2; }
+elf="$1"; name="$2"; n1="${3:-200}"; n2="${4:-1000}"
+t1="$(mktemp "${TMPDIR:-/tmp}/simbench.XXXXXX")"; t2="$(mktemp "${TMPDIR:-/tmp}/simbench.XXXXXX")"
+trap 'rm -f "$t1" "$t2"' EXIT
+
+get() {   # get <file> <n> <name>
+	"$HERE/simrun" --stats --quiet --stats-file "$1" "$elf" "$3" "$2" >/dev/null || { echo "simbench: run failed ($3 $2)" >&2; exit 1; }
+}
+measure() {   # measure <name> -> "insts/iter cycles/iter fixed_insts fixed_cycles"
+	get "$t1" "$n1" "$1"; get "$t2" "$n2" "$1"
+	awk -v n1="$n1" -v n2="$n2" '
+		FNR == NR { split($0, kv, "="); a[kv[1]] = kv[2]; next }
+		{ split($0, kv, "="); b[kv[1]] = kv[2] }
+		END { d = n2 - n1
+			fi = (b["insts"] - a["insts"]) / d; fc = (b["cycles"] - a["cycles"]) / d
+			printf "%.4f %.4f %.0f %.0f\n", fi, fc, a["insts"] - fi * n1, a["cycles"] - fc * n1 }' "$t1" "$t2"
+}
+
+set -- $(measure "$name")
+[ $# -eq 4 ] || exit 1
+fi="$1"; fc="$2"; oi="$3"; oc="$4"
+label="bench=$name"
+if [ -n "$base" ]; then
+	set -- $(measure "$base")
+	[ $# -eq 4 ] || exit 1
+	fi=$(awk -v a="$fi" -v b="$1" 'BEGIN { printf "%.4f", a - b }')
+	fc=$(awk -v a="$fc" -v b="$2" 'BEGIN { printf "%.4f", a - b }')
+	label="bench=$name (minus $base)"
+fi
+awk -v l="$label" -v d="$((n2 - n1))" -v fi="$fi" -v fc="$fc" -v oi="$oi" -v oc="$oc" \
+	'BEGIN { printf "%s iters=%d insts/iter=%.2f cycles/iter=%.2f  (fixed overhead: insts=%d cycles=%d)\n", l, d, fi, fc, oi, oc }'

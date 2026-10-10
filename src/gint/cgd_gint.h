@@ -1,0 +1,696 @@
+/* CGDoom gint platform (fx-CG100 / Graph Math+ under MPM, and fx-CG50):
+   internal interfaces shared by the files of src/gint.
+
+   The public side of this platform is src/platform/platform.h (PL_*). This
+   header only declares what the gint files need from each other:
+
+     sys.c       model / OS detection, OS call table (BFile, block map)
+     tlb.c       UTLB snapshot, repair after world switches, TLB-miss handler
+     memory.c    arena discovery (3 mpm.bin variants), PL_GetZones
+     files.c     world-switched BFile helpers, PL_File*, delayed writes
+     wad.c       PL_Wad* (RAM image / 4 KiB block map / BFile)
+     video.c     PL_SetPalette / PL_FinishUpdate / PL_VideoReset
+     input.c     PL_ScanKeyboard, raw-scan UI keys
+     keymaps.c   fx-CG100 keymaps, key names, presets
+     time.c      PL_GetTics / PL_GetMicros / PL_WaitTics
+     clock.c     overclock levels
+     ui.c        launcher drawing helpers
+     diag.c      diagnostics screen and microbenchmarks
+     stack.S     run a function on a private stack
+     main.c      entry point, launcher, game start, exit path, PL_Fatal
+
+   Nothing here is visible to the engine. */
+
+#ifndef CGD_GINT_H
+#define CGD_GINT_H
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdarg.h>
+#include <gint/bfile.h>
+
+#include "platform.h"
+
+/* ---- Tunables -------------------------------------------------------------- */
+
+/* Heap left free for the engine's malloc() after the zones are carved out
+   (screens ~266 KB, lumpinfo, lumpcache, delayed-write copies...). */
+#ifndef CGD_MALLOC_RESERVE
+#define CGD_MALLOC_RESERVE        (768 << 10)
+#endif
+/* Same on the fx-CG50, where the whole heap is ~450 KiB (+ OS heap). */
+#ifndef CGD_MALLOC_RESERVE_CG50
+#define CGD_MALLOC_RESERVE_CG50   (320 << 10)
+#endif
+/* Smallest block worth turning into a zone. */
+#define CGD_MIN_ZONE              (32 << 10)
+/* The WAD is copied to RAM (the primary path) when the image fits in the
+   largest free block and at least this much heap remains afterwards for
+   the zone and malloc (host runs show ~1-1.7 MB zone peaks on 64-bit). */
+#ifndef CGD_MIN_GAME_ZONE
+#define CGD_MIN_GAME_ZONE         (1 << 20)
+#endif
+#ifndef CGD_WAD_RAM_MARGIN
+#define CGD_WAD_RAM_MARGIN        (CGD_MALLOC_RESERVE + CGD_MIN_GAME_ZONE)
+#endif
+/* Refuse to start (fx-CG100) with less heap than this in total. */
+/* fx-CG50: with a smaller zone estimate (experimental RAM + the heap past
+   the malloc reserve), doom1.wad cannot run (SH simulator, final review:
+   the title needs ~400 KiB of zone, E1M6 peaks at ~640 KiB) */
+#define CGD_CG50_MIN_GAME_ZONE    (700 << 10)
+#ifndef CGD_MIN_TOTAL_HEAP
+#define CGD_MIN_TOTAL_HEAP        (1536 << 10)
+#endif
+/* Private stack for the game (fx-CG100); 0 disables it. */
+#ifndef CGD_PRIVATE_STACK_SIZE
+#define CGD_PRIVATE_STACK_SIZE    (128 << 10)
+#endif
+
+/* Physical memory limits (fx-CG100 / CG50 SDRAM is 8 MiB at 0x0c000000) */
+#define CGD_RAM_P1_START          0x8c000000u
+#define CGD_RAM_LOW_LIMIT         0x8c200000u  /* OS owns below */
+#define CGD_RAM_OLD_MPM_LIMIT     0x8c700000u  /* Feb-2025/dynload mpm.bin */
+#define CGD_RAM_END               0x8c800000u  /* never touch (cold boot) */
+
+//---
+// sys.c: model and OS detection, OS call table
+//---
+
+typedef enum {
+	GOS_SYSCALL = 0,  /* fx-CG50 family: OS syscall gate at 0x80020070 */
+	GOS_CG100_200,    /* fx-CG100 "02.00.0000": the MPM firmware */
+	GOS_CG100_100,    /* fx-CG100 "01.00.0000" (gint API 1, experimental) */
+	GOS_CG100_210,    /* fx-CG100 "02.10.0000" (own table, experimental) */
+	GOS_UNSUPPORTED,  /* no known OS entry points: no file access at all */
+} gos_kind_t;
+
+/* Table of the OS functions used by the platform. Every function must be
+   called inside gint_world_switch() (see gfs_os_call()). */
+typedef struct {
+	int (*open)(uint16_t const *path, int mode, int zero);
+	int (*close)(int fd);
+	int (*size)(int fd);
+	int (*read)(int fd, void *buf, int size, int whence);
+	int (*write)(int fd, void const *buf, int size);
+	int (*create)(uint16_t const *path, int type, int *size);
+	int (*remove)(uint16_t const *path);
+	int (*find_first)(uint16_t const *pattern, int *shandle,
+		uint16_t *found, struct BFile_FileInfo *info);
+	int (*find_next)(int shandle, uint16_t *found,
+		struct BFile_FileInfo *info);
+	int (*find_close)(int shandle);
+	/* Bfile_GetBlockAddress (NULL if unknown on this OS) */
+	int (*block)(int fd, int offset, void **ptr);
+} gos_api_t;
+
+extern bool        g_is_cg100;      /* gint[HWCALC] == HWCALC_FXCG100 */
+extern gos_kind_t  g_os_kind;
+extern char        g_os_version[11]; /* string at 0x80020020 */
+extern gos_api_t   g_os;            /* valid unless GOS_UNSUPPORTED */
+extern uint32_t    g_entry_r15;     /* stack pointer at main() entry */
+
+void gsys_init(void);
+bool gsys_files_supported(void);
+bool gsys_os_experimental(void);
+char const *gsys_model_name(void);
+char const *gsys_os_path_name(void);
+/* fx-CG50 with OS <= 3.60 (CGDoom's experimental RAM gate) */
+bool gsys_cg50_extra_ram_allowed(void);
+
+//---
+// tlb.c: protect our code pages against UTLB replacement by the OS
+//---
+
+/* safe: safe start (DEL held at launch, final review): the miss handler
+   only, no P2 executor (no pinning, no ldtlb), as when the executor cannot
+   be set up (URB contained instead) */
+void gtlb_init(bool safe);
+/* Verify the snapshot after a world switch; rewrite missing pages. */
+void gtlb_repair(void);
+/* Exit normalisation (unpin, URB restore). Called from main.c's destructor
+   on every exit path, after gwad_quit(). */
+void gtlb_quit(void);
+typedef struct {
+	int pages;          /* our 64 KiB pages found in the UTLB snapshot */
+	bool handler;       /* own TLB-miss handler installed at VBR+0x400 */
+	int checks;         /* gtlb_repair() calls */
+	int repairs;        /* entries rewritten by gtlb_repair() */
+	uint32_t *misses;   /* counter incremented by the miss handler */
+	int pinned;         /* image pages pinned above MMUCR.URB (0: none) */
+	int urb_orig;       /* MMUCR.URB found at startup (MPM: 54) */
+	int urb;            /* MMUCR.URB while pinned */
+	int urb_fixes;      /* times gtlb_repair() found URB changed */
+	int last_repairs;   /* entries rewritten by the last gtlb_repair() */
+	bool executor;      /* P2 UTLB executor available (pin/repair/unpin) */
+	int urb_cap;        /* round 3.1: URB lowered without the executor
+	                       (0: not lowered) */
+	bool safe;          /* safe start: executor not used */
+} gtlb_stats_t;
+extern gtlb_stats_t gtlb_stats;
+
+/* tlbplan.c: UTLB layout planning, pure logic (host-tested in
+   tests/gint-host). Pages are the 64 KiB pages of [0x00300000,
+   0x00700000); slots are the 64 UTLB entries. */
+#define GTLB_SLOTS      64
+#define GTLB_PAGES      64
+#define GTLB_ROM_BASE   0x00300000u
+#define GTLB_ADDR_V     0x00000100u   /* address array: valid bit */
+#define GTLB_DATA_V     0x00000100u   /* data array / PTEL: valid bit */
+#define GTLB_ADDR_VPN   0xfffffc00u
+#define GTLB_DATA_PPN   0x1ffffc00u
+#define GTLB_VPN64      0xffff0000u   /* 64 KiB page of an address */
+/* Keep at least this many replaceable slots for the OS when pinning */
+#define GTLB_MIN_REPLACEABLE 16
+/* Capacity of the operation buffer handed to cgd_tlb_apply() */
+#define GTLB_MAX_OPS    (GTLB_PAGES + 8)
+
+typedef struct {
+	uint32_t pteh;      /* VPN | ASID (0 for "not one of our pages") */
+	uint32_t ptel;      /* PTEL value; 0 = page not in the snapshot */
+} gtlb_entry_t;
+
+/* Copy of the UTLB address and data arrays (memory-mapped reads) */
+typedef struct {
+	uint32_t addr[GTLB_SLOTS];
+	uint32_t data[GTLB_SLOTS];
+} gtlb_view_t;
+/* Read the UTLB (fx-CG100; zeros elsewhere), for the Diagnostics probe */
+void gtlb_read_view(gtlb_view_t *v);
+
+/* One UTLB write, performed by cgd_tlb_apply() (tlbh.S) as
+   MMUCR.URC = slot; PTEH = pteh; PTEL = ptel; ldtlb. Before a valid load,
+   the executor invalidates every OTHER valid slot that maps the same
+   64 KiB page, so the UTLB never holds two entries for one address (a
+   multiple hit resets the CPU). Layout known to tlbh.S: 12 bytes. */
+typedef struct {
+	uint32_t slot;
+	uint32_t pteh;
+	uint32_t ptel;
+} gtlb_op_t;
+
+/* Reference semantics of cgd_tlb_apply() for one op (planner, tests) */
+void gtlb_view_apply(gtlb_view_t *v, gtlb_op_t const *op);
+/* Plan pinning of image pages 0..n-1 into the n slots just below urb
+   (slots urb-n .. urb-1); the caller then sets MMUCR.URB = urb-n. Updates
+   v and slot[] (displaced pages get slot -1: reloaded on demand by the
+   miss handler). Returns the number of ops, 0 if pinning was refused
+   (nothing changed), and sets *new_urb. */
+int gtlb_plan_pin(gtlb_view_t *v, gtlb_entry_t const *table, int8_t *slot,
+	int n, int urb, gtlb_op_t *ops, int max_ops, int *new_urb);
+/* Plan the repair after a world switch: every page with slot[p] >= 0 that
+   is not in its slot is rewritten there, except unpinned pages
+   (slot[p] < pin_lo) that the miss handler reloaded elsewhere. Pinned
+   pages found elsewhere are moved back. Updates v; returns the op count. */
+int gtlb_plan_repair(gtlb_view_t *v, gtlb_entry_t const *table,
+	int8_t const *slot, int pin_lo, gtlb_op_t *ops, int max_ops);
+/* Restrict slot[] to the image pages 0..n-1 (n <= 0: keep all): only
+   they are repaired after world switches (gint review round 2) */
+void gtlb_track_image(int8_t *slot, int n);
+/* Plan the exit normalisation: every snapshot page p (slot_orig[p] >= 0)
+   back in slot_orig[p] and in no other slot (the executor drops the other
+   copies). Pages already alone in their slot are skipped. Updates v;
+   returns the op count. */
+int gtlb_plan_unpin(gtlb_view_t *v, gtlb_entry_t const *table,
+	int8_t const *slot_orig, gtlb_op_t *ops, int max_ops);
+/* MMUCR value with URB = urb and URC = 0 (other fields kept, TI clear) */
+uint32_t gtlb_mmucr_with_urb(uint32_t mmucr, int urb);
+/* Without the executor (gint review round 3.1): the URB that keeps miss-
+   handler reloads inside the leading slots MPM's next launch rewrites
+   (those that held snapshot pages at startup); urb if no change. */
+int gtlb_plan_contain_urb(int8_t const *slot_orig, int urb);
+static inline int gtlb_mmucr_urb(uint32_t mmucr) { return (mmucr >> 18) & 63; }
+
+//---
+// memory.c
+//---
+
+typedef struct {
+	int zone_count;
+	void *zone_base[8];
+	int zone_size[8];
+	int reserve;           /* bytes left for malloc */
+	int extra_ram;         /* fx-CG50 experimental RAM (bytes) */
+	bool os_heap_removed;
+	int mpm_variant;       /* GMPM_* */
+	uint32_t rom_phys;     /* mmu_translate(0x00300000) */
+	uint32_t uram_phys;    /* mmu_translate(0x08100000) */
+	uint32_t image_size;   /* loaded binary size (from linker symbols) */
+	uintptr_t priv_start, priv_end;  /* private arena "cgd_ram" */
+	uintptr_t priv2_start, priv2_end;  /* "cgd_ram2" (pre-Feb-2025) */
+} gmem_stats_t;
+
+enum {
+	GMPM_NONE = 0,     /* not a fx-CG100 (no MPM) */
+	GMPM_V11,          /* mpm.bin >= 1.1: _ld1 up to the code */
+	GMPM_FEB2025,      /* public Feb-2025 mpm.bin: 2 MiB _ld1 + extra */
+	GMPM_DYNLOAD,      /* dynload mpm.bin (gpSP/KhiCAS): no loadinfo */
+	GMPM_UNKNOWN,
+	GMPM_PRELOADINFO,  /* mpm.bin <= a1a2cc3: fixed 0x8c400000, no loadinfo */
+};
+
+extern gmem_stats_t gmem_stats;
+void gmem_init(void);
+char const *gmem_variant_name(void);
+/* Total free bytes in the default gint arenas (excluding the OS heap) */
+size_t gmem_total_free(void);
+/* Largest block currently available in the default gint arenas */
+size_t gmem_largest_free(void);
+/* fx-CG50: probe zeroed RAM past the 2 MB line (CGDoom's experimental
+   RAM). Only called when the user enabled it. */
+void gmem_probe_extra_ram(void);
+/* Zero the experimental RAM handed to the engine, for the next probe */
+void gmem_release_extra_ram(void);
+/* Iterate known arenas for diagnostics: returns false past the end */
+bool gmem_arena_info(int i, char const **name, uintptr_t *start,
+	uintptr_t *end, size_t *free_bytes, size_t *largest);
+
+//---
+// files.c: world-switched BFile helpers, delayed writes
+//---
+
+#define GFS_NAME_MAX  13          /* strict 8.3 name, including NUL */
+#define GFS_LIST_NAME 40          /* names found on storage (read/list) */
+#define GFS_PATH_MAX  (7 + GFS_LIST_NAME)
+/* PL_FileWrite() refuses larger sizes before touching the file (gint review
+   round 3.3): every legitimate write (settings, saves, a demo of at most
+   128 KiB) comes from RAM, and no RAM of these models is that large. A
+   bogus size such as the engine's "demo_p - demobuffer" with demo_p still
+   NULL (about 1.9e9) used to reach os_flush(), which removed the existing
+   file before create() failed. */
+#define GFS_WRITE_MAX (16 << 20)
+
+typedef struct {
+	char name[GFS_LIST_NAME];
+	int size;
+} gfs_entry_t;
+
+/* Validate a strict 8.3 name (letters, digits, _ - ! # $ % ( ) @ ^) */
+bool gfs_valid_83(char const *name);
+/* Build u"\\\\fls0\\<name>" (any listed name; caller validates) */
+bool gfs_make_path(uint16_t *path, int max, char const *name);
+
+/* Run fn(arg) in the OS world (gint_world_switch). Waits for the LCD DMA,
+   marks the LCD as dirty (the OS may draw its busy indicator), and repairs
+   the UTLB afterwards. Every OS call of the platform goes through this. */
+int gfs_os_call(int (*fn)(void *), void *arg);
+extern int gfs_world_switches;
+
+/* BFile_Read result check: Fugue returns the bytes read (MPM relies on it);
+   the CASIOWIN convention returns the bytes remaining (gpSP accepts 0). */
+bool gfs_read_ok(int rc, int size, int remaining_after);
+
+/* P1 scratch area used for every path / small buffer given to the OS */
+typedef struct {
+	uint16_t path[GFS_PATH_MAX + 1];
+	uint16_t found[512];
+	struct BFile_FileInfo info;
+	uint8_t small[64];
+} gfs_scratch_t;
+gfs_scratch_t *gfs_scratch(void);
+/* True if p..p+size is a P1 address the OS can safely use */
+bool gfs_is_p1(void const *p, size_t size);
+
+/* List "*.wad" and "*.lmp" in the storage root in one world switch.
+   gfs_list_more says which list was cut at its maximum (final review). */
+int gfs_list(gfs_entry_t *wads, int wad_max, int *wad_count,
+	gfs_entry_t *demos, int demo_max, int *demo_count);
+enum { GFS_MORE_WADS = 1, GFS_MORE_DEMOS = 2 };
+extern int gfs_list_more;
+/* Failure result recorded when PL_FileWrite() cannot keep a copy for later
+   and may not write at once (WAD block map live) */
+#define GFS_ERR_NO_MEMORY  (-1000)
+
+/* Write all pending writes/deletes in a single world switch. Returns the
+   number of failed operations. Refuses while the WAD block map is live. */
+int gfs_flush(void);
+int gfs_pending_count(void);
+int gfs_flush_failures(void);
+/* Text for the exit screen if any write failed during the session (or
+   flush_result, the exit gfs_flush()'s result, is non-zero); false if
+   there is nothing to report */
+bool gfs_failure_text(char *text, size_t size, int flush_result);
+void gfs_drop_read_cache(void);
+
+/* Name and result of the first failed operation of the last gfs_flush()
+   with failures (false if there was none) */
+bool gfs_last_failure(char name[GFS_NAME_MAX], int *result);
+
+/* While set, the settings file written by CGD_SaveSettings() gets the
+   platform's own "CG.*" lines appended (see main.c). */
+extern char const *(*gfs_settings_appender)(void);
+extern char const *gfs_settings_name;
+
+//---
+// wadnames.c: WAD names for the engine and the launcher
+//---
+
+/* WAD base name (up to the first '.') for CGD_WADFileName: whole, never
+   truncated (the engine hashes it into an 8.3 prefix) */
+void gnames_wad_base(char *out, size_t size, char const *wadname);
+/* Index in wads[] of the WAD a demo file belongs to, -1 if unknown */
+int gnames_demo_wad(gfs_entry_t const *wads, int count, char const *demo);
+
+//---
+// wad.c
+//---
+
+typedef enum { GWAD_NONE = 0, GWAD_RAM, GWAD_MAP, GWAD_BFILE } gwad_mode_t;
+
+/* The engine reads lumps with W_LUMP_PAD trailing WAD bytes (w_wad.h):
+   PL_WadMap(position, size + pad), clamped to the WAD end. Every RAM-image
+   segment is followed by this many true file bytes (zeros past the end).
+   main.c checks GWAD_LUMP_PAD >= W_LUMP_PAD at compile time. */
+#define GWAD_LUMP_PAD 136
+
+typedef struct {
+	gwad_mode_t mode;
+	int size;
+	/* RAM image */
+	int ram_bytes;         /* RAM used by the image */
+	int ram_segments;      /* lumps/segments loaded */
+	int ram_skipped;       /* sound/music lumps left in storage */
+	int ram_skipped_bytes;
+	bool ram_failed;       /* RAM image attempted and failed */
+	/* Block map */
+	int blocks;            /* 4 KiB blocks in the file */
+	int mapped;            /* blocks with a usable direct pointer */
+	int raw_p1, raw_p2, raw_p0, raw_other, raw_error;
+	int rej_unaligned;
+	bool map_rejected;     /* map did not match the file: BFile reads */
+	int runs, longest_run; /* physically contiguous runs (blocks) */
+	uint32_t phys_min, phys_max;
+	/* Common */
+	int load_ms;           /* RAM load / block query time (RTC) */
+	int map_hits, map_misses;   /* PL_WadMap results */
+	int fallback_reads;    /* PL_WadRead served by world-switched BFile */
+	int read_errors;
+} gwad_stats_t;
+
+extern gwad_stats_t gwad_stats;
+extern bool gwad_force_bfile;   /* CGD_Options.WADMethod == BFILE */
+bool gwad_map_live(void);
+/* PL_WadOpen() failures (final review: one -1 for every cause gave the
+   user nothing to act on) and their launcher text */
+enum {
+	GWAD_ERR_FS = -1,          /* file access unsupported on this OS */
+	GWAD_ERR_NAME = -2,        /* name too long / unusable characters */
+	GWAD_ERR_OPEN = -3,        /* BFile open failed */
+	GWAD_ERR_SHORT = -4,       /* < 12 bytes, header unreadable */
+	GWAD_ERR_MAGIC = -5,       /* no IWAD/PWAD magic */
+	GWAD_ERR_TRUNCATED = -6,   /* directory past the end of the file */
+};
+char const *gwad_error_text(int rc);
+/* Whether the open WAD's directory has this lump (case-insensitive) */
+bool gwad_has_lump(char const *lump);
+/* Re-query block addresses after a storage write */
+void gwad_remap(void);
+char const *gwad_mode_name(void);
+/* Close the WAD file if it is still open (main.c's destructor: the abort()
+   path skips PL_WadClose; gint review round 3.1). Nothing else is freed. */
+void gwad_quit(void);
+
+//---
+// video.c
+//---
+
+enum {
+	GDISP_DMA = 0,    /* expand to RAM frame, async DMA (overlaps) */
+	GDISP_STRIPS,     /* expand into X/Y on-chip strips, ping-pong DMA */
+	GDISP_CPU,        /* CPU writes to the LCD data register */
+	GDISP_COUNT,
+};
+
+/* Allocate the RGB565 frame buffer (call early, before the zones) */
+bool gvid_init(void);
+void gvid_set_mode(int display_path);
+/* Display name of a path; GDISP_DMA reads "DMA n/a: CPU" when the frame
+   buffer could not be allocated (PL_FinishUpdate then uses the CPU path) */
+char const *gvid_mode_name(int mode);
+/* False if gvid_init() failed: GDISP_DMA falls back to CPU writes */
+bool gvid_dma_available(void);
+/* Wait for the frame DMA and give the full 396x224 window back (always
+   before gint drawing + dupdate()). */
+void gvid_release(void);
+/* The OS may have drawn into GRAM (world switch): clear the borders before
+   the next frame. */
+void gvid_note_os_activity(void);
+/* Clear the whole LCD to black (CPU writes) */
+void gvid_clear_lcd(void);
+/* Push one frame with a given path (diagnostics benchmark) */
+void gvid_push_test(int mode, uint8_t const *fb);
+
+/* On-chip strip banks (one 8 KiB X bank, one 8 KiB Y bank; the addresses
+   gint's dma_translate() whitelists). Nothing else may use them. */
+#define GVID_XBANK ((void *)0xe5007000)
+#define GVID_YBANK ((void *)0xe5017000)
+
+/* Replaceable 8-bit -> RGB565 expansion. The presenter uses the _p32
+   entry with a persistent 1 KiB table built by cgd_expand_build_pal32()
+   in PL_SetPalette() (layout: pal32[k] = pal[k ^ 0x80] * 0x00010001). Weak
+   C defaults in video.c; the SH4 versions (src/engine/sh4: expand_sh4.S,
+   r_draw_sh4_c.c, same prototypes as cgd_sh4.h) replace them when linked.
+   Contract (also of the plain cgd_expand_p8_rgb565 in expand_sh4.S):
+   - dst[i] = pal[src[i]]; npixels % 16 == 0 (the _p32 entry writes nothing
+     otherwise); src is 4-byte aligned (the asm accepts any alignment, the
+     weak C reads words), big-endian: src[0] is the leftmost pixel and
+     dst[0] its RGB565 value;
+   - dst is 32-byte aligned and is EITHER cached SDRAM (P1, 0x8xxxxxxx) OR
+     on-chip X/Y memory (0xe5xxxxxx, not cacheable). For P1 dst every
+     32-byte line is allocated with movca.l and purged with ocbp once
+     written (asm and weak C alike), so the data is in RAM on return and
+     the caller only issues synco before a DMA reads it. For on-chip dst,
+     plain stores only (no movca.l / ocb*);
+   - no DSP repeat loops (ldrs/ldre), no DSP or MAC registers: safe in
+     interrupt context (it runs in the foreground today). */
+void cgd_expand_build_pal32(uint32_t *pal32, uint16_t const *pal);
+void cgd_expand_p8_rgb565_p32(uint16_t *dst, uint8_t const *src,
+	uint32_t const *pal32, int npixels);
+
+//---
+// input.c / keymaps.c
+//---
+
+/* Raw KEYSC scan (12 bytes, PL_ScanKeyboard layout) */
+void ginp_scan(uint8_t state[12]);
+bool ginp_any_key(void);
+/* True if the emergency abort chord SHIFT+7+3+AC/ON is held in a scan
+   (checked by time.c's tic interrupt; gint's own chord cannot fire, see
+   input.c) */
+bool ginp_abort_chord(uint8_t const st[12]);
+/* Safe start (final review): DEL held when the add-in starts. Read from a
+   raw scan before any OS call or UTLB change; same key on both models. */
+#define GINP_SAFE_START_KEY 0x44
+bool ginp_safe_start(void);
+/* Wait until every key is released (all KEYSC words read 0), at most
+   GINP_RELEASE_TIMEOUT_US (or GINP_RELEASE_MAX_POLLS polls) */
+#define GINP_RELEASE_TIMEOUT_US  3000000u
+#define GINP_RELEASE_MAX_POLLS   2000
+void ginp_wait_release(void);
+/* True on a new key press: a key that was not down at entry, or one
+   released and pressed again (gint review round 3.1: a key held or stuck
+   at entry does not count); false after timeout_ms */
+bool ginp_wait_any_key(int timeout_ms);
+/* Wait for a new key press and return its matrix code (AC/ON is 0x07);
+   -1 after timeout_ms */
+int ginp_wait_raw_key(int timeout_ms);
+
+/* UI key events (from raw scans, by physical position on each model) */
+enum {
+	GK_NONE = 0, GK_UP, GK_DOWN, GK_LEFT, GK_RIGHT,
+	GK_OK,       /* EXE, or OK on the fx-CG100 */
+	GK_BACK,     /* EXIT / BACK */
+	GK_DEL,
+	GK_QUIT,     /* HOME (fx-CG100) / MENU (fx-CG50) */
+	GK_DIGIT0,   /* GK_DIGIT0 + n for digit n */
+};
+/* Wait for a UI key. If ginp_idle_hook is set, once the keyboard has
+   not changed for GINP_IDLE_MS (time.c's tic scan, round 3.2: an
+   auto-repeating held arrow is no activity) the hook is called and GK_NONE
+   is returned (callers redraw and wait again). Without a tic timer, each
+   call times out after GINP_IDLE_MS without a UI key instead. */
+int ginp_getkey(void);
+#define GINP_IDLE_MS  (10 * 60 * 1000)
+extern void (*ginp_idle_hook)(void);
+/* Like ginp_getkey() but returns GK_NONE after timeout_ms */
+int ginp_getkey_timeout(int timeout_ms);
+
+/* Display name of a physical key (fx-CG100 legends on the fx-CG100) */
+char const *gkm_key_name(int code);
+
+typedef struct {
+	char const *name;
+	int16_t const *map;    /* CGDOOM_KEYMAP_SIZE entries */
+} gkm_preset_t;
+
+/* Presets for the current model (index 0 = default) */
+gkm_preset_t const *gkm_presets(int *count);
+/* Matrix code that opens the Doom menu (KEY_ESCAPE), and whether the
+   engine let us choose it (weak hook, see keymaps.c). */
+int gkm_menu_key(void);
+bool gkm_menu_key_configurable(void);
+void gkm_apply_engine_hooks(void);
+
+/* Check a key captured by the Controls screen: OK to bind, cancel (BACK /
+   HOME, EXIT / MENU: keep the old binding), or reserved (*why is set). */
+enum { GKM_BIND_OK = 0, GKM_BIND_CANCEL, GKM_BIND_RESERVED };
+int gkm_rebind_check(int code, char const **why);
+/* Index of the keymap entry (CGDOOM_KEYMAP_SIZE entries) other than
+   `except` that is bound to `code`, or -1 (final review: a rebind clears
+   the older binding of the key and says so) */
+int gkm_find_binding(int16_t const *map, int code, int except);
+/* Second Enter key of the Doom menu (CGD_EnterKeycode2): OK on the
+   fx-CG100 when BACK is the menu key, else -1 */
+int gkm_enter_key2(void);
+
+//---
+// time.c
+//---
+
+void gtime_init(void);
+void gtime_quit(void);
+void gtime_resync(void);
+/* Quit chord (gint review round 3.1): the tic interrupt latches a request;
+   gtime_take_quit() returns it once and disarms the interrupt-context
+   abort() fallback, which only fires when the chord stays held this long
+   without the request being taken (hang). */
+#define GTIME_ABORT_HOLD_TICS  70          /* 2 s */
+bool gtime_take_quit(void);
+/* No abort() from the tic any more (PL_Fatal, exit path: bounded, and
+   their file writes must not be cut) */
+void gtime_disarm_abort(void);
+/* Tics since the keyboard state last changed (0 without a tic timer) */
+int gtime_idle_tics(void);
+void gtime_idle_reset(void);
+/* True if the 35 Hz tic timer runs (gtime_idle_tics() is meaningful) */
+bool gtime_ticking(void);
+/* TMU of the 35 Hz tic (-1: none, polled clock) */
+int gtime_tic_timer(void);
+
+//---
+// main.c
+//---
+
+/* Foreground safe point (PL_GetTics, every input.c wait): takes a quit
+   chord request (exit path, keeping the session's saves) and, in a game,
+   runs the idle exit. Does nothing on the exit and fatal paths. */
+void gquit_poll(void);
+/* Safe point of long engine phases that never call PL_GetTics (startup
+   R_Init, level setup and precache, game loads; round 3.2): wad.c calls it
+   on entry of PL_WadRead()/PL_WadMap(). In a game, takes a pending quit
+   chord request like gquit_poll(); never draws (no idle exit). */
+void gquit_poll_load(void);
+/* In-game idle exit: demo playback / title loop (nothing to lose) after
+   GINP_IDLE_MS, the player's own game after this long; 60 s warning
+   either way */
+#define GINP_GAME_IDLE_MS  (30 * 60 * 1000)
+/* In-game idle policy (time.c, pure; main.c's game_idle_check). paused is
+   the engine's CGD_IsPaused() mask (bits below, equal to cgdoom.h's
+   CGD_IDLE_*, checked in main.c), usergame the engine's flag (a game the
+   player started: false during demos), title whether the title loop is
+   showing a page (gamestate == GS_DEMOSCREEN). Returns the idle limit in
+   ms: GINP_IDLE_MS when nothing can be lost (a demo, a title page, no
+   level outside a user game), else GINP_GAME_IDLE_MS (a level being played,
+   paused, behind the menu or save-name entry, with the automap, or the
+   intermission/finale of the player's game). *lose_progress says whether
+   quitting loses unsaved progress (the warning says so). */
+#define GIDLE_PAUSED   0x01
+#define GIDLE_MENU     0x02
+#define GIDLE_NOLEVEL  0x04
+#define GIDLE_DEMO     0x08
+int gtime_game_idle_limit_ms(int paused, bool usergame, bool title,
+	bool *lose_progress);
+/* False if gint's profiler found no free TMU (prof_tcnt unusable: no
+   microsecond clock, benchmarks impossible) */
+bool gtime_prof_ok(void);
+
+//---
+// clock.c
+//---
+
+enum { GCLK_OFF = 0, GCLK_F4 = 1, GCLK_PTUNE4_F5 = 2, GCLK_COUNT };
+void gclk_init(void);
+void gclk_apply(int level);
+/* Levels offered on this model (GCLK_COUNT on the fx-CG100; the fx-CG50
+   stops before GCLK_PTUNE4_F5, which gclk_apply() runs as F4 there) */
+int gclk_levels(void);
+char const *gclk_name(int level);
+int gclk_current(void);
+
+//---
+// diag.c
+//---
+
+/* hints.c: one recovery line for common fatal errors (NULL: none) */
+char const *gfatal_hint(char const *msg, bool cg100);
+
+/* wads: the launcher's WAD list (the Storage page can probe one) */
+void gdiag_screen(gfs_entry_t const *wads, int count);
+
+//---
+// stack.S
+//---
+
+/* Call fn() with r15 = stack_top (8-byte aligned top of a P1 buffer) */
+void cgd_call_on_stack(void (*fn)(void), void *stack_top);
+
+//---
+// Platform options (persisted as "CG.*" lines in CGDoom.cfg)
+//---
+
+typedef struct {
+	int overclock;      /* GCLK_* */
+	int display;        /* GDISP_* */
+	int frameskip;      /* -1 = auto, 0..3 */
+	int fps_counter;    /* bool */
+	int wad_in_ram;     /* bool: RAM image when it fits (primary path) */
+	int skill;          /* 0..4 */
+	int extra_ram;      /* bool: fx-CG50 experimental RAM */
+} gopt_t;
+
+extern gopt_t g_opt;
+
+//---
+// ui.c: launcher drawing
+//---
+
+#define UI_BG      0xffff
+#define UI_FG      0x0000
+#define UI_DIM     0x7bef
+#define UI_TITLE   0x9800
+#define UI_WARN    0xb800
+#define UI_HEAD    0x18e3
+
+#define UI_MAX_ITEMS 48
+
+typedef struct {
+	int y, count;             /* reset each frame */
+	int focus, scroll;        /* persistent */
+	int item_y[UI_MAX_ITEMS];
+} ui_layout_t;
+
+void ui_init(void);
+int  ui_line_height(void);
+void ui_layout_init(ui_layout_t *l);
+void ui_frame_start(ui_layout_t *l, char const *title);
+void ui_frame_end(ui_layout_t *l, char const *footer);
+int  ui_item(ui_layout_t *l, char const *label, char const *fmt, ...)
+	__attribute__((format(printf, 3, 4)));
+void ui_note(ui_layout_t *l, int color, char const *fmt, ...)
+	__attribute__((format(printf, 3, 4)));
+void ui_space(ui_layout_t *l, int pixels);
+bool ui_nav(ui_layout_t *l, int key);
+
+void ui_begin(void);        /* gvid_release() + clear */
+void ui_end(void);          /* dupdate() */
+void ui_message(char const *title, char const *text, bool wait);
+/* ui_message(wait = true) that also returns after timeout_ms */
+void ui_message_timeout(char const *title, char const *text, int timeout_ms);
+bool ui_confirm(char const *title, char const *text);
+void ui_status(char const *title, char const *line1, char const *line2);
+void ui_text(int x, int y, int color, int halign, char const *str);
+void ui_printf(int x, int y, int color, int halign, char const *fmt, ...)
+	__attribute__((format(printf, 5, 6)));
+int  ui_wrap(int x, int y, int w, int color, char const *text);
+
+#endif /* CGD_GINT_H */

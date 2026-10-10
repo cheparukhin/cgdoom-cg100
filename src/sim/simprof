@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""simprof - flat profile / annotated disassembly from a SIM_PCPROF file.
+
+  simrun --pcprof prof.txt prog.elf args...          # needs sh-elf-run64 (make sim-tool)
+  simprof prog.elf prof.txt                          # top functions by simulated cycles
+  simprof -n 50 --sort insts prog.elf prof.txt
+  simprof --disasm R_DrawColumn prog.elf prof.txt    # per-instruction counts inside a function
+
+The profile lists, for every executed instruction address, how often it ran and how many simulator
+cycles it was charged (1 per instruction + 2 per taken branch/jump/return; a delay slot is charged
+to its branch, so its own count is the number of executions but its cycles column is 0).
+"""
+import argparse, bisect, os, re, subprocess, sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+BIN = os.path.join(ROOT, "toolchain", "bin")
+
+def load_profile(path):
+    prof = {}
+    with open(path) as f:
+        for line in f:
+            a, n, c = line.split()
+            prof[int(a, 16)] = (int(n), int(c))
+    return prof
+
+def load_symbols(elf):
+    out = subprocess.run([os.path.join(BIN, "sh-elf-nm"), "-n", "--defined-only", elf],
+                         capture_output=True, text=True, check=True).stdout
+    syms = []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) != 3 or parts[1] not in "TtWwiI":
+            continue
+        name = parts[2]
+        if name.startswith("."):          # local asm labels belong to the preceding function
+            continue
+        if name.startswith("_") and not name.startswith("__"):
+            name = name[1:]
+        elif name.startswith("___"):
+            name = name[1:]
+        syms.append((int(parts[0], 16), name))
+    return syms
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("elf"); ap.add_argument("profile")
+    ap.add_argument("-n", type=int, default=30, help="number of functions to list (default 30)")
+    ap.add_argument("--sort", choices=("cycles", "insts"), default="cycles")
+    ap.add_argument("--disasm", metavar="FUNC", help="annotated disassembly of FUNC (exact name)")
+    args = ap.parse_args()
+
+    prof = load_profile(args.profile)
+    syms = load_symbols(args.elf)
+    addrs = [a for a, _ in syms]
+
+    def func_of(pc):
+        i = bisect.bisect_right(addrs, pc) - 1
+        return syms[i][1] if i >= 0 else "?"
+
+    if args.disasm:
+        out = subprocess.run([os.path.join(BIN, "sh-elf-objdump"), "-d", "--no-show-raw-insn", args.elf],
+                             capture_output=True, text=True, check=True).stdout
+        want = args.disasm
+        show = False
+        print("%10s %10s   address  instruction" % ("count", "cycles"))
+        for line in out.splitlines():
+            m = re.match(r"^([0-9a-f]+) <(.+)>:$", line)
+            if m:
+                name = m.group(2)
+                if name.startswith("_") and not name.startswith("__"):
+                    name = name[1:]
+                show = (name == want)
+                if show:
+                    print(line)
+                continue
+            if not show:
+                continue
+            m = re.match(r"^\s*([0-9a-f]+):\s+(.*)$", line)
+            if m:
+                n, c = prof.get(int(m.group(1), 16), (0, 0))
+                print("%10s %10s  %s" % (n or "", c or "", line))
+            else:
+                print(" " * 22 + line)
+        return
+
+    tot_n = sum(n for n, _ in prof.values())
+    tot_c = sum(c for _, c in prof.values())
+    agg = {}
+    for pc, (n, c) in prof.items():
+        f = func_of(pc)
+        a = agg.setdefault(f, [0, 0])
+        a[0] += n; a[1] += c
+    key = 1 if args.sort == "cycles" else 0
+    rows = sorted(agg.items(), key=lambda kv: -kv[1][key])[:args.n]
+    print("total: %d instructions, %d cycles (simulator model)" % (tot_n, tot_c))
+    print("%12s %6s %12s %6s  %s" % ("cycles", "%", "insts", "c/i", "function"))
+    acc = 0
+    for f, (n, c) in rows:
+        acc += c
+        print("%12d %5.1f%% %12d %6.2f  %s" % (c, 100.0 * c / max(tot_c, 1), n, c / max(n, 1), f))
+    print("top %d functions cover %.1f%% of cycles" % (len(rows), 100.0 * acc / max(tot_c, 1)))
+
+if __name__ == "__main__":
+    main()

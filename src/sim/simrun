@@ -1,0 +1,92 @@
+#!/bin/bash
+# simrun - run an ELF under sh-elf-run with sane argument handling and clean statistics.
+#
+#   simrun [--stats] [--stats-file FILE] [--quiet] prog.elf [args...]
+#
+#   exit status = exit status of the simulated program (sim signals: 10 = bus error, 4 = illegal insn,
+#                 5 = trap/breakpoint...).
+#   --stats       run with sh-elf-run -v and print on stderr, after the program output:
+#                   SIMSTATS insts=N cycles=N stalls=N misaligned=N
+#   --stats-file  also write those key=value pairs (one per line) to FILE.
+#   --quiet       with --stats: do not echo the SIMSTATS line (use --stats-file).
+#   --pcprof FILE write a per-PC profile (see simprof); needs the sim64 simulator.
+#   --stock       use the stock toolchain/bin/sh-elf-run even if build-sim/tools/sh-elf-run64 exists.
+#
+# The simulator is build-sim/tools/sh-elf-run64 when present (make sim-tool: 64-bit counters, in-program
+# counters, PC profile), else the stock toolchain/bin/sh-elf-run (32-bit counters that wrap at 4G!).
+# $SIM_RUN overrides the choice.
+#
+# Why a wrapper: sh-elf-run treats ANY argument beginning with a digit (even program arguments such as
+# "-skill 4") as a RAM-size option, so such arguments are prefixed here with a \037 byte, which the
+# harness start-up code (syscalls.c) strips again.  The stats block printed by the simulator is
+# separated from the program output.
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+STOCK="$ROOT/toolchain/bin/sh-elf-run"
+RUN64="${SIM_BUILD:-$ROOT/build-sim}/tools/sh-elf-run64"
+
+stats=0 quiet=0 statsfile="" stock=0 pcprof=""
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--stats) stats=1; shift ;;
+	--quiet) quiet=1; shift ;;
+	--stock) stock=1; shift ;;
+	--pcprof) pcprof="$2"; shift 2 ;;
+	--stats-file) statsfile="$2"; stats=1; shift 2 ;;
+	--) shift; break ;;
+	-*) echo "simrun: unknown option $1" >&2; exit 2 ;;
+	*) break ;;
+	esac
+done
+if [ -n "${SIM_RUN:-}" ]; then RUN="$SIM_RUN"
+elif [ $stock -eq 0 ] && [ -x "$RUN64" ]; then RUN="$RUN64"
+else RUN="$STOCK"; fi
+if [ -n "$pcprof" ]; then
+	[ "$RUN" = "$RUN64" ] || { echo "simrun: --pcprof needs sh-elf-run64 (run: make sim-tool)" >&2; exit 2; }
+	export SIM_PCPROF="$pcprof"
+fi
+[ $# -ge 1 ] || { echo "usage: simrun [--stats] [--stats-file F] [--quiet] prog.elf [args...]" >&2; exit 2; }
+elf="$1"; shift
+esc=$'\037'
+args=()
+for a in "$@"; do
+	case "$a" in
+	[0-9]*) args+=("${esc}${a}") ;;
+	*) args+=("$a") ;;
+	esac
+done
+
+if [ $stats -eq 0 ]; then
+	exec "$RUN" "$elf" ${args[@]+"${args[@]}"}
+fi
+
+tmp="$(mktemp "${TMPDIR:-/tmp}/simrun.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+"$RUN" -v "$elf" ${args[@]+"${args[@]}"} | awk -v tmp="$tmp" '
+	function flushblank() { while (nb > 0) { print ""; nb-- } }
+	BEGIN { nb = 0; first = 1 }
+	first && /^sh-elf-run[0-9]* / { first = 0; next }
+	{ first = 0 }
+	/^# (instructions executed|cycles|pipeline stalls|misaligned load\/store|real time taken|virtual time taken|profiling|profile maxpc|cycles\/second|simulation ratio)/ {
+		nb = 0
+		line = $0; sub(/^# /, "", line)
+		n = split(line, f, " ")
+		val = f[n] + 0
+		if (val < 0) val += 4294967296     # the simulator counters are 32-bit and print as signed
+		if (line ~ /^instructions executed/) printf "insts=%.0f\n", val > tmp
+		else if (line ~ /^cycles /)           printf "cycles=%.0f\n", val > tmp
+		else if (line ~ /^pipeline stalls/)   printf "stalls=%.0f\n", val > tmp
+		else if (line ~ /^misaligned/)        printf "misaligned=%.0f\n", val > tmp
+		next
+	}
+	/^$/ { nb++; if (nb > 2) { print ""; nb-- } ; next }
+	{ flushblank(); print; fflush() }
+'
+rc=${PIPESTATUS[0]}
+if [ -s "$tmp" ]; then
+	line="SIMSTATS $(tr '\n' ' ' < "$tmp" | sed 's/ $//')"
+	[ $quiet -eq 1 ] || echo "$line" >&2
+	[ -z "$statsfile" ] || cp "$tmp" "$statsfile"
+fi
+exit "$rc"

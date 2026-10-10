@@ -1,0 +1,23 @@
+# Build outputs
+/build-*/
+/CGDoom.g3a
+/dist/
+*.o
+*.d
+
+# Built toolchain and its work tree (tools/build-toolchain.sh)
+/toolchain/
+/toolchain-build/
+
+# Upstream clones (see "Pinned upstream revisions" in README.md)
+/ref/
+
+# Test WADs (Freedoom 0.13.0; never commit id Software WADs)
+/test-wads/
+*.wad
+*.WAD
+
+# Logs
+*.log
+
+.DS_Store
