@@ -7,6 +7,7 @@
 #
 #   sh tests/gint-host/run.sh            build into $OUT and run every test
 #   CGD_TEST_WADS="a.wad b.wad" sh ...   also run the WAD tests on these
+#   SANITIZE=0 sh ...                    build without ASan/UBSan
 #
 # By default the freedoom WADs of test-wads/ are used when present.
 set -u
@@ -18,6 +19,11 @@ mkdir -p "$OUT"
 
 CFLAGS="-std=gnu11 -O1 -g -Wall -Wextra -Wno-unused-parameter -DCGD_HOST_TEST \
  -I$HERE/stub -I$ROOT/src/gint -I$ROOT/src/platform -I$ROOT/src/engine"
+if [ "${SANITIZE:-1}" != 0 ]; then
+	CFLAGS="$CFLAGS -fsanitize=address,undefined -fno-sanitize-recover=all \
+ -fno-omit-frame-pointer"
+	export ASAN_OPTIONS=${ASAN_OPTIONS:-detect_leaks=0}
+fi
 G=$ROOT/src/gint
 E=$ROOT/src/engine
 
@@ -34,7 +40,10 @@ run() {
 build() {
 	exe=$1; shift
 	# shellcheck disable=SC2086
-	$CC $CFLAGS -o "$OUT/$exe" "$@" || { echo "BUILD FAILED: $exe"; return 1; }
+	$CC $CFLAGS -o "$OUT/$exe" "$@" && return 0
+	echo "BUILD FAILED: $exe"
+	fail=$((fail + 1)); failed="$failed $exe"
+	return 1
 }
 
 # test_files.c #includes files.c (malloc interposed)

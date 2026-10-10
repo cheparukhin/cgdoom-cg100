@@ -811,8 +811,9 @@ bool gwad_has_lump(char const *lump)
 {
 	if(W.mode == GWAD_NONE || !lump || strlen(lump) > 8)
 		return false;
-	char up[9];
-	for(int i = 0; i < 9; i++)
+	/* Stop at the terminator: lump may be shorter than 8 chars */
+	char up[9] = { 0 };
+	for(int i = 0; i < 8 && lump[i]; i++)
 		up[i] = (lump[i] >= 'a' && lump[i] <= 'z') ? lump[i] - 32 : lump[i];
 	uint32_t numlumps = le32(W.header + 4), dirofs = le32(W.header + 8);
 	enum { CHUNK = 128 };

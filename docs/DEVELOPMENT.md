@@ -289,7 +289,7 @@ There is no hardware, so correctness rests on three things:
 | `make check-sh` | Every engine file compiles with sh-elf-gcc |
 | `make test-demosync` | Optional. DEMO1-3 of the shareware DOOM v1.9 `doom1.wad` named by `CGD_DOOM1_WAD` must play in sync: the per-tic game-state traces are compared with `tests/demosync/*.ckpt`, which were checked tic by tic against linuxdoom-1.10. Skipped when the variable is not set. `make test-demosync-sim` runs it in the simulator. |
 | `make -C src/engine/sh4/test run` | Asm vs the C reference: randomized and bit-exact, with stray-write, stack-canary and calling-convention checks; `asmcheck` |
-| `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers: expand, files (delayed writes, RAM image, packed images, refusal counting), hints, input, keymaps, memory (arena discovery, experimental RAM), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
+| `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: expand, files (delayed writes, RAM image, packed images, refusal counting), hints, input, keymaps, memory (arena discovery, experimental RAM), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
 | `make test-sim-full` | All 36 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
