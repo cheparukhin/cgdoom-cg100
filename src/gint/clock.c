@@ -2,11 +2,9 @@
 
    Levels:
    - GCLK_OFF: leave the OS clock alone.
-   - GCLK_F4 (default): gint's CLOCK_SPEED_F4 (fx-CG100: 235.93 MHz CPU,
-     58.98 MHz bus; fx-CG50: Ftune F4, 232 MHz CPU, 58 MHz bus). Shipped by
-     OutRun on the fx-CG100.
-   - GCLK_PTUNE4_F5 (experimental, opt-in with a warning, fx-CG100 only;
-     a stored F5 runs F4 on the fx-CG50): CalcLoverHK's
+   - GCLK_F4 (default): gint's CLOCK_SPEED_F4 (235.93 MHz CPU, 58.98 MHz
+     bus). Shipped by OutRun on the fx-CG100.
+   - GCLK_PTUNE4_F5 (experimental, opt-in with a warning): CalcLoverHK's
      Ptune4 F5 as applied by gpSP-sh4-jit (src/overclock.c) on fx-CG100
      hardware: PLL x32, CPU 1/2 = 235.93 MHz, SuperHyway and SDRAM bus
      1/4 = 117.96 MHz (CL2, TRC6), Pphi 1/16 = 29.49 MHz. Some units show
@@ -31,19 +29,8 @@ void gclk_init(void)
 	g_current = GCLK_OFF;
 }
 
-/* Ptune4 F5 is gpSP's fx-CG100 register set; gint's own fx-CG50 F5 uses
-   other values (PLL x25, CS0WCR 0x440, CS3WCR 0x24d1), and the fx-CG50
-   fetches add-in code from flash through CS0, so the CG100 timings are not
-   offered there (final review): two levels on the fx-CG50 */
-int gclk_levels(void)
-{
-	return g_is_cg100 ? GCLK_COUNT : GCLK_PTUNE4_F5;
-}
-
 void gclk_apply(int level)
 {
-	if(level >= gclk_levels())
-		level = GCLK_F4;
 	if(level == g_current)
 		return;
 

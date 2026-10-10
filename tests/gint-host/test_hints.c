@@ -10,22 +10,20 @@ static int fails = 0;
 int main(void)
 {
 	/* The engine's exact texts (z_zone.c, g_game.c, m_misc.c, w_wad.c) */
-	char const *zm = gfatal_hint("Z_Malloc(42776) failure", true);
-	CHECK(zm && strstr(zm, "Copy WAD to RAM"), "CG100 memory hint: %s", zm ? zm : "-");
-	zm = gfatal_hint("Z_Malloc(42776) failure", false);
-	CHECK(zm && strstr(zm, "experimental RAM"), "CG50 memory hint: %s", zm ? zm : "-");
-	char const *d = gfatal_hint("Demo is from a different game version (110)", true);
+	char const *zm = gfatal_hint("Z_Malloc(42776) failure");
+	CHECK(zm && strstr(zm, "Copy WAD to RAM"), "memory hint: %s", zm ? zm : "-");
+	char const *d = gfatal_hint("Demo is from a different game version (110)");
 	CHECK(d && strstr(d, ".LMP"), "demo version hint");
-	CHECK(gfatal_hint("M_ReadFile: cannot open FRE0D03.LMP (-1)", true) == d, "demo read hint");
-	CHECK(gfatal_hint("Demo is damaged: too short (12)", true) == d, "damaged demo hint");
-	char const *s = gfatal_hint("Bad savegame: state 5000", true);
+	CHECK(gfatal_hint("M_ReadFile: cannot open FRE0D03.LMP (-1)") == d, "demo read hint");
+	CHECK(gfatal_hint("Demo is damaged: too short (12)") == d, "damaged demo hint");
+	char const *s = gfatal_hint("Bad savegame: state 5000");
 	CHECK(s && strstr(s, ".DSG"), "savegame hint");
-	CHECK(gfatal_hint("Bad savegame", true) == s, "savegame marker hint");
-	CHECK(gfatal_hint("M_ReadFile: cannot open FOO.CFG (-1)", true) == NULL, "non-demo read: no hint");
-	char const *w = gfatal_hint("W_GetNumForName: map40 not found!", true);
+	CHECK(gfatal_hint("Bad savegame") == s, "savegame marker hint");
+	CHECK(gfatal_hint("M_ReadFile: cannot open FOO.CFG (-1)") == NULL, "non-demo read: no hint");
+	char const *w = gfatal_hint("W_GetNumForName: map40 not found!");
 	CHECK(w && strstr(w, "WAD"), "missing lump hint");
-	CHECK(gfatal_hint("Savegame buffer overrun", true) == NULL, "other errors: no hint");
-	CHECK(gfatal_hint(NULL, true) == NULL, "no message");
+	CHECK(gfatal_hint("Savegame buffer overrun") == NULL, "other errors: no hint");
+	CHECK(gfatal_hint(NULL) == NULL, "no message");
 	printf("%s (%d failures)\n", fails ? "FAILED" : "OK", fails);
 	return fails != 0;
 }

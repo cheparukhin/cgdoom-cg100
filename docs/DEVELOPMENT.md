@@ -29,7 +29,7 @@ Makefile               host and simulator builds and tests (includes src/sim/cgd
 src/platform/platform.h  the PL_* platform API: the only interface between engine and platform
 src/engine/            portable DOOM engine (CGDoom's cgdoom/ + vanilla fixes); includes only platform.h
 src/engine/sh4/        SH4AL-DSP assembly: column/span drawers, palette expansion, FixedDiv helper
-src/gint/              fx-CG100 / fx-CG50 platform on gint: launcher, video, input, time, files, WAD, memory, UTLB
+src/gint/              fx-CG100 platform on gint: launcher, video, input, time, files, WAD, memory, UTLB
 src/host/              headless macOS/clang platform; also compiled for the simulator with -DPL_SIM
 src/sim/               GDB SH simulator harness: crt0, linker script, trap syscalls, libc glue, profilers
 tools/                 build-toolchain.sh, build-mpm.sh, wadtool.py
@@ -123,36 +123,37 @@ Rules:
 | File | Role |
 |---|---|
 | `main.c` | Entry point, launcher, game start, the single exit path, `PL_Fatal`, idle exit, quit-chord polling, destructor |
-| `sys.c` | Model detection and a full 10-character OS-string check. Builds the BFile call table (gint API 2 for `02.00.0000`; experimental tables for `01.00.0000` / `02.10.0000`; syscalls on the fx-CG50) |
-| `memory.c` | Arena discovery for the mpm.bin variants (v1.1, Feb-2025, dynload, pre-Feb-2025). Removes the `_os` arena on the fx-CG100. fx-CG50 experimental RAM. `PL_GetZones` (malloc reserve: 768 KiB on the fx-CG100, 320 KiB on the fx-CG50) |
-| `wad.c` | `PL_Wad*`, three back-ends: **RAM image** (primary), **flash block map** (`Bfile_GetBlockAddress`, checked against the file at open), **BFile** reads (reference) |
+| `sys.c` | Model check and a full 10-character OS-string check: the fx-CG100 with `02.00.0000` (gint API 2) only. Builds the BFile call table |
+| `memory.c` | Removes the `_os` arena. `PL_GetZones` (malloc reserve 768 KiB) over gint's arenas: `_uram` and mpm.bin 1.1's `_ld1` |
+| `wad.c` | `PL_Wad*`, three back-ends: **RAM image** (primary), **flash block map** (`Bfile_GetBlockAddress`, checked against the file at open), **BFile** reads (fallback) |
 | `files.c` | World-switched BFile helpers (P1 bounce buffers), `PL_File*`, delayed writes flushed in one world switch at exit (a replacement that does not fit puts the old file back from RAM), failure reporting |
 | `video.c` | Three presenters: async DMA from an SDRAM RGB565 frame (default), DMA strips through the X/Y on-chip banks, CPU writes. The 320x200 frame is centered in the 396x224 panel |
 | `input.c`, `keymaps.c` | Raw KEYSC reads only (never gint `getkey`). Launcher keys by physical position. fx-CG100 presets and key names. Rebind checks |
 | `time.c` | 35 Hz TMU tic. Microseconds from gint's profiler TMU. The quit chord and key activity sampled in the tic interrupt |
-| `clock.c` | Off / F4 (gint `CLOCK_SPEED_F4`) / Ptune4 F5 (fx-CG100 only) |
-| `tlb.c`, `tlbh.S`, `tlbplan.c` | UTLB protection of the code pages on the fx-CG100 (§2.5). `tlbplan.c` is pure logic, tested on the host |
+| `clock.c` | Off / F4 (gint `CLOCK_SPEED_F4`) / Ptune4 F5 |
+| `tlb.c`, `tlbh.S`, `tlbplan.c` | UTLB protection of the code pages (§2.5). `tlbplan.c` is pure logic, tested on the host |
 | `diag.c`, `hints.c`, `ui.c` | Diagnostics pages and benchmarks, `PL_Log` ring buffer, fatal-error hints, launcher drawing |
-| `stack.S` | Runs the game on a private 128 KiB stack (fx-CG100) |
+| `stack.S` | Runs the game on a private 128 KiB stack |
 | `wadnames.c` | Pure logic: the WAD base name given to the engine, and which WAD a demo in storage belongs to |
-| `no_osheap.c` | Replaces gint's OS-heap arena at link time: on the fx-CG100 every request fails (NULL) instead of calling OS code before `main()` |
+| `no_osheap.c` | Replaces gint's OS-heap arena at link time: every request fails (NULL) instead of calling OS code before `main()` |
 | `uram_check.ld` | Link-time guard: `.data` + `.bss` must leave at least 192 KiB of gint's 512 KiB static RAM (`_uram`) free for gint's own start-up allocations |
 
 **Startup** (`main()`):
 
-1. Record r15. Before any OS call, check the OS string (`gsys_init`).
+1. Record r15. Before any OS call, check the model and the OS string (`gsys_init`). On anything else,
+   show "Unsupported calculator" and return, with nothing else set up.
 2. Read DEL (safe start).
-3. Discover the heap (`gmem_init`). Snapshot the UTLB and install the miss handler, then pin the image
-   (`gtlb_init`).
+3. Remove the OS heap arena (`gmem_init`). Snapshot the UTLB and install the miss handler, then pin the
+   image (`gtlb_init`).
 4. Start the clock state and the timers.
-5. On the fx-CG100, back up on-chip memory across world switches (`GINT_ONCHIP_BACKUP`).
+5. Back up on-chip memory across world switches (`GINT_ONCHIP_BACKUP`).
 6. Allocate the RGB565 frame (`gvid_init`) and the private stack.
-7. Run the OS check and the memory check (at least 1.5 MiB on the fx-CG100). Load the settings, list the
-   WADs and demos (one world switch), then run the launcher.
+7. Run the memory check (at least 3 MiB, which refuses the older mpm.bin builds). Load the settings, list the WADs and demos (one world
+   switch), then run the launcher.
 
 **Game** (`run_game()`):
 
-1. fx-CG50 memory estimate and warnings, and the demo-overwrite check.
+1. The demo-overwrite check.
 2. `PL_WadOpen`: RAM image if the image fits in the largest block and 768 KiB + 1 MiB remain; otherwise
    the block map; otherwise BFile.
 3. Check that the start map exists (`gwad_has_lump`).
@@ -165,30 +166,29 @@ quit chord, and the idle exit.
 1. Wait for the keys to be released, and for the LCD DMA.
 2. `PL_WadClose()`.
 3. Write the pending files in one world switch.
-4. Zero the fx-CG50 experimental RAM.
-5. Report write failures, then stop the timers.
+4. Report write failures, then stop the timers.
 
 The `platform_quit()` destructor then runs on every path, `abort()` included. It closes the WAD file if
-it is still open, zeroes the experimental RAM if that is still needed, and restores MPM's UTLB layout.
+it is still open and restores MPM's UTLB layout.
 Finally, gint's `kquit` restores the OS clock, the LCD window and the drivers.
 
 ### 2.4 Memory
 
 - **Static:** all `.data`/`.bss` sit in gint's 512 KiB `_uram`, shared with gint's VRAM. Do not grow
   static arrays; allocate big renderer arrays at init (design §8).
-  - The current build has `.bss` 72 KiB, `.data` 2.8 KiB, `.text` 188 KiB, `.rodata` 143 KiB and
+  - The current build has `.bss` 72 KiB, `.data` 2.8 KiB, `.text` 188 KiB, `.rodata` 142 KiB and
     `.ilram` 1552 B (of about 4 KiB).
-  - The binary is 344,576 B and the g3a 373,252 B. The binary limit is 2 MiB (gint's linker script).
+  - The binary is 343,236 B and the g3a 371,912 B. The binary limit is 2 MiB (gint's linker script).
 - **Heap:**
-  - Never hard-code RAM addresses. Never use anything above 0x8c700000, and never touch 0x8c800000 or
-    above.
+  - Only the arenas gint creates: `_uram` and the `_ld1` that mpm.bin 1.1 announces (about 5.5 MiB). No
+    RAM address is hard-coded. Older mpm.bin builds announce less or none (critique §B3) and are not
+    supported.
   - RAM is not zeroed between launches.
   - Zones get the largest blocks, after the malloc reserve.
-- **mpm.bin variants:** see the table in `src/gint/memory.c` and critique §B3. With v1.1, a packed
-  doom1.wad (3318 KiB image) should fit in RAM. That is a calculation only; Developer info shows the mode
-  actually used.
+  - With mpm.bin 1.1, a packed doom1.wad (3318 KiB image) should fit in RAM. That is a calculation only;
+    Developer info shows the mode actually used.
 
-### 2.5 UTLB protection (fx-CG100 only)
+### 2.5 UTLB protection
 
 MPM maps the add-in image at 0x00300000 with 64 KiB UTLB entries, and sets URB=54. The OS runs `LDTLB`
 during world switches, so it can evict one of our code pages. gint's own miss handler would then jump
@@ -199,11 +199,12 @@ into the fx-CG50 syscall gate and crash. There are four layers (design §7, `src
 2. **Pinning:** move the image entries just below URB and lower URB, using a P2 executor with interrupts
    masked. The OS cannot replace them then, in either world.
 3. **Repair:** after every world switch, check and rewrite the slots and URB.
-4. **Restore at exit:** everything goes back to MPM's slots and URB. This is required because the
-   Feb-2025 mpm.bin does not flush the TLB between launches.
+4. **Restore at exit:** everything goes back to MPM's slots and URB. mpm.bin 1.1 flushes the TLB and
+   rewrites MMUCR before the next launch anyway; older builds (Feb-2025) did not, which is why this
+   exists.
 
-Without the executor, URB is only lowered to the slots MPM rewrites. **Safe start** (DEL held) uses that
-path on purpose. The fx-CG50 does none of this.
+Without the executor nothing is pinned or repaired; the miss handler still reloads evicted pages in the
+gint world. **Safe start** (DEL held) uses that path on purpose.
 
 ## 3. Builds
 
@@ -293,7 +294,7 @@ There is no hardware, so correctness rests on three things:
 | `make check-sh` | Every engine file compiles with sh-elf-gcc |
 | `make test-demosync` | Optional. DEMO1-3 of the shareware DOOM v1.9 `doom1.wad` named by `CGD_DOOM1_WAD` must play in sync: the per-tic game-state traces are compared with `tests/demosync/*.ckpt`, which were checked tic by tic against linuxdoom-1.10. Skipped when the variable is not set. `make test-demosync-sim` runs it in the simulator. |
 | `make -C src/engine/sh4/test run` | Asm vs the C reference: randomized and bit-exact, with stray-write, stack-canary and calling-convention checks; `asmcheck` |
-| `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (arena discovery, experimental RAM), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
+| `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
 | `make test-sim-full` | All 36 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
@@ -365,15 +366,15 @@ from frame 42 to the end, with view size 10 and full detail. They exclude the ho
 | All storage writes deferred to exit; `PL_WadClose` first | A write moves flash records and invalidates the block map | critique §B2, `cgdoom.h` |
 | A file of the same size is overwritten in place, a file of another size is replaced by remove + create + write. Either way the old file is kept in RAM first and written back if the new one does not fit | create + rename would need room for both copies when storage is nearly full, and `BFile_Rename` would be one more OS entry point never tested on hardware. Without memory for the backup, the replacement still goes ahead, so a failure then loses the old file | `files.c` (`os_flush`) |
 | Block map checked against the file at open | A wrong pointer would make the game read garbage; on a mismatch, CGDoom uses BFile reads instead | final review §16 |
-| Full OS-string check before any OS call | gint matches only `02.00`, which wrongly accepts 02.00.0010; 02.10 would reach the dead fx-CG50 gate | critique §B6, `sys.c` |
-| Arena discovery per mpm.bin build; `_os` removed | The builds give 2 to 5.5 MiB in different places; out-of-memory must return NULL, not call the OS | critique §B3, `memory.c` |
+| Model and full OS-string check before any OS call; anything but the fx-CG100 with `02.00.0000` quits | gint matches only `02.00`, which wrongly accepts 02.00.0010; other OS versions would reach the dead fx-CG50 gate; the g3a also starts on the fx-CG50 | critique §B6, `sys.c` |
+| mpm.bin 1.1 only; `_os` removed | 1.1 announces 5.5 MiB to gint; older builds hid RAM that needed per-build discovery. Out-of-memory must return NULL, not call the OS | critique §B3, `memory.c` |
 | UTLB pinning + repair + exit restore; safe start | The OS can evict code pages during world switches; stale entries can reset the next launch | design §7, `tlb.c` |
 | Raw KEYSC only; matrix codes; weak hooks for menu, Enter and ALPHA keys | gint remaps CG100 rows 5–9; CGDoom keymaps are matrix codes | design §7–8, `input.c` |
-| BACK = Doom menu, OK = second Enter (fx-CG100) | 0x84 (CGDoom's MENU) is OK on the fx-CG100, the launcher's select key | `keymaps.c` |
-| Overclock F4 by default, Ptune4 F5 opt-in on the fx-CG100 only | F4 is gint's supported preset; F5's 118 MHz bus fails on some units | `clock.c` |
+| BACK = Doom menu, OK = second Enter | 0x84 (CGDoom's MENU) is OK on the fx-CG100, the launcher's select key | `keymaps.c` |
+| Overclock F4 by default, Ptune4 F5 opt-in | F4 is gint's supported preset; F5's 118 MHz bus fails on some units | `clock.c` |
 | Async DMA presenter by default; X/Y strips and CPU as options | Overlaps the bus-bound transfer with rendering; strips are gpSP's proven path | `video.c` |
-| Hot drawers in ILRAM; X/Y banks reserved for the presenter | On-chip memory is re-initialized by world switches (code is fine, data is not); gint backs it up on the fx-CG100 | design §7 |
-| 128 KiB private game stack (fx-CG100) | The OS stack's size and location are unknown (critique §B7); Developer info reports the peak | `main.c`, `stack.S` |
+| Hot drawers in ILRAM; X/Y banks reserved for the presenter | On-chip memory is re-initialized by world switches (code is fine, data is not); gint backs it up | design §7 |
+| 128 KiB private game stack | The OS stack's size and location are unknown (critique §B7); Developer info reports the peak | `main.c`, `stack.S` |
 | One exit path; the quit chord is latched by the tic interrupt; `abort()` only for a hang; destructor | Saves survive every exit but a hang; the UTLB is restored even after `abort()` | gint-review rounds 2–3, `time.c` |
 | Idle exit (10 min, or 30 min in a user game) | The add-in owns the interrupts, so the OS auto power-off cannot run | critique §C7 |
 | Auto frameskip (max 3) | Game speed stays at 35 Hz; frames are dropped instead | design §8 |
@@ -390,12 +391,12 @@ channel.
 
 | Question | Probe | Where it is shown |
 |---|---|---|
-| Model, OS, OS access path | Model string, OS string, `gsys_os_path_name` | System, line 1 |
+| Model, OS | Model string, OS string | System, line 1 |
 | Which LCD controller (critique §A3) | `r61524_get_version()` | System: "LCD controller id" |
 | Where the stack is, and how much is used (§B7) | r15 at entry; stack peak of the 128 KiB private stack | System: "r15 at entry"; Developer info (after): "Stack peak" |
-| Which mpm.bin (§A5, §B3) | `gint_load_info`, phys(0x00300000), phys(0x08100000), detected loader, image size | System: loadinfo / phys / Loader lines; Advanced screen |
+| Which mpm.bin (§A5, §B3) | `gint_load_info`, phys(0x00300000), phys(0x08100000), image size; the `_ld1` arena | System: loadinfo / phys / Image lines; Memory |
 | Stock clock vs F1 (§B8) | FRQCR, FLLFRQ, `clock_get_speed()`, CS0WCR/CS3WCR/CS3BCR, Iφ/Bφ/Pφ | System (read at the current clock; the launcher runs at the OS clock) |
-| Heap layout (§B3) | Arena table: name, start, end, free, largest; OS heap removed; private arenas; zones and reserve once a game has run | Memory |
+| Heap layout (§B3) | Arena table: name, start, end, free, largest; OS heap removed; zones and reserve once a game has run | Memory |
 | Flash layout and block-map pointers (§A8, §B2, §C4) | Blocks, mapped, P1/P2/P0/other/error/unaligned counts, contiguous runs, longest run, physical range, "map did not match" | Storage (probe a WAD with OK/EXE); Developer info (before) |
 | Does the OS reload TLB entries during world switches (§C3) | UTLB slots changed by the probe's world switches; URB before and after; repairs and misses | Storage after a probe; System UTLB lines; Developer info (after) |
 | UTLB pinning worked | "UTLB pinned N pages: URB x (was 54)", or "executor off", or "SAFE START" | System |
@@ -404,7 +405,7 @@ channel.
 | Tic timer obtained | TMU number, or "polled clock" | System, last line |
 | `BFile_Read` return convention | Both conventions are accepted (`gfs_read_ok`); a failure shows as an open error | Launcher error / Log |
 | X/Y bank aliasing, partial-window DMA (§A2, §B4) | The picture is correct in *DMA strips* and *DMA (async)* | In game |
-| Exit leaves a clean UTLB | Another add-in launches normally after CGDoom, especially with the Feb-2025 mpm.bin | MPM |
+| Exit leaves a clean UTLB | Another add-in launches normally after CGDoom | MPM |
 
 Not implemented from §E: the SH-4A PMU check and the cache-size stride sweeps (item 7, optional).
 
@@ -431,13 +432,13 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
      which one happened.
 5. Check navigation: Up/Down, Left/Right, OK and EXE select, BACK returns. Typing digits on the
    episode/map rows works.
-6. Open Advanced and record the model, OS string (expected `02.00.0000`), loader (expected
-   `mpm.bin >= 1.1`) and free KiB.
+6. Open Advanced and record the free KiB (about 5.5 MiB expected by calculation with mpm.bin 1.1; under
+   3 MiB CGDoom would have refused to start).
 
 **Diagnostics**
 
 7. System page: record every line. Expected:
-   - "gint API 2 (OS 2.00)";
+   - "fx-CG100/Graph Math+, OS 02.00.0000";
    - a loadinfo line;
    - "UTLB pinned N pages: URB x (was 54)";
    - "Tic timer: TMU n (35 Hz)";
@@ -462,7 +463,7 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 13. In the game, check:
     - the picture is centered and has correct colors, and there is no garbage in the borders;
     - the FPS counter value, in a few places (record them);
-    - every action of the *Thumbs* preset, from the [user guide](USER-GUIDE.md#fx-cg100--graph-math) table;
+    - every action of the *Thumbs* preset, from the [user guide](USER-GUIDE.md#presets) table;
     - BACK opens the Doom menu, and EXE and OK select;
     - the *Detail* menu item, and the view-size keys;
     - Frameskip (TOOLS), Heap stats (sqrt), Run profiler (`)`); record the profiler line.
@@ -486,9 +487,6 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 22. Repeat a short game with each display mode (DMA strips, CPU direct) and record the FPS. Then repeat
     with *Copy WAD to RAM* unticked (flash block map) and compare the FPS.
 23. Optional, and risky: Ptune4 F5. Rerun the benchmarks, and play a few minutes.
-24. If other `mpm.bin` builds are available (Feb-2025, dynload), repeat steps 4–12. With those builds,
-    expect the WAD mode *flash block map*.
-25. fx-CG50, if available: OS ≤ 3.60. Turn on *Use experimental RAM* and run steps 4–16.
 
 **Report:**
 

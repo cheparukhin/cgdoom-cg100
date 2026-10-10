@@ -101,8 +101,6 @@ static void test_roundtrip(void)
     CGDoom_Options o, n;
     CGD_DefaultOptions(&o);
     o.DeveloperInfo = 1;
-    o.WADMethod = CGDOOM_WAD_BFILE;
-    o.TrustUnalignedLumps = 1;
     o.AutoStart = 1;
     o.EnableDemos = 1;
     o.DelaySaves = 0;
@@ -164,7 +162,8 @@ static void test_none_and_garbage(void)
     n += sprintf(text + n, "View=3\n");                         /* prefix */
     n += sprintf(text + n, "ViewSizeX=4\n");
     n += sprintf(text + n, "Low=1\nLowDetai=1\n");
-    n += sprintf(text + n, "WADMethod=MMAPX\n");
+    /* Options of older versions (WAD access, unaligned lumps) */
+    n += sprintf(text + n, "WADMethod=BFILE\nTrustUnalignedLumps=1\n");
     n += sprintf(text + n, "=5\n=\nnoequals\n\x01\x02=\xff\xfe\n");
     n += sprintf(text + n, "FlatFloors=1\n");
     n += sprintf(text + n, "ViewSize=8");                       /* no '\n' */
@@ -186,7 +185,7 @@ static void test_none_and_garbage(void)
         CHECK(o.Keymap[i] == want.Keymap[i], "keymap[%d] (%s): %d, want %d",
             i, CGD_DoomKey_TechnicalName(CGD_KeymapEntries[i]), o.Keymap[i],
             want.Keymap[i]);
-    CHECK(o.LowDetail == 0 && o.WADMethod == d.WADMethod, "prefix keys/values");
+    CHECK(o.LowDetail == 0 && o.ViewSize == 8, "prefix keys");
 
     /* Exact technical-name lookups */
     CHECK(CGD_PhysicalKey_FromTechnicalName("F", 1) < 0, "F is not F1");
@@ -240,7 +239,7 @@ static void test_numeric_values(void)
 
     sprintf(text, "Version=%d\nLowDetail=\n1\nFlatFloors=\r\n1\r\n"
         "DelaySaves=\n0\nViewSize= 5\nDeveloperInfo=1x\nEnableDemos=-\n"
-        "Autostart=99999999999\nTrustUnalignedLumps=\n",
+        "Autostart=99999999999\n",
         CGDOOM_SETTINGS_FILE_VERSION);
     set_file(text);
     o = d;

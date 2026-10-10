@@ -464,87 +464,6 @@ static void test_fuzz(void)
 	printf("fuzz: %d repair ops, %d ldtlb executed\n", total_ops, exec_ldtlb_count);
 }
 
-/* Round 3.1: no P2 executor (nothing can unpin or drop entries at exit).
-   gtlb_init() lowers URB to gtlb_plan_contain_urb(); the miss handler and
-   the OS then load at URC < URB only; gtlb_quit() leaves URB alone (kquit
-   may still take misses; MPM rewrites MMUCR when the add-in returns, and
-   sets URB 54 at the next launch). Run OS activity and handler reloads,
-   exit, replay MPM's next launch. */
-static bool unpinned_session(int kind, int run_urb, int steps)
-{
-	mpm_layout_kind(kind);
-	snapshot_img(5);
-	urb = run_urb;
-	urc = 0;
-	for(int step = 0; step < steps; step++) {
-		if(rnd() % 2) {
-			/* OS: URC-based load of a foreign 4 KiB page */
-			uint32_t vpn = 0x00100000u + (rnd() % 0x100) * 0x1000;
-			bool clash = false;
-			for(int i = 0; i < 64; i++)
-				if((hw.addr[i] & GTLB_ADDR_V) && (hw.addr[i] & GTLB_ADDR_VPN) == vpn) clash = true;
-			if(!clash) hw_load(urc, vpn, (0x0c000000u | vpn) | PTEL_4K);
-		}
-		else {
-			/* Miss handler: a missing snapshot page, loaded at URC */
-			int p = (int)(rnd() % GTLB_PAGES);
-			if(table[p].ptel && where(p) == -1)
-				hw_load(urc, table[p].pteh, table[p].ptel);
-		}
-		urc = (urc + 1 + (int)(rnd() % 3)) % urb;
-		CHECK(no_duplicates(&hw), "%s: duplicate during the session", mpm_name[kind]);
-	}
-	/* gtlb_quit(): nothing. kquit: a few more handler reloads at URC */
-	for(int p = 0; p < GTLB_PAGES; p++) {
-		if(table[p].ptel && where(p) == -1) {
-			hw_load(urc, table[p].pteh, table[p].ptel);
-			urc = (urc + 1) % urb;
-		}
-	}
-	mpm_launch(kind);   /* MMU_SetEnabled(true): URB 54 */
-	return no_duplicates(&hw);
-}
-
-static void test_contain(void)
-{
-	for(int kind = 0; kind < MPM_KINDS; kind++) {
-		mpm_layout_kind(kind);
-		snapshot_img(5);
-		int want = (kind == MPM_FEB2025) ? 48 : 54;
-		int cap = gtlb_plan_contain_urb(slot_orig, 54);
-		CHECK(cap == want, "%s: URB %d, want %d", mpm_name[kind], cap, want);
-		/* URB 0: no boundary at all (all 64 slots) */
-		cap = gtlb_plan_contain_urb(slot_orig, 0);
-		CHECK(cap == mpm_rom_pages(kind), "%s: URB 0 -> %d", mpm_name[kind], cap);
-		/* Already inside */
-		CHECK(gtlb_plan_contain_urb(slot_orig, 40) == 40, "%s: URB 40 kept", mpm_name[kind]);
-
-		int bad = 0;
-		for(int r = 0; r < 40; r++)
-			bad += !unpinned_session(kind, gtlb_plan_contain_urb(slot_orig, 54), 400);
-		CHECK(bad == 0, "%s: contained sessions, %d next launches reset", mpm_name[kind], bad);
-	}
-
-	/* Without containment, Feb-2025 does reset (the round-3.1 finding) */
-	int bad = 0;
-	for(int r = 0; r < 40; r++)
-		bad += !unpinned_session(MPM_FEB2025, 54, 400);
-	CHECK(bad > 0, "Feb-2025 with URB 54: expected some duplicate (got none)");
-	printf("contain: Feb-2025 with URB 54: %d/40 next launches reset\n", bad);
-
-	/* A gap in the snapshot's leading slots: contain to the gap; fewer
-	   than GTLB_MIN_REPLACEABLE leading slots: leave URB alone */
-	int8_t so[GTLB_PAGES];
-	memset(so, -1, sizeof so);
-	for(int p = 0; p < 30; p++) so[p] = (int8_t)p;
-	so[20] = -1;
-	CHECK(gtlb_plan_contain_urb(so, 54) == 20, "gap at 20");
-	so[10] = -1;
-	CHECK(gtlb_plan_contain_urb(so, 54) == 54, "too few leading slots");
-	memset(so, -1, sizeof so);
-	CHECK(gtlb_plan_contain_urb(so, 54) == 54, "empty snapshot");
-}
-
 static void test_mmucr(void)
 {
 	/* AT=1, SV=1, URB=54, URC=17, SQMD=1, TI bit set in the "read" */
@@ -564,7 +483,6 @@ int main(void)
 	test_repair_cases();
 	test_relaunch();
 	test_fuzz();
-	test_contain();
 	test_mmucr();
 	printf("%s (%d failures)\n", fails ? "FAILED" : "OK", fails);
 	return fails != 0;

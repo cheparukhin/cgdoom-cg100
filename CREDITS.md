@@ -36,9 +36,7 @@ and of nDoom.
   - building the flash block map with `Bfile_GetBlockAddress` in one world switch, and the rules for
     accepting P1/P2 pointers and rejecting P0 pointers (`src/gint/wad.c`);
   - the Ptune4 F5 overclock register set (`src/gint/clock.c`);
-  - the bounded key-release wait (`src/gint/input.c`);
-  - the fx-CG50 syscall trampoline (`src/gint/cg50_syscall.S`);
-  - the RAM ranges that are safe to use under MPM (`src/gint/memory.c`).
+  - the bounded key-release wait (`src/gint/input.c`).
 - **Ptune4** (CalcLoverHK): the F5 clock preset, as applied by gpSP.
 - **GBADoom:** the `COLEXTRABITS` trick in the SH4 column drawers (`src/engine/sh4/r_draw_sh4.S`). The
   texture coordinate is pre-shifted, so that a single shift gives the texel row.

@@ -31,22 +31,14 @@ diagnostics and troubleshooting.
 - **Do not install Casio OS updates on an MPM calculator.** Any OS update removes the patch, and the
   newer OS versions (2.10, 2.20) are not supported by the installer yet.
 
-Inside CGDoom, the Advanced screen and the Diagnostics show the OS as `02.00.0000`. That is the internal
-string of both supported builds, so it is normal. On OS strings `01.00.0000` and `02.10.0000`, CGDoom asks
-before it continues ("Experimental OS"): its file access there uses entry points nobody has tested. On any
-other unknown OS it shows "Unsupported OS" and quits.
+Inside CGDoom, the Diagnostics show the OS as `02.00.0000`. That is the internal string of both
+supported builds, so it is normal. On any other OS string, or on another model, CGDoom shows
+"Unsupported calculator" and quits without touching anything.
 
 ### fx-CG50 / Graph 90+E
 
-The same `CGDoom.g3a` starts on the fx-CG50 from the main MENU, with its own keymaps. MPM is not needed
-there. This is a bonus target, and it is untested. The game needs about 700 KiB of zone memory for
-`doom1.wad`. Without CGDoom's "experimental RAM" the fx-CG50 leaves only about 150 KiB.
-
-- **OS 3.60 or older:** turn on Advanced → *Use experimental RAM*.
-- **OS 3.70 and later:** there is no experimental RAM, so `doom1.wad` cannot run.
-
-Before a game starts, the launcher estimates the memory and warns you if it is too small. On the fx-CG50,
-[Lephenixnoir's original CGDoom](https://git.planet-casio.com/Lephenixnoir/CGDoom) is the proven build.
+Not supported. The `.g3a` starts from the fx-CG50's main MENU, shows "Unsupported calculator" and quits.
+On the fx-CG50, use [Lephenixnoir's CGDoom](https://git.planet-casio.com/Lephenixnoir/CGDoom).
 
 ## MPM in detail
 
@@ -58,21 +50,14 @@ Windows PC, or a Windows VM with the calculator's USB device attached to it. MPM
 but nobody has confirmed it on Apple Silicon. Copying files only needs USB mass storage, which works from
 any OS.
 
-**Which `mpm.bin`.** Several builds of `mpm.bin` are in use, and they leave very different amounts of RAM
-to add-ins. CGDoom detects the build and uses all the RAM it can find. The figures below come from reading
-the loaders' source, not from measurements.
+**Which `mpm.bin`.** CGDoom needs `mpm.bin` 1.1, the build in the release zip. It hands add-ins about
+5.5 MiB of RAM in one block (a figure from reading the loader's source, not a measurement), enough to copy a
+packed `doom1.wad` to RAM with about 300 KiB to spare by calculation.
 
-| `mpm.bin` build | Free RAM for CGDoom | Where the WAD is read from |
-|---|---|---|
-| **1.1 or later** (recommended; in the release zip) | about 5.5 MiB in one block | Copied to RAM: a packed `doom1.wad` should fit, with about 300 KiB to spare by calculation |
-| Public Feb-2025 zip | 2 MiB, plus about 2.5 MiB that CGDoom finds itself | Read in place from flash (slower) |
-| "dynload" build (shipped by gpSP and KhiCAS) | about 4.5 MiB, which CGDoom finds itself | Read in place from flash (slower) |
-| builds before Feb-2025 | 2 MiB, plus about 2.5 MiB | Read in place from flash (slower) |
-
-- With less than 1.5 MiB in total, CGDoom stops at startup with "Not enough memory" and asks for
-  mpm.bin 1.1 or later.
-- The Advanced screen shows which loader was detected and how much RAM is free, for example
-  `mpm.bin >= 1.1, <N> KiB free`.
+- Older builds (the public Feb-2025 zip, the "dynload" build of gpSP and KhiCAS) announce at most about
+  2 MiB, and CGDoom does not look for the rest. They are not supported: with less than 3 MiB free, CGDoom
+  stops at startup with "Not enough memory" and asks for mpm.bin 1.1.
+- The Advanced screen shows how much RAM is free.
 - MPM publishes no binary releases. The release zip's `mpm.bin` is built unmodified from the MPM
   repository (`git.planet-casio.com/PlaneteCasio/mpm`, commit `cbd1a41`) by `tools/build-mpm.sh`.
 - KhiCAS and gpSP ship their own "dynload" `mpm.bin`. Whether they run under 1.1 has not been checked, so
@@ -118,10 +103,8 @@ need room. That is why only shareware-sized IWADs fit:
 The launcher lists every `*.wad` file in the storage root, with up to 16 WADs and 24 demos. Below the list
 are the game options.
 
-**Navigation (fx-CG100):** **Up/Down** select, **Left/Right** change a value, **OK** or **EXE** select,
-**BACK** or **HOME** returns. On the main screen, **BACK** or **HOME** quits to MPM.
-
-**Navigation (fx-CG50):** the arrows, **EXE**, and **EXIT** to return. **MENU** quits.
+**Navigation:** **Up/Down** select, **Left/Right** change a value, **OK** or **EXE** select, **BACK** or
+**HOME** returns. On the main screen, **BACK** or **HOME** quits to MPM.
 
 On the episode and map rows you can also type a digit.
 
@@ -149,7 +132,7 @@ Launch it again to play again.
 
 | Option | Values | Default |
 |---|---|---|
-| CPU clock | **Off (OS clock)**; **F4: 236 MHz CPU**, the bus is unchanged (gint's safe preset); **Ptune4 F5 (exp.)**, a 236 MHz CPU with the memory bus at 118 MHz (fx-CG100 only, asks for confirmation, see [Performance tips](#performance-tips)). | F4 |
+| CPU clock | **Off (OS clock)**; **F4: 236 MHz CPU**, the bus is unchanged (gint's safe preset); **Ptune4 F5 (exp.)**, a 236 MHz CPU with the memory bus at 118 MHz (asks for confirmation, see [Performance tips](#performance-tips)). | F4 |
 | Display | **DMA (async)**: the frame is sent to the screen by DMA while the next one is drawn. **DMA strips (X/Y RAM)**: the frame goes out in 10-row strips through on-chip memory. **CPU direct**: the CPU writes each pixel. | DMA (async) |
 | Frameskip | **Auto (max 3)**: the game always runs at 35 tics per second and skips drawing at most 3 frames in a row when it falls behind. **0–3**: a fixed number of frames skipped after every drawn frame. | Auto |
 | FPS counter | Shows the frame rate in the game. | Off |
@@ -165,12 +148,9 @@ the Doom menu. CGDoom saves those changes. Flat floors can only be changed here.
 | Option | What it does | Default |
 |---|---|---|
 | Developer info | Shows statistics screens before and after the game: WAD mode, RAM image, heap, clock, zone peak, stack peak, UTLB repairs. | Off |
-| WAD access | **Memory**: a RAM copy, or reading in place from flash. **BFile reads**: reads every lump through the OS, which is slow (for debugging). | Memory |
 | Copy WAD to RAM if it fits | Copies the WAD (without its sounds) to RAM when there is enough memory left for the game. Otherwise lumps are read in place from flash. | On |
-| Trust unaligned lumps | Uses lumps that are not 4-byte aligned in place instead of copying them. Packed WADs have none. | Off |
-| Use experimental RAM | Only shown on the fx-CG50 with OS 3.60 or older. Uses the RAM above the 2 MB line. | Off |
 
-The screen also shows the model, OS string, `mpm.bin` build and free RAM.
+The screen also shows the free RAM.
 
 Settings are stored in `CGDOOM.CFG` and written when CGDoom exits.
 
@@ -179,15 +159,14 @@ Settings are stored in `CGDOOM.CFG` and written when CGDoom exits.
 The Controls screen (**Controls...**) has these actions:
 
 - *Load preset*: pick a preset with Left/Right, then press OK/EXE to apply it.
-- Rebind an action: select it, press OK/EXE, then press the new key. BACK or HOME cancels (MENU on the fx-CG50).
+- Rebind an action: select it, press OK/EXE, then press the new key. BACK or HOME cancels.
 - **DEL** unbinds an action.
 - *Discard changes* restores the keymap you had when you opened the screen.
 
 Each key does one action. If you bind a key that was already in use, its old action is unbound and the
-screen says so. **AC/ON** cannot be bound, and neither can the Doom menu key. (Two fx-CG50 presets
-put Pause on AC/ON; that binding is kept, but you cannot make it yourself.)
+screen says so. **AC/ON** cannot be bound, and neither can the Doom menu key.
 
-### fx-CG100 / Graph Math+
+### Presets
 
 The key names are the ones the Controls screen shows. On the fx-CG100, *X,O,t* is the X,θ,t key.
 
@@ -217,30 +196,6 @@ The key names are the ones the Controls screen shows. On the fx-CG100, *X,O,t* i
 - **EXE** selects. **OK** also selects, as long as no action is bound to it; the presets leave it free.
 - The move keys navigate. With *Strafe arrows*, Left/Right on sliders are the turn keys PrevTab/NextTab.
 - Prompts say "press exe to confirm". EXE or the Interact key answers yes, and BACK answers no.
-
-### fx-CG50 / Graph 90+E
-
-| Action | **Thumbs only** (default) | **Full hands** | **CGDoom 0.3** |
-|---|---|---|---|
-| Look left / Look right | Left / Right | F5 / F6 | Left / Right |
-| Move forward / Move backward | Up / Down | OPTN / x^2 | Up / Down |
-| Strafe left / Strafe right | X,O,T / log | ALPHA / ^ | 0 / . |
-| Shoot | ALPHA | DEL | ALPHA |
-| Interact | x^2 | x | EXE |
-| Toggle run | tan | cos | (none) |
-| Weapons 1–6 / 7 | F1–F6 / 7 | 1–6 / 7 | F1–F6 / SHIFT |
-| Map | EXIT | tan | EXIT |
-| Pause | AC/ON | AC/ON | OPTN |
-| Smaller / Larger view | - / + | - / + | - / + |
-| Cheat | , | , | ^ |
-| Noclip | -> | -> | -> |
-| Brightness | Frac | Frac | Frac |
-| Heap stats | S<>D | S<>D | S<>D |
-| FPS counter | ( | ( | ( |
-| Frameskip | VARS | sin | VARS |
-| Run profiler | ) | ) | ) |
-
-On the fx-CG50, **MENU** opens the Doom menu and **EXE** selects.
 
 ### Special keys
 
@@ -296,7 +251,7 @@ instructions. In the simulator, in instructions per frame, compared with the def
 - **Ptune4 F5 is experimental.** It also runs the memory bus at 118 MHz. gint does not offer it on the
   fx-CG100 because some units cannot handle the faster bus: **crashes or corrupted data are possible**.
   gpSP and KhiCAS use it on many units. Try it only if you accept that risk, and turn it off if anything
-  odd happens. The fx-CG50 only gets Off and F4.
+  odd happens.
 - **Leave Frameskip on Auto.** The game then keeps real-time speed and draws as often as it can.
 - **Use mpm.bin 1.1** so that the WAD can be copied to RAM. Reading from flash is several times slower.
   The Developer info screen shows the mode that was used: *RAM image*, *flash block map* or *BFile reads*.
@@ -338,14 +293,14 @@ shortened with a hash, for example `FRE0P` for `freedoom1.wad`.
 **Diagnostics...** in the launcher has five pages. Change pages with Left/Right.
 
 1. **System:**
-   - model, OS string and OS access path;
+   - model and OS string;
    - gint version, LCD controller id, and the stack pointer at entry;
-   - MPM load info, the physical addresses of the code and static RAM, the loader and the image size;
+   - MPM load info, the physical addresses of the code and static RAM, and the image size;
    - the clock registers and the CPU/bus/peripheral frequencies;
    - UTLB state: pages, miss handler, misses, repairs, pinning and URB;
    - world switches, and the tic timer. "SAFE START" appears here when DEL was held.
-2. **Memory:** the RAM arenas (start, end, free, largest block), whether the OS heap was removed, and any
-   private arenas. Game zones only exist once a game has started.
+2. **Memory:** the RAM arenas (start, end, free, largest block) and whether the OS heap was removed. Game
+   zones only exist once a game has started.
 3. **Storage:**
    - Up/Down picks a WAD, and OK/EXE maps it read-only (nothing is written). The page then shows how the
      OS laid it out in flash: blocks, direct pointers, contiguous runs and the physical range.
@@ -364,7 +319,7 @@ it with the Diagnostics pages.
 **What to report.** Please open an issue on GitHub, and include:
 
 - the calculator model and OS version (from Settings → About);
-- the `mpm.bin` build you use (the Advanced screen shows CGDoom's guess);
+- the `mpm.bin` build you use;
 - the WAD (name and size) and how you prepared it;
 - what you did and what happened. Copy the exact text of any error screen. A fatal error screen shows the
   engine's message, and for common errors a hint line under it.
@@ -378,12 +333,11 @@ it with the Diagnostics pages.
 |---|---|
 | Black screen or reset when you launch CGDoom | Launch it again while you hold **DEL** (safe start), then report it. Check that your OS and MPM are supported (see [Compatibility](#compatibility)). |
 | "No *.wad file in the storage root." | Copy the WAD over USB to the top folder of the storage memory, not to a subfolder or `@MainMem`. The name must end in `.wad`. |
-| "Unsupported OS" | CGDoom only runs on the OS versions that MPM supports (02.00.0202 / 02.00.2202), and on the fx-CG50. |
-| "Not enough memory ... Install mpm.bin version 1.1 or later" | Your `mpm.bin` leaves less than 1.5 MiB. Install mpm.bin 1.1 from the release zip. |
+| "Unsupported calculator" | CGDoom only runs on the fx-CG100 / Graph Math+ with the OS versions that MPM supports (02.00.0202 / 02.00.2202). |
+| "Not enough memory ... Install the mpm.bin 1.1" | Your `mpm.bin` leaves less than 3 MiB (an older build). Install mpm.bin 1.1 from the release zip. |
 | "Cannot open DOOM1.WAD." with a reason | *Too small*, *truncated* or *could not be opened*: the copy is incomplete, so copy it again. *Not a WAD file*: the file is not a WAD. *Name too long or has characters CGDoom cannot use*: rename it, for example to `doom1.wad`. |
 | "DOOM1.WAD has no map E2M1" | The shareware WAD only has episode 1. Change *Start at episode/map*. |
-| "Z_Malloc ... failure" (out of memory) | On the fx-CG100, untick Advanced → *Copy WAD to RAM if it fits* to leave more memory to the game, or use a smaller WAD. On the fx-CG50, turn on *Use experimental RAM* (OS 3.60 or older). After an earlier session, reset the calculator first. |
-| "Not enough memory" / "Low memory" before a game (fx-CG50) | Follow what the dialog says: turn on experimental RAM, or reset the calculator. On OS 3.70+ the game cannot run. |
+| "Z_Malloc ... failure" (out of memory) | Check that you use mpm.bin 1.1. Untick Advanced → *Copy WAD to RAM if it fits* to leave more memory to the game, or use a smaller WAD. |
 | "Demo is from a different game version" | Delete that `.LMP` file or record it again. |
 | "W_GetNumForName: ... not found!" | The WAD is incomplete or not one CGDoom can play. Copy it again. |
 | "NOT SAVED" when leaving | Storage is full. Delete files to make room. The new version of the listed file is lost. The screen says whether its previous version was kept. |
@@ -408,5 +362,5 @@ it with the Diagnostics pages.
   - The title demos are still off by default.
 - **Storage.** About 4.5 MB of storage means only shareware-sized WADs fit on the fx-CG100.
 - **One game per launch.** After a game, CGDoom returns to MPM.
-- **fx-CG50:** untested. It needs experimental RAM (OS 3.60 or older) for `doom1.wad`.
+- **fx-CG100 with mpm.bin 1.1 only.** Other models, OS versions and `mpm.bin` builds are not supported.
 - **Ptune4 F5** can crash some units.

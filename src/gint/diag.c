@@ -1,8 +1,8 @@
 /* CGDoom gint platform: diagnostics screen, microbenchmarks, PL_Log.
 
    Everything here exists to answer the questions that only hardware can
-   answer (notes/research-critique.md §E): which mpm.bin variant and LCD
-   controller we run on, where the stack is, the clock registers, the heap
+   answer (notes/research-critique.md §E): what the loader announced, which
+   LCD controller we run on, where the stack is, the clock registers, the heap
    layout, the WAD block map (P1/P2/P0 counts, physical range), UTLB
    repairs, and flash vs SDRAM / CPU vs DMA timings. Shown on screen only
    (an fxlink text channel would need the USB driver and a connected host).
@@ -166,8 +166,7 @@ static void page_system(void)
 	cpg_get_overclock_setting(&cpg);
 	clock_frequency_t const *f = clock_freq();
 
-	LINE("%s, OS %s (%s)", gsys_model_name(), g_os_version,
-		gsys_os_path_name());
+	LINE("%s, OS %s", gsys_model_name(), g_os_version);
 	LINE("gint %s, LCD controller id %d", GINT_VERSION,
 		(int)r61524_get_version());
 	LINE("r15 at entry: %08x", (unsigned)g_entry_r15);
@@ -186,8 +185,7 @@ static void page_system(void)
 		LINE("loadinfo: none (no 'MPM0')");
 	LINE("phys(00300000)=%08x phys(08100000)=%08x",
 		(unsigned)gmem_stats.rom_phys, (unsigned)gmem_stats.uram_phys);
-	LINE("Loader: %s, image %u KiB", gmem_variant_name(),
-		(unsigned)(gmem_stats.image_size >> 10));
+	LINE("Image %u KiB", (unsigned)(gmem_stats.image_size >> 10));
 	LINE("FRQCR %08x FLLFRQ %08x speed F%d", (unsigned)cpg.FRQCR,
 		(unsigned)cpg.FLLFRQ, clock_get_speed());
 	LINE("CS0WCR %08x CS3WCR %08x CS3BCR %08x", (unsigned)cpg.CS0WCR,
@@ -205,11 +203,9 @@ static void page_system(void)
 		LINE("UTLB pinned %d pages: URB %d (was %d), URB resets %d",
 			gtlb_stats.pinned, gtlb_stats.urb, gtlb_stats.urb_orig,
 			gtlb_stats.urb_fixes);
-	else if(g_is_cg100 && gtlb_stats.handler && !gtlb_stats.executor)
-		LINE("UTLB executor off: not pinned, URB %d (was %d)",
-			gtlb_stats.urb_cap ? gtlb_stats.urb_cap : gtlb_stats.urb_orig,
-			gtlb_stats.urb_orig);
-	else if(g_is_cg100)
+	else if(gtlb_stats.handler && !gtlb_stats.executor)
+		LINE("UTLB executor off: not pinned, URB %d", gtlb_stats.urb_orig);
+	else
 		LINE("UTLB pages not pinned (URB %d)", gtlb_stats.urb_orig);
 	LINE("Clock option: %s", gclk_name(gclk_current()));
 	/* Final review: whether the 35 Hz TMU tic was obtained (critique §E) */
@@ -239,13 +235,7 @@ static void page_memory(void)
 		(unsigned)(gmem_total_free() >> 10),
 		(unsigned)(gmem_largest_free() >> 10));
 	LINE("OS heap arena: %s", gmem_stats.os_heap_removed ? "removed" :
-		(g_is_cg100 ? "present" : "kept (CG50 syscalls)"));
-	if(gmem_stats.priv_end)
-		LINE("Private arena %08x-%08x", (unsigned)gmem_stats.priv_start,
-			(unsigned)gmem_stats.priv_end);
-	if(gmem_stats.priv2_end)
-		LINE("Private arena 2 %08x-%08x", (unsigned)gmem_stats.priv2_start,
-			(unsigned)gmem_stats.priv2_end);
+		"present");
 	if(!gmem_stats.zone_count)
 		LINE("Zones and malloc reserve: set up when a game starts.");
 	if(gmem_stats.zone_count) {
@@ -255,8 +245,6 @@ static void page_memory(void)
 				gmem_stats.zone_size[i] >> 10);
 		LINE("malloc reserve: %d KiB", gmem_stats.reserve >> 10);
 	}
-	if(gmem_stats.extra_ram)
-		LINE("CG50 experimental RAM: %d KiB", gmem_stats.extra_ram >> 10);
 }
 
 /* Storage probe (final review): open a WAD in block-map mode from the
@@ -279,9 +267,7 @@ static void probe_wad(void)
 		return;
 	char const *name = g_wads[g_wad_sel].name;
 	static gtlb_view_t before, after;
-	bool force = gwad_force_bfile;
 	int ram = g_opt.wad_in_ram;
-	gwad_force_bfile = false;
 	g_opt.wad_in_ram = 0;
 
 	ui_status("Storage probe", name, "Mapping the WAD (read-only)...");
@@ -292,7 +278,6 @@ static void probe_wad(void)
 	g_urb_after = gtlb_mmucr_urb(*(volatile uint32_t *)0xff000010u);
 	PL_WadClose();
 
-	gwad_force_bfile = force;
 	g_opt.wad_in_ram = ram;
 	strcpy(g_probe_name, name);
 
@@ -324,7 +309,7 @@ static void page_wad(void)
 	}
 	if(g_wad_count > 0)
 		LINE("EXE/OK: probe %s", g_wads[g_wad_sel].name);
-	if(g_probe_name[0] && g_is_cg100) {
+	if(g_probe_name[0]) {
 		LINE("UTLB: %d slots changed, URB %d -> %d", g_utlb_changed,
 			g_urb_before, g_urb_after);
 		if(g_utlb_changed)

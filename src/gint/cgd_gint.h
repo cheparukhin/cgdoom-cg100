@@ -1,12 +1,12 @@
-/* CGDoom gint platform (fx-CG100 / Graph Math+ under MPM, and fx-CG50):
-   internal interfaces shared by the files of src/gint.
+/* CGDoom gint platform (fx-CG100 / Graph Math+ under MPM 1.1): internal
+   interfaces shared by the files of src/gint.
 
    The public side of this platform is src/platform/platform.h (PL_*). This
    header only declares what the gint files need from each other:
 
-     sys.c       model / OS detection, OS call table (BFile, block map)
+     sys.c       model / OS check, OS call table (BFile, block map)
      tlb.c       UTLB snapshot, repair after world switches, TLB-miss handler
-     memory.c    arena discovery (3 mpm.bin variants), PL_GetZones
+     memory.c    heap arenas, PL_GetZones
      files.c     world-switched BFile helpers, PL_File*, delayed writes
      wad.c       PL_Wad* (RAM image / 4 KiB block map / BFile)
      video.c     PL_SetPalette / PL_FinishUpdate / PL_VideoReset
@@ -39,10 +39,6 @@
 #ifndef CGD_MALLOC_RESERVE
 #define CGD_MALLOC_RESERVE        (768 << 10)
 #endif
-/* Same on the fx-CG50, where the whole heap is ~450 KiB (+ OS heap). */
-#ifndef CGD_MALLOC_RESERVE_CG50
-#define CGD_MALLOC_RESERVE_CG50   (320 << 10)
-#endif
 /* Smallest block worth turning into a zone. */
 #define CGD_MIN_ZONE              (32 << 10)
 /* The WAD is copied to RAM (the primary path) when the image fits in the
@@ -54,36 +50,20 @@
 #ifndef CGD_WAD_RAM_MARGIN
 #define CGD_WAD_RAM_MARGIN        (CGD_MALLOC_RESERVE + CGD_MIN_GAME_ZONE)
 #endif
-/* Refuse to start (fx-CG100) with less heap than this in total. */
-/* fx-CG50: with a smaller zone estimate (experimental RAM + the heap past
-   the malloc reserve), doom1.wad cannot run (SH simulator, final review:
-   the title needs ~400 KiB of zone, E1M6 peaks at ~640 KiB) */
-#define CGD_CG50_MIN_GAME_ZONE    (700 << 10)
+/* Refuse to start with less heap than this in total: mpm.bin 1.1 leaves
+   about 5.5 MiB (by calculation), the older builds at most about 2 MiB, so
+   they are refused rather than run untested (their UTLB handling is gone) */
 #ifndef CGD_MIN_TOTAL_HEAP
-#define CGD_MIN_TOTAL_HEAP        (1536 << 10)
+#define CGD_MIN_TOTAL_HEAP        (3 << 20)
 #endif
-/* Private stack for the game (fx-CG100); 0 disables it. */
+/* Private stack for the game; 0 disables it. */
 #ifndef CGD_PRIVATE_STACK_SIZE
 #define CGD_PRIVATE_STACK_SIZE    (128 << 10)
 #endif
 
-/* Physical memory limits (fx-CG100 / CG50 SDRAM is 8 MiB at 0x0c000000) */
-#define CGD_RAM_P1_START          0x8c000000u
-#define CGD_RAM_LOW_LIMIT         0x8c200000u  /* OS owns below */
-#define CGD_RAM_OLD_MPM_LIMIT     0x8c700000u  /* Feb-2025/dynload mpm.bin */
-#define CGD_RAM_END               0x8c800000u  /* never touch (cold boot) */
-
 //---
-// sys.c: model and OS detection, OS call table
+// sys.c: model and OS check, OS call table
 //---
-
-typedef enum {
-	GOS_SYSCALL = 0,  /* fx-CG50 family: OS syscall gate at 0x80020070 */
-	GOS_CG100_200,    /* fx-CG100 "02.00.0000": the MPM firmware */
-	GOS_CG100_100,    /* fx-CG100 "01.00.0000" (gint API 1, experimental) */
-	GOS_CG100_210,    /* fx-CG100 "02.10.0000" (own table, experimental) */
-	GOS_UNSUPPORTED,  /* no known OS entry points: no file access at all */
-} gos_kind_t;
 
 /* Table of the OS functions used by the platform. Every function must be
    called inside gint_world_switch() (see gfs_os_call()). */
@@ -100,23 +80,19 @@ typedef struct {
 	int (*find_next)(int shandle, uint16_t *found,
 		struct BFile_FileInfo *info);
 	int (*find_close)(int shandle);
-	/* Bfile_GetBlockAddress (NULL if unknown on this OS) */
+	/* Bfile_GetBlockAddress (NULL: no block map, tests only) */
 	int (*block)(int fd, int offset, void **ptr);
 } gos_api_t;
 
-extern bool        g_is_cg100;      /* gint[HWCALC] == HWCALC_FXCG100 */
-extern gos_kind_t  g_os_kind;
 extern char        g_os_version[11]; /* string at 0x80020020 */
-extern gos_api_t   g_os;            /* valid unless GOS_UNSUPPORTED */
+extern gos_api_t   g_os;            /* valid if gsys_supported() */
 extern uint32_t    g_entry_r15;     /* stack pointer at main() entry */
 
 void gsys_init(void);
-bool gsys_files_supported(void);
-bool gsys_os_experimental(void);
+/* fx-CG100 with OS "02.00.0000" (CASIOWIN API 2), the only firmware MPM
+   installs on. Anything else: no OS call, no MMU or heap change. */
+bool gsys_supported(void);
 char const *gsys_model_name(void);
-char const *gsys_os_path_name(void);
-/* fx-CG50 with OS <= 3.60 (CGDoom's experimental RAM gate) */
-bool gsys_cg50_extra_ram_allowed(void);
 
 //---
 // tlb.c: protect our code pages against UTLB replacement by the OS
@@ -124,7 +100,7 @@ bool gsys_cg50_extra_ram_allowed(void);
 
 /* safe: safe start (DEL held at launch, final review): the miss handler
    only, no P2 executor (no pinning, no ldtlb), as when the executor cannot
-   be set up (URB contained instead) */
+   be set up */
 void gtlb_init(bool safe);
 /* Verify the snapshot after a world switch; rewrite missing pages. */
 void gtlb_repair(void);
@@ -143,8 +119,6 @@ typedef struct {
 	int urb_fixes;      /* times gtlb_repair() found URB changed */
 	int last_repairs;   /* entries rewritten by the last gtlb_repair() */
 	bool executor;      /* P2 UTLB executor available (pin/repair/unpin) */
-	int urb_cap;        /* round 3.1: URB lowered without the executor
-	                       (0: not lowered) */
 	bool safe;          /* safe start: executor not used */
 } gtlb_stats_t;
 extern gtlb_stats_t gtlb_stats;
@@ -175,7 +149,7 @@ typedef struct {
 	uint32_t addr[GTLB_SLOTS];
 	uint32_t data[GTLB_SLOTS];
 } gtlb_view_t;
-/* Read the UTLB (fx-CG100; zeros elsewhere), for the Diagnostics probe */
+/* Read the UTLB, for the Diagnostics probe */
 void gtlb_read_view(gtlb_view_t *v);
 
 /* One UTLB write, performed by cgd_tlb_apply() (tlbh.S) as
@@ -215,10 +189,6 @@ int gtlb_plan_unpin(gtlb_view_t *v, gtlb_entry_t const *table,
 	int8_t const *slot_orig, gtlb_op_t *ops, int max_ops);
 /* MMUCR value with URB = urb and URC = 0 (other fields kept, TI clear) */
 uint32_t gtlb_mmucr_with_urb(uint32_t mmucr, int urb);
-/* Without the executor (gint review round 3.1): the URB that keeps miss-
-   handler reloads inside the leading slots MPM's next launch rewrites
-   (those that held snapshot pages at startup); urb if no change. */
-int gtlb_plan_contain_urb(int8_t const *slot_orig, int urb);
 static inline int gtlb_mmucr_urb(uint32_t mmucr) { return (mmucr >> 18) & 63; }
 
 //---
@@ -230,37 +200,18 @@ typedef struct {
 	void *zone_base[8];
 	int zone_size[8];
 	int reserve;           /* bytes left for malloc */
-	int extra_ram;         /* fx-CG50 experimental RAM (bytes) */
 	bool os_heap_removed;
-	int mpm_variant;       /* GMPM_* */
 	uint32_t rom_phys;     /* mmu_translate(0x00300000) */
 	uint32_t uram_phys;    /* mmu_translate(0x08100000) */
 	uint32_t image_size;   /* loaded binary size (from linker symbols) */
-	uintptr_t priv_start, priv_end;  /* private arena "cgd_ram" */
-	uintptr_t priv2_start, priv2_end;  /* "cgd_ram2" (pre-Feb-2025) */
 } gmem_stats_t;
-
-enum {
-	GMPM_NONE = 0,     /* not a fx-CG100 (no MPM) */
-	GMPM_V11,          /* mpm.bin >= 1.1: _ld1 up to the code */
-	GMPM_FEB2025,      /* public Feb-2025 mpm.bin: 2 MiB _ld1 + extra */
-	GMPM_DYNLOAD,      /* dynload mpm.bin (gpSP/KhiCAS): no loadinfo */
-	GMPM_UNKNOWN,
-	GMPM_PRELOADINFO,  /* mpm.bin <= a1a2cc3: fixed 0x8c400000, no loadinfo */
-};
 
 extern gmem_stats_t gmem_stats;
 void gmem_init(void);
-char const *gmem_variant_name(void);
 /* Total free bytes in the default gint arenas (excluding the OS heap) */
 size_t gmem_total_free(void);
 /* Largest block currently available in the default gint arenas */
 size_t gmem_largest_free(void);
-/* fx-CG50: probe zeroed RAM past the 2 MB line (CGDoom's experimental
-   RAM). Only called when the user enabled it. */
-void gmem_probe_extra_ram(void);
-/* Zero the experimental RAM handed to the engine, for the next probe */
-void gmem_release_extra_ram(void);
 /* Iterate known arenas for diagnostics: returns false past the end */
 bool gmem_arena_info(int i, char const **name, uintptr_t *start,
 	uintptr_t *end, size_t *free_bytes, size_t *largest);
@@ -391,17 +342,15 @@ typedef struct {
 } gwad_stats_t;
 
 extern gwad_stats_t gwad_stats;
-extern bool gwad_force_bfile;   /* CGD_Options.WADMethod == BFILE */
 bool gwad_map_live(void);
 /* PL_WadOpen() failures (final review: one -1 for every cause gave the
    user nothing to act on) and their launcher text */
 enum {
-	GWAD_ERR_FS = -1,          /* file access unsupported on this OS */
-	GWAD_ERR_NAME = -2,        /* name too long / unusable characters */
-	GWAD_ERR_OPEN = -3,        /* BFile open failed */
-	GWAD_ERR_SHORT = -4,       /* < 12 bytes, header unreadable */
-	GWAD_ERR_MAGIC = -5,       /* no IWAD/PWAD magic */
-	GWAD_ERR_TRUNCATED = -6,   /* directory past the end of the file */
+	GWAD_ERR_NAME = -1,        /* name too long / unusable characters */
+	GWAD_ERR_OPEN = -2,        /* BFile open failed */
+	GWAD_ERR_SHORT = -3,       /* < 12 bytes, header unreadable */
+	GWAD_ERR_MAGIC = -4,       /* no IWAD/PWAD magic */
+	GWAD_ERR_TRUNCATED = -5,   /* directory past the end of the file */
 };
 char const *gwad_error_text(int rc);
 /* Whether the open WAD's directory has this lump (case-insensitive) */
@@ -482,7 +431,7 @@ bool ginp_any_key(void);
    input.c) */
 bool ginp_abort_chord(uint8_t const st[12]);
 /* Safe start (final review): DEL held when the add-in starts. Read from a
-   raw scan before any OS call or UTLB change; same key on both models. */
+   raw scan before any OS call or UTLB change. */
 #define GINP_SAFE_START_KEY 0x44
 bool ginp_safe_start(void);
 /* Wait until every key is released (all KEYSC words read 0), at most
@@ -498,13 +447,13 @@ bool ginp_wait_any_key(int timeout_ms);
    -1 after timeout_ms */
 int ginp_wait_raw_key(int timeout_ms);
 
-/* UI key events (from raw scans, by physical position on each model) */
+/* UI key events (from raw scans, by physical position) */
 enum {
 	GK_NONE = 0, GK_UP, GK_DOWN, GK_LEFT, GK_RIGHT,
-	GK_OK,       /* EXE, or OK on the fx-CG100 */
-	GK_BACK,     /* EXIT / BACK */
+	GK_OK,       /* OK or EXE */
+	GK_BACK,     /* BACK */
 	GK_DEL,
-	GK_QUIT,     /* HOME (fx-CG100) / MENU (fx-CG50) */
+	GK_QUIT,     /* HOME */
 	GK_DIGIT0,   /* GK_DIGIT0 + n for digit n */
 };
 /* Wait for a UI key. If ginp_idle_hook is set, once the keyboard has
@@ -518,7 +467,7 @@ extern void (*ginp_idle_hook)(void);
 /* Like ginp_getkey() but returns GK_NONE after timeout_ms */
 int ginp_getkey_timeout(int timeout_ms);
 
-/* Display name of a physical key (fx-CG100 legends on the fx-CG100) */
+/* Display name of a physical key (fx-CG100 legends) */
 char const *gkm_key_name(int code);
 
 typedef struct {
@@ -526,7 +475,7 @@ typedef struct {
 	int16_t const *map;    /* CGDOOM_KEYMAP_SIZE entries */
 } gkm_preset_t;
 
-/* Presets for the current model (index 0 = default) */
+/* Keymap presets (index 0 = default) */
 gkm_preset_t const *gkm_presets(int *count);
 /* Matrix code that opens the Doom menu (KEY_ESCAPE), and whether the
    engine let us choose it (weak hook, see keymaps.c). */
@@ -535,15 +484,15 @@ bool gkm_menu_key_configurable(void);
 void gkm_apply_engine_hooks(void);
 
 /* Check a key captured by the Controls screen: OK to bind, cancel (BACK /
-   HOME, EXIT / MENU: keep the old binding), or reserved (*why is set). */
+   HOME: keep the old binding), or reserved (*why is set). */
 enum { GKM_BIND_OK = 0, GKM_BIND_CANCEL, GKM_BIND_RESERVED };
 int gkm_rebind_check(int code, char const **why);
 /* Index of the keymap entry (CGDOOM_KEYMAP_SIZE entries) other than
    `except` that is bound to `code`, or -1 (final review: a rebind clears
    the older binding of the key and says so) */
 int gkm_find_binding(int16_t const *map, int code, int except);
-/* Second Enter key of the Doom menu (CGD_EnterKeycode2): OK on the
-   fx-CG100 when BACK is the menu key, else -1 */
+/* Second Enter key of the Doom menu (CGD_EnterKeycode2): OK when BACK is
+   the menu key, else -1 */
 int gkm_enter_key2(void);
 
 //---
@@ -614,9 +563,6 @@ bool gtime_prof_ok(void);
 enum { GCLK_OFF = 0, GCLK_F4 = 1, GCLK_PTUNE4_F5 = 2, GCLK_COUNT };
 void gclk_init(void);
 void gclk_apply(int level);
-/* Levels offered on this model (GCLK_COUNT on the fx-CG100; the fx-CG50
-   stops before GCLK_PTUNE4_F5, which gclk_apply() runs as F4 there) */
-int gclk_levels(void);
 char const *gclk_name(int level);
 int gclk_current(void);
 
@@ -625,7 +571,7 @@ int gclk_current(void);
 //---
 
 /* hints.c: one recovery line for common fatal errors (NULL: none) */
-char const *gfatal_hint(char const *msg, bool cg100);
+char const *gfatal_hint(char const *msg);
 
 /* wads: the launcher's WAD list (the Storage page can probe one) */
 void gdiag_screen(gfs_entry_t const *wads, int count);
@@ -648,7 +594,6 @@ typedef struct {
 	int fps_counter;    /* bool */
 	int wad_in_ram;     /* bool: RAM image when it fits (primary path) */
 	int skill;          /* 0..4 */
-	int extra_ram;      /* bool: fx-CG50 experimental RAM */
 } gopt_t;
 
 extern gopt_t g_opt;

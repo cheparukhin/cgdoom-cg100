@@ -43,8 +43,9 @@ Good to know:
   versions yet.
 - On OS 02.10, 02.20 or 02.00.xx1x, MPM can only be installed after a downgrade, and only on units with
   the old display. [Check your calculator](docs/USER-GUIDE.md#check-your-calculator) explains how to tell.
-- If an `mpm.bin` is already on the calculator (for example from KhiCAS or gpSP), keep a copy. Those
-  add-ins ship their own build, and whether they run under 1.1 has not been checked.
+- CGDoom needs the zip's `mpm.bin` 1.1. If an `mpm.bin` is already on the calculator (for example from
+  KhiCAS or gpSP), keep a copy. Those add-ins ship their own build, and whether they run under 1.1 has not
+  been checked.
 
 ## Playing
 
@@ -67,12 +68,13 @@ Default keys on the fx-CG100 / Graph Math+:
 - If the game is slow, try *Detail: Low* or a smaller *View size* in the launcher's *Options*.
 
 The launcher's *Controls...* screen rebinds keys. The [user guide](docs/USER-GUIDE.md) covers every
-option, all keymaps (including the fx-CG50's), saves and demos.
+option, the keymaps, saves and demos.
 
 ## If something goes wrong
 
 - **Black screen or reset at launch:** launch CGDoom again while holding **DEL** (safe start).
-- **"Unsupported OS":** CGDoom only runs on the OS versions MPM supports.
+- **"Unsupported calculator":** CGDoom only runs on the fx-CG100 / Graph Math+, with the OS versions MPM
+  supports.
 - **The game froze:** hold **SHIFT + 7 + 3 + AC/ON**.
 
 To report a problem, open an [issue](https://github.com/cheparukhin/cgdoom-cg100/issues) with your OS
@@ -84,9 +86,8 @@ from the launcher. More fixes are in the [troubleshooting table](docs/USER-GUIDE
 - **Without the release zip:** `python3 tools/wadtool.py fetch-wad DOOM1.WAD` downloads the shareware WAD
   and packs it, and `tools/build-mpm.sh` builds `mpm.bin` 1.1. Only shareware-sized WADs fit in the
   calculator's 4.5 MB of storage (see [WAD files](docs/USER-GUIDE.md#wad-files)).
-- **fx-CG50 / Graph 90+E:** the same `CGDoom.g3a` starts from the main MENU, without MPM. It is untested
-  there, and `doom1.wad` needs *Use experimental RAM* (OS 3.60 or older). On the fx-CG50,
-  [Lephenixnoir's CGDoom](https://git.planet-casio.com/Lephenixnoir/CGDoom) is the proven build.
+- **fx-CG50 / Graph 90+E:** not supported (CGDoom says so and quits). Use
+  [Lephenixnoir's CGDoom](https://git.planet-casio.com/Lephenixnoir/CGDoom) there.
 
 ## Building from source
 

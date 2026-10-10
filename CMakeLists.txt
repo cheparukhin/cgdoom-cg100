@@ -1,9 +1,8 @@
-# CGDoom for the fx-CG100 / Graph Math+ (MPM + gint) and the fx-CG50.
+# CGDoom for the fx-CG100 / Graph Math+ (MPM 1.1 + gint).
 #
 #   export PATH=$PWD/toolchain/bin:$PATH
 #   fxsdk build-cg            -> CGDoom.g3a (and build-cg/cgdoom.bin)
 #
-# The same g3a runs on both models (gint detects the model at runtime).
 # Development loop with MPM >= 1.1: press SETTINGS in the MPM menu, then
 #   fxlink -pw build-cg/cgdoom.bin
 # (the header-less binary; MPM maps it at 0x00300000).

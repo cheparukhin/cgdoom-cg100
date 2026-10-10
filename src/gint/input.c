@@ -10,7 +10,7 @@
    gint's keydown()/getkey()/events are never used: on the fx-CG100 gint
    remaps rows 5-9 through its own table, so matrix codes would not mean
    physical keys any more. The launcher UI also works from raw scans and
-   interprets keys by physical position for each model. gint's event queue
+   interprets keys by physical position. gint's event queue
    is simply left to overflow (events are dropped).
 
    Consequence (gint review round 2): gint's freeze-abort chord
@@ -53,11 +53,8 @@ void PL_ScanKeyboard(uint8_t state[12])
 
 bool ginp_abort_chord(uint8_t const st[12])
 {
-	/* SHIFT+7+3+AC/ON by physical position: SHIFT is (8,1) on the fx-CG50
-	   and (7,1) on the fx-CG100; rows 1..4 and AC/ON are the same on both
-	   models (keymaps.c) */
-	int shift = g_is_cg100 ? 0x71 : 0x81;
-	return PL_KeyDown(st, shift) && PL_KeyDown(st, 0x41)
+	/* SHIFT+7+3+AC/ON by physical position (keymaps.c) */
+	return PL_KeyDown(st, 0x71) && PL_KeyDown(st, 0x41)
 		&& PL_KeyDown(st, 0x23) && PL_KeyDown(st, 0x07);
 }
 
@@ -184,28 +181,14 @@ int ginp_wait_raw_key(int timeout_ms)
 /* Physical positions as matrix codes */
 static int ui_action(int code)
 {
-	if(g_is_cg100) {
-		switch(code) {
-		case 0x94: return GK_UP;        /* UP       (row 9) */
-		case 0x74: return GK_DOWN;      /* DOWN     (row 7) */
-		case 0x83: return GK_LEFT;      /* LEFT     (row 8) */
-		case 0x85: return GK_RIGHT;     /* RIGHT    (row 8) */
-		case 0x84: return GK_OK;        /* OK       (row 8) */
-		case 0x82: return GK_BACK;      /* BACK     (row 8) */
-		case 0x92: return GK_QUIT;      /* HOME     (row 9) */
-		}
-	}
-	else {
-		switch(code) {
-		case 0x86: return GK_UP;
-		case 0x75: return GK_DOWN;
-		case 0x85: return GK_LEFT;
-		case 0x76: return GK_RIGHT;
-		case 0x74: return GK_BACK;      /* EXIT */
-		case 0x84: return GK_QUIT;      /* MENU */
-		}
-	}
 	switch(code) {
+	case 0x94: return GK_UP;            /* UP       (row 9) */
+	case 0x74: return GK_DOWN;          /* DOWN     (row 7) */
+	case 0x83: return GK_LEFT;          /* LEFT     (row 8) */
+	case 0x85: return GK_RIGHT;         /* RIGHT    (row 8) */
+	case 0x84: return GK_OK;            /* OK       (row 8) */
+	case 0x82: return GK_BACK;          /* BACK     (row 8) */
+	case 0x92: return GK_QUIT;          /* HOME     (row 9) */
 	case 0x15: return GK_OK;            /* EXE */
 	case 0x44: return GK_DEL;           /* DEL */
 	case 0x11: return GK_DIGIT0 + 0;

@@ -105,8 +105,6 @@ void CGD_DefaultOptions(CGDoom_Options *o)
 {
 	memset(o, 0, sizeof *o);
 	o->DeveloperInfo       = 0;
-	o->WADMethod           = CGDOOM_WAD_MMAP;
-	o->TrustUnalignedLumps = 0;
 	o->AutoStart           = 0;
 	o->EnableDemos         = 0;
 	o->DelaySaves          = 1;
@@ -126,14 +124,8 @@ int CGD_SaveSettings(const CGDoom_Options *o)
 	out += sprintf(out, "Version=%d\n", CGDOOM_SETTINGS_FILE_VERSION);
 
 	/* Settings */
-	out += sprintf(out, "WADMethod=%s\n",
-		o->WADMethod == CGDOOM_WAD_BFILE ? "BFILE" :
-		o->WADMethod == CGDOOM_WAD_MMAP  ? "MMAP"  :
-		"?");
 	out += sprintf(out, "DeveloperInfo=%d\n",
 		o->DeveloperInfo);
-	out += sprintf(out, "TrustUnalignedLumps=%d\n",
-		o->TrustUnalignedLumps);
 	out += sprintf(out, "EnableDemos=%d\n",
 		o->EnableDemos);
 	out += sprintf(out, "Autostart=%d\n",
@@ -240,13 +232,6 @@ int CGD_LoadSettings(CGDoom_Options *o)
 			}
 		}
 
-		else if(SettingIs(key, klen, "WADMethod")) {
-			if(SettingIs(value, vlen, "BFILE"))
-				n.WADMethod = CGDOOM_WAD_BFILE;
-			else if(SettingIs(value, vlen, "MMAP"))
-				n.WADMethod = CGDOOM_WAD_MMAP;
-		}
-
 		/* "Keymap.<action>=<key>"; <key> = NONE unbinds the action (gint
 		   review §13: CGD_SaveSettings writes NONE for an action unbound
 		   in the launcher, and it used to be ignored here, so the preset
@@ -269,8 +254,6 @@ int CGD_LoadSettings(CGDoom_Options *o)
 
 		else if(SettingIs(key, klen, "DeveloperInfo"))
 			SettingInt(value, vlen, &n.DeveloperInfo);
-		else if(SettingIs(key, klen, "TrustUnalignedLumps"))
-			SettingInt(value, vlen, &n.TrustUnalignedLumps);
 		else if(SettingIs(key, klen, "EnableDemos"))
 			SettingInt(value, vlen, &n.EnableDemos);
 		else if(SettingIs(key, klen, "Autostart"))

@@ -39,14 +39,11 @@ static int t_memcmp(void const *a, void const *b, size_t n) { return memcmp(tr(a
 #undef memcpy
 #undef memcmp
 
-bool g_is_cg100 = true;
-gos_kind_t g_os_kind = GOS_CG100_200;
 char g_os_version[11] = "02.00.0000";
 gos_api_t g_os;
 uint32_t g_entry_r15;
 gopt_t g_opt;
 gtlb_stats_t gtlb_stats;
-bool gsys_files_supported(void) { return true; }
 void gvid_release(void) {}
 void gvid_note_os_activity(void) {}
 void gtlb_repair(void) {}
@@ -130,7 +127,6 @@ static void setup(int fsize, int const *kind, int const *slot)
 static void check_all(char const *tag)
 {
 	g_opt.wad_in_ram = 0;
-	gwad_force_bfile = false;
 	int rc = PL_WadOpen("TEST.WAD");
 	CHECK(rc == g_fsize, "%s open %d", tag, rc);
 	CHECK(gwad_stats.mode == GWAD_MAP, "%s mode %d", tag, gwad_stats.mode);
@@ -300,7 +296,7 @@ int main(void)
 	for(int i = 0; i < N; i++) { kind[i] = K_P2; slot[i] = 40 + i; }
 	setup(N * 4096 - 3, kind, slot);
 	CHECK(PL_WadIsSlow() == 0, "slow: no WAD");
-	g_opt.wad_in_ram = 0; gwad_force_bfile = false; PL_WadOpen("T.WAD");
+	g_opt.wad_in_ram = 0; PL_WadOpen("T.WAD");
 	CHECK(W.mode == GWAD_MAP && PL_WadIsSlow() == 1, "slow: MAP (mode %d)", W.mode);
 	memset(g_flash + 0x00C80000u + 40 * 4096u, 0x11, 12);   /* header gone */
 	gwad_remap();
@@ -308,13 +304,15 @@ int main(void)
 	PL_WadClose();
 	CHECK(PL_WadIsSlow() == 0, "slow: closed");
 	setup(N * 4096 - 3, kind, slot);
-	gwad_force_bfile = true; PL_WadOpen("T.WAD");
+	/* no block map: BFile reads */
+	g_os.block = NULL; PL_WadOpen("T.WAD");
 	CHECK(W.mode == GWAD_BFILE && PL_WadIsSlow() == 1, "slow: BFILE (mode %d)", W.mode);
 	PL_WadClose();
+	g_os.block = s_block;
 	/* a directory with one lump, for the RAM image (as in 8.) */
 	{ uint8_t *h = g_file; uint32_t pos = 4096; h[4]=1;h[5]=h[6]=h[7]=0; h[8]=16;h[9]=h[10]=h[11]=0;
 	  h[16]=pos;h[17]=pos>>8;h[18]=h[19]=0; h[20]=60;h[21]=h[22]=h[23]=0; memcpy(h+24,"LUMP\0\0\0\0",8); }
-	gwad_force_bfile = false; g_opt.wad_in_ram = 1; PL_WadOpen("T.WAD");
+	g_opt.wad_in_ram = 1; PL_WadOpen("T.WAD");
 	CHECK(W.mode == GWAD_RAM && PL_WadIsSlow() == 0, "slow: RAM (mode %d)", W.mode);
 	PL_WadClose();
 	g_opt.wad_in_ram = 0;
@@ -330,7 +328,7 @@ int main(void)
 		setup(N * 4096 - 21, kind, slot);
 		/* the flash copy of one block disagrees with the file */
 		g_flash[0x00C80000u + slot[bad[t].block] * 4096u + 2] ^= 0x5a;
-		g_opt.wad_in_ram = 0; gwad_force_bfile = false;
+		g_opt.wad_in_ram = 0;
 		CHECK(PL_WadOpen("T.WAD") == N * 4096 - 21, "verify %s: open", bad[t].tag);
 		CHECK(W.mode == GWAD_BFILE && gwad_stats.map_rejected && !gwad_map_live(),
 			"verify %s: BFile reads (mode %d)", bad[t].tag, W.mode);

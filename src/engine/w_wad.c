@@ -323,8 +323,8 @@ boolean W_SlowPrecacheWanted(int lump)
 }
 
 /* CGDoom: Lumps are referenced in place when the platform can map them
-   (PL_WadMap) and the pointer is 4-aligned (or TrustUnalignedLumps is set);
-   otherwise they are copied to the zone heap. Volatile lumps (iEnableFlash=0)
+   (PL_WadMap) and the pointer is 4-aligned; otherwise they are copied to
+   the zone heap. Volatile lumps (iEnableFlash=0)
    are modified by the caller and always copied. With a slow WAD mapping
    (W_WadSlow), mappable lumps are also copied while the zone has room (step
    3, W_CopySlowLump above). */
@@ -356,8 +356,6 @@ void * W_ReadLumpWithZ_Malloc(int lump,int tag,int iEnableFlash)
   }
 
   int aligned = (((uintptr_t)mapped & 3) == 0);
-  if(CGD_Options.TrustUnalignedLumps)
-    aligned = 1;
 
   /* Record statistics on loading unaligned but mapped lumps */
   if(mapped && !aligned) {

@@ -1,11 +1,11 @@
 /* CGDoom gint platform: entry point, launcher, game start, exit path.
 
    Startup (before any OS call):
-     record r15, detect model/OS (sys.c), discover the heap and remove the
-     OS heap arena on the fx-CG100 (memory.c), snapshot the UTLB and install
+     record r15 and check the model and OS string (sys.c): anything but the
+     fx-CG100 with OS 02.00 -> message, exit, with nothing else set up.
+     Then remove the OS heap arena (memory.c), snapshot the UTLB and install
      the TLB-miss handler (tlb.c), start the timers, allocate the frame
-     buffer and the private stack. An unsupported OS string or too little
-     heap -> message, exit.
+     buffer and the private stack. Too little heap -> message, exit.
    Launcher (port of CGDoom's cgdoom-ui.c UI_Main to gint on 396x224):
      WAD list, skill, start episode/map, title screen mode, demo recording
      and replay, controls editor, options (overclock, display path,
@@ -15,12 +15,11 @@
      takes the zones (PL_GetZones) and returns when the player quits.
    Exit path (also reached from PL_Fatal through longjmp): wait for keys to
      be released, finish the LCD DMA, close the WAD, write the delayed files
-     in one world switch, zero the fx-CG50 experimental RAM, stop the
-     timers, return from main(). Then, on this path and on the abort() path
-     alike, the platform_quit() destructor closes the WAD file if it is
-     still open (gwad_quit), zeroes the experimental RAM if still needed and
-     restores MPM's UTLB layout (gtlb_quit), before gint's kquit restores
-     the OS clock, LCD window and drivers; MPM redraws.
+     in one world switch, stop the timers, return from main(). Then, on this
+     path and on the abort() path alike, the platform_quit() destructor
+     closes the WAD file if it is still open (gwad_quit) and restores MPM's
+     UTLB layout (gtlb_quit), before gint's kquit restores the OS clock, LCD
+     window and drivers; MPM redraws.
    Safe start (final review): DEL held when the add-in starts skips the
      UTLB executor and pinning, the overclock and the private stack for
      that session (a way out of a startup problem on new hardware without
@@ -70,7 +69,7 @@ static volatile bool g_in_exit = false;
 /* DEL held at startup: no UTLB pinning, no overclock, no private stack */
 static bool g_safe_start = false;
 
-/* Private stack (fx-CG100) */
+/* Private stack */
 static uint32_t *g_stack = NULL;
 static size_t g_stack_words = 0;
 static int g_stack_peak = -1;
@@ -79,8 +78,6 @@ static int g_stack_peak = -1;
 //---
 // Option defaults, load and save
 //---
-
-static int g_keymap_model_cg100 = -1;   /* from CG.Model; -1 if absent */
 
 static void options_defaults(void)
 {
@@ -95,7 +92,6 @@ static void options_defaults(void)
 	g_opt.fps_counter = 0;
 	g_opt.wad_in_ram = 1;
 	g_opt.skill = 2;
-	g_opt.extra_ram = 0;
 }
 
 static int clampi(int v, int lo, int hi)
@@ -107,9 +103,7 @@ static void parse_platform_line(char const *key, int klen, char const *value)
 {
 	#define IS(k) (klen == (int)strlen(k) && !strncmp(key, k, klen))
 	int v = atoi(value);
-	if(IS("Model"))
-		g_keymap_model_cg100 = !strncmp(value, "CG100", 5);
-	else if(IS("Overclock"))
+	if(IS("Overclock"))
 		g_opt.overclock = clampi(v, 0, GCLK_COUNT - 1);
 	else if(IS("Display"))
 		g_opt.display = clampi(v, 0, GDISP_COUNT - 1);
@@ -121,8 +115,6 @@ static void parse_platform_line(char const *key, int klen, char const *value)
 		g_opt.wad_in_ram = (v != 0);
 	else if(IS("Skill"))
 		g_opt.skill = clampi(v, 0, 4);
-	else if(IS("ExtraRAM"))
-		g_opt.extra_ram = (v != 0);
 	#undef IS
 }
 
@@ -164,17 +156,15 @@ static char g_append[256];
 static char const *settings_appender(void)
 {
 	snprintf(g_append, sizeof g_append,
-		"CG.Model=%s\nCG.Overclock=%d\nCG.Display=%d\nCG.Frameskip=%d\n"
-		"CG.FPS=%d\nCG.WadRam=%d\nCG.Skill=%d\nCG.ExtraRAM=%d\n",
-		g_is_cg100 ? "CG100" : "CG50", g_opt.overclock, g_opt.display,
-		g_opt.frameskip, g_opt.fps_counter, g_opt.wad_in_ram, g_opt.skill,
-		g_opt.extra_ram);
+		"CG.Overclock=%d\nCG.Display=%d\nCG.Frameskip=%d\n"
+		"CG.FPS=%d\nCG.WadRam=%d\nCG.Skill=%d\n",
+		g_opt.overclock, g_opt.display, g_opt.frameskip, g_opt.fps_counter,
+		g_opt.wad_in_ram, g_opt.skill);
 	return g_append;
 }
 
 static CGDoom_Options g_saved_engine_opts;
 static gopt_t g_saved_opts;
-static bool g_force_save = false;
 /* Set by load_settings(): before that, g_saved_* are not a baseline and
    saving would write default settings over the user's file (the idle hook
    runs from the startup error screens since gint review round 2) */
@@ -187,20 +177,6 @@ static void load_settings(void)
 	CGD_LoadSettings(&CGD_Options);
 	load_platform_settings();
 
-	/* A keymap saved on the other model binds the wrong physical keys */
-	if(g_keymap_model_cg100 != (g_is_cg100 ? 1 : 0)) {
-		if(g_is_cg100 || g_keymap_model_cg100 == 1) {
-			int n;
-			CGD_CopyKeymap(CGD_Options.Keymap, gkm_presets(&n)[0].map);
-			g_force_save = true;
-		}
-	}
-	if(!g_is_cg100 && !gsys_cg50_extra_ram_allowed())
-		g_opt.extra_ram = 0;
-	/* Ptune4 F5 is fx-CG100 only (clock.c, final review) */
-	if(g_opt.overclock >= gclk_levels())
-		g_opt.overclock = GCLK_F4;
-
 	memcpy(&g_saved_engine_opts, &CGD_Options, sizeof CGD_Options);
 	g_saved_opts = g_opt;
 	g_settings_loaded = true;
@@ -211,8 +187,7 @@ static void save_settings_if_changed(void)
 {
 	if(!g_settings_loaded)
 		return;
-	if(!g_force_save
-		&& !memcmp(&g_saved_engine_opts, &CGD_Options, sizeof CGD_Options)
+	if(!memcmp(&g_saved_engine_opts, &CGD_Options, sizeof CGD_Options)
 		&& !memcmp(&g_saved_opts, &g_opt, sizeof g_opt))
 		return;
 
@@ -222,7 +197,6 @@ static void save_settings_if_changed(void)
 
 	memcpy(&g_saved_engine_opts, &CGD_Options, sizeof CGD_Options);
 	g_saved_opts = g_opt;
-	g_force_save = false;
 }
 
 //---
@@ -236,14 +210,12 @@ static char const * const skill_names[5] = {
 
 static char const *footer_main(void)
 {
-	return g_is_cg100 ? "OK/EXE: select   </>: change   BACK: quit"
-	                  : "EXE: select   </>: change   EXIT: quit";
+	return "OK/EXE: select   </>: change   BACK: quit";
 }
 
 static char const *footer_sub(void)
 {
-	return g_is_cg100 ? "OK/EXE: select   </>: change   BACK: return"
-	                  : "EXE: select   </>: change   EXIT: return";
+	return "OK/EXE: select   </>: change   BACK: return";
 }
 
 /* Engine renderer settings (CGD_Options.ViewSize/LowDetail/FlatFloors,
@@ -308,11 +280,7 @@ static void screen_options(void)
 			continue;
 
 		if(l.focus == i_clk) {
-			/* Ptune4 F5 only on the fx-CG100 (gclk_levels(); final
-			   review: gpSP's CG100 registers were offered on the
-			   fx-CG50 with CG100-only assurances) */
-			int nl = gclk_levels();
-			int v = (g_opt.overclock + d + nl) % nl;
+			int v = (g_opt.overclock + d + GCLK_COUNT) % GCLK_COUNT;
 			if(v == GCLK_PTUNE4_F5 && !ui_confirm("Experimental overclock",
 				"Ptune4 F5 runs the SDRAM bus at 118 MHz (CPU 236 MHz). "
 				"gint does not offer it on the fx-CG100 because some "
@@ -347,24 +315,12 @@ static void screen_advanced(void)
 		int i_dev = ui_item(&l, "Developer info:", "%s",
 			CGD_Options.DeveloperInfo ? "[x]" : "[ ]");
 		ui_note(&l, UI_DIM, "Statistics before and after the game.");
-		int i_wad = ui_item(&l, "WAD access:", "< %s >",
-			CGD_Options.WADMethod == CGDOOM_WAD_BFILE ? "BFile reads"
-			: "Memory");
 		int i_ram = ui_item(&l, "Copy WAD to RAM if it fits:", "%s",
 			g_opt.wad_in_ram ? "[x]" : "[ ]");
 		ui_note(&l, UI_DIM, "Otherwise lumps are read from flash.");
-		int i_ua = ui_item(&l, "Trust unaligned lumps:", "%s",
-			CGD_Options.TrustUnalignedLumps ? "[x]" : "[ ]");
-		int i_x = -1;
-		if(gsys_cg50_extra_ram_allowed()) {
-			i_x = ui_item(&l, "Use experimental RAM:", "%s",
-				g_opt.extra_ram ? "[x]" : "[ ]");
-			ui_note(&l, UI_DIM, "fx-CG50, OS 3.60 or older only.");
-		}
 		ui_space(&l, 4);
-		ui_note(&l, UI_DIM, "%s, OS %s", gsys_model_name(), g_os_version);
-		ui_note(&l, UI_DIM, "%s, %u KiB free", gmem_variant_name(),
-			(unsigned)(gmem_total_free() >> 10));
+		ui_note(&l, UI_DIM, "%u KiB free", (unsigned)(gmem_total_free()
+			>> 10));
 		ui_frame_end(&l, footer_sub());
 
 		int k = ginp_getkey();
@@ -377,15 +333,8 @@ static void screen_advanced(void)
 
 		if(l.focus == i_dev)
 			CGD_Options.DeveloperInfo ^= 1;
-		else if(l.focus == i_wad)
-			CGD_Options.WADMethod = (CGD_Options.WADMethod ==
-				CGDOOM_WAD_BFILE) ? CGDOOM_WAD_MMAP : CGDOOM_WAD_BFILE;
 		else if(l.focus == i_ram)
 			g_opt.wad_in_ram ^= 1;
-		else if(l.focus == i_ua)
-			CGD_Options.TrustUnalignedLumps ^= 1;
-		else if(l.focus == i_x)
-			g_opt.extra_ram ^= 1;
 	}
 }
 
@@ -416,9 +365,7 @@ static void screen_controls(void)
 				first = idx;
 		}
 		int i_undo = ui_item(&l, "Discard changes", NULL);
-		ui_frame_end(&l, g_is_cg100
-			? "OK/EXE: rebind  DEL: unbind  BACK: done"
-			: "EXE: rebind  DEL: unbind  EXIT: done");
+		ui_frame_end(&l, "OK/EXE: rebind  DEL: unbind  BACK: done");
 
 		int k = ginp_getkey();
 		if(ui_nav(&l, k))
@@ -446,15 +393,14 @@ static void screen_controls(void)
 				char line[80];
 				snprintf(line, sizeof line, "Press a key for: %s",
 					CGD_DoomKey_DisplayName(CGD_KeymapEntries[e]));
-				ui_status("Controls", line, g_is_cg100
-					? "(release first; BACK/HOME: cancel)"
-					: "(release first; MENU: cancel)");
+				ui_status("Controls", line,
+					"(release first; BACK/HOME: cancel)");
 				/* -1 after the idle time: cancels the capture, then
 				   the idle hook of the controls screen takes over */
 				int code = ginp_wait_raw_key(GINP_IDLE_MS);
 				ginp_wait_release();
-				/* BACK/HOME (fx-CG50: MENU) cancel; AC/ON and the Doom
-				   menu key are refused (gint review rounds 1, 2) */
+				/* BACK/HOME cancel; AC/ON and the Doom menu key are
+				   refused (gint review rounds 1, 2) */
 				char const *why = NULL;
 				int verdict = gkm_rebind_check(code, &why);
 				if(verdict == GKM_BIND_OK) {
@@ -616,8 +562,7 @@ static void launcher(gfs_entry_t *wads, int wad_count, gfs_entry_t *demos,
 
 	while(1) {
 		launcher_normalize(out);
-		ui_frame_start(&l, g_is_cg100 ? "CGDoom for fx-CG100 / Graph Math+"
-			: "CGDoom for fx-CG50 / Graph 90+E");
+		ui_frame_start(&l, "CGDoom for fx-CG100 / Graph Math+");
 
 		if(wad_count == 0) {
 			ui_note(&l, UI_WARN, "No *.wad file in the storage root.");
@@ -773,10 +718,10 @@ static void dev_info_before(char const *wadname)
 			w->longest_run, (unsigned)w->phys_min, (unsigned)w->phys_max,
 			w->load_ms);
 	n += snprintf(text + n, sizeof text - n,
-		"Heap: %u KiB free, largest block %u KiB (%s). Clock: %s. "
+		"Heap: %u KiB free, largest block %u KiB. Clock: %s. "
 		"Display: %s. World switches so far: %d.",
 		(unsigned)(gmem_total_free() >> 10),
-		(unsigned)(gmem_largest_free() >> 10), gmem_variant_name(),
+		(unsigned)(gmem_largest_free() >> 10),
 		gclk_name(g_opt.overclock), gvid_mode_name(g_opt.display),
 		gfs_world_switches);
 	ui_message("Developer info", text, true);
@@ -865,53 +810,8 @@ static bool run_game(gfs_entry_t *wads, gfs_entry_t *demos, launch_t *L)
 	static char demo_name[GFS_LIST_NAME];
 	char const *wadname = wads[L->wad].name;
 
-	gwad_force_bfile = (CGD_Options.WADMethod == CGDOOM_WAD_BFILE);
 	save_settings_if_changed();
 	gfs_drop_read_cache();
-
-	/* fx-CG50: optional extra RAM; warn when memory is short. Final
-	   review: the zones get the experimental RAM and what the heap has
-	   past the malloc reserve (PL_GetZones); below CGD_CG50_MIN_GAME_ZONE
-	   doom1.wad cannot run, so say so, and say what can help here. */
-	if(!g_is_cg100) {
-		if(g_opt.extra_ram)
-			gmem_probe_extra_ram();
-		size_t heap = gmem_total_free();
-		size_t total = heap + gmem_stats.extra_ram;
-		size_t zone = gmem_stats.extra_ram + (heap > CGD_MALLOC_RESERVE_CG50
-			? heap - CGD_MALLOC_RESERVE_CG50 : 0);
-		if(zone < CGD_CG50_MIN_GAME_ZONE) {
-			char const *help = !gsys_cg50_extra_ram_allowed()
-				? "OS 3.70 and later have no experimental RAM, so "
-				  "Doom cannot run on this calculator."
-				: !g_opt.extra_ram
-				? "Enable 'Use experimental RAM' in Advanced (OS 3.60 "
-				  "or older), then start again."
-				: "'Use experimental RAM' is on but no free RAM was "
-				  "found (still in use since an earlier session or by "
-				  "another add-in): reset the calculator, then start "
-				  "again.";
-			char t[320];
-			snprintf(t, sizeof t, "Only about %u KiB of RAM are left for "
-				"the game; Doom needs about %u KiB and will stop with a "
-				"'Z_Malloc' error. %s Start anyway?",
-				(unsigned)(zone >> 10),
-				(unsigned)(CGD_CG50_MIN_GAME_ZONE >> 10), help);
-			if(!ui_confirm("Not enough memory", t))
-				return false;
-		}
-		else if(total < CGD_MIN_TOTAL_HEAP) {
-			char t[200];
-			snprintf(t, sizeof t, "Only %u KiB of RAM are available; the "
-				"game may run out of memory in large levels.%s Start "
-				"anyway?", (unsigned)(total >> 10),
-				gsys_cg50_extra_ram_allowed() && !g_opt.extra_ram
-				? " Enabling 'Use experimental RAM' in Advanced helps."
-				: "");
-			if(!ui_confirm("Low memory", t))
-				return false;
-		}
-	}
 
 	/* Recording over an existing demo of this WAD and slot (final review:
 	   it was replaced at exit without a word). Needs only the WAD's name:
@@ -1079,9 +979,6 @@ static void exit_path(void)
 	   counts, including the immediate writes of PL_FileWrite()'s
 	   no-memory path, which leave nothing pending (gint review round 2;
 	   nothing reports failures before this point). */
-	/* The engine is done with its zones: zero the fx-CG50 experimental
-	   RAM for the next launch's probe (final review) */
-	gmem_release_extra_ram();
 	char text[256];
 	if(gfs_failure_text(text, sizeof text, failures)) {
 		/* Bounded: the idle hook is off here (gint review round 2) */
@@ -1112,7 +1009,7 @@ void PL_Fatal(const char *msg)
 	drect(0, 0, DWIDTH - 1, 17, UI_TITLE);
 	ui_text(DWIDTH / 2, 4, UI_BG, DTEXT_CENTER, "CGDoom error");
 	int y = ui_wrap(12, 28, DWIDTH - 24, UI_FG, msg ? msg : "(no message)");
-	char const *hint = gfatal_hint(msg, g_is_cg100);
+	char const *hint = gfatal_hint(msg);
 	if(hint)
 		ui_wrap(12, y + 8, DWIDTH - 24, UI_DIM, hint);
 	drect(0, DHEIGHT - 14, DWIDTH - 1, DHEIGHT - 1, UI_HEAD);
@@ -1276,8 +1173,6 @@ __attribute__((destructor))
 static void platform_quit(void)
 {
 	gwad_quit();
-	/* No-op if exit_path() did it; after abort() the engine is gone too */
-	gmem_release_extra_ram();
 	gtlb_quit();
 }
 
@@ -1285,14 +1180,34 @@ static void platform_quit(void)
 // Entry point
 //---
 
+/* Another model or OS (the g3a also starts on the fx-CG50, from its main
+   MENU): say so and leave. Nothing else is set up; the timers only bound
+   the wait, and the destructor finds nothing to undo. */
+static int unsupported(void)
+{
+	gtime_init();
+	ui_init();
+	char t[300];
+	snprintf(t, sizeof t, "CGDoom only runs on the fx-CG100 / Graph Math+ "
+		"under MPM, with OS 02.00.0202 or 02.00.2202 (the versions MPM can "
+		"be installed on). This calculator: %s, OS %s.", gsys_model_name(),
+		g_os_version);
+	ui_message_timeout("Unsupported calculator", t, GINP_IDLE_MS);
+	gtime_quit();
+	return 1;
+}
+
 int main(void)
 {
 	uint32_t r15;
 	__asm__ volatile("mov r15, %0" : "=r"(r15));
 	g_entry_r15 = r15;
 
-	/* No OS call before the OS string has been checked */
+	/* No OS call, UTLB or heap change before the model and the OS string
+	   have been checked */
 	gsys_init();
+	if(!gsys_supported())
+		return unsupported();
 	/* Safe start (final review): DEL held at launch. A raw KEYSC read,
 	   before the UTLB is touched. */
 	g_safe_start = ginp_safe_start();
@@ -1302,18 +1217,16 @@ int main(void)
 	gtime_init();
 	ui_init();
 
-	/* fx-CG100: keep on-chip memory intact across world switches */
-	if(g_is_cg100) {
-		void *onchip = malloc(GINT_ONCHIP_BUFSIZE);
-		if(onchip)
-			gint_set_onchip_save_mode(GINT_ONCHIP_BACKUP, onchip);
-	}
+	/* Keep on-chip memory intact across world switches */
+	void *onchip = malloc(GINT_ONCHIP_BUFSIZE);
+	if(onchip)
+		gint_set_onchip_save_mode(GINT_ONCHIP_BACKUP, onchip);
 	/* Without the RGB565 frame, the DMA display path falls back to CPU
 	   writes; gvid_mode_name() and the benchmark page say so (gint review
 	   round 2) */
 	if(!gvid_init())
 		PL_Log("DMA frame buffer unavailable: DMA display uses CPU\n");
-	if(g_is_cg100 && CGD_PRIVATE_STACK_SIZE > 0 && !g_safe_start) {
+	if(CGD_PRIVATE_STACK_SIZE > 0 && !g_safe_start) {
 		g_stack = malloc(CGD_PRIVATE_STACK_SIZE);
 		if(g_stack)
 			g_stack_words = CGD_PRIVATE_STACK_SIZE / 4;
@@ -1322,9 +1235,9 @@ int main(void)
 	if(setjmp(g_exit_jmp) == 0) {
 		g_exit_ready = true;
 		/* Idle timeout on every screen from here on, including the
-		   startup error screens and the experimental-OS confirm (gint
-		   review round 2). idle_quit() saves nothing before
-		   load_settings(), and exit_path() then has nothing to write. */
+		   startup error screens (gint review round 2). idle_quit() saves
+		   nothing before load_settings(), and exit_path() then has
+		   nothing to write. */
 		ginp_idle_hook = idle_quit;
 
 		if(g_safe_start) {
@@ -1335,27 +1248,12 @@ int main(void)
 				"Diagnostics pages.", true);
 		}
 
-		if(!gsys_files_supported()) {
+		if(gmem_total_free() < CGD_MIN_TOTAL_HEAP) {
 			char t[300];
-			snprintf(t, sizeof t, "This OS version (%s) is not supported. "
-				"CGDoom runs on the fx-CG100 / Graph Math+ with OS "
-				"02.00.0202 or 02.00.2202 (the versions MPM can be "
-				"installed on), and on the fx-CG50 / Graph 90+E.",
-				g_os_version);
-			ui_message("Unsupported OS", t, true);
-		}
-		else if(g_is_cg100 && gmem_total_free() < CGD_MIN_TOTAL_HEAP) {
-			char t[300];
-			snprintf(t, sizeof t, "Only %u KiB of RAM are available (%s). "
-				"Install mpm.bin version 1.1 or later (from the MPM "
-				"repository) and try again.",
-				(unsigned)(gmem_total_free() >> 10), gmem_variant_name());
+			snprintf(t, sizeof t, "Only %u KiB of RAM are available. "
+				"Install the mpm.bin 1.1 of the CGDoom release zip and "
+				"try again.", (unsigned)(gmem_total_free() >> 10));
 			ui_message("Not enough memory", t, true);
-		}
-		else if(gsys_os_experimental() && !ui_confirm("Experimental OS",
-			"This OS version is not one MPM can be installed on; file "
-			"access uses untested entry points and may crash. Continue?"))
-		{
 		}
 		else {
 			load_settings();

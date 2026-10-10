@@ -11,7 +11,6 @@
 static int fails = 0;
 #define CHECK(c, ...) do { if(!(c)) { fails++; printf("FAIL %s:%d: ", __FILE__, __LINE__); printf(__VA_ARGS__); printf("\n"); } } while(0)
 
-bool g_is_cg100 = true;
 volatile uint16_t cgd_host_keysc[6];
 
 static uint32_t now_us = 0;
@@ -281,27 +280,22 @@ static void set_key(uint8_t st[12], int code) { st[PL_KEY_BYTE(code)] |= PL_KEY_
 static void test_abort_chord(void)
 {
 	uint8_t st[12];
-	for(int model = 0; model < 2; model++) {
-		g_is_cg100 = (model == 0);
-		int shift = g_is_cg100 ? 0x71 : 0x81;
-		int keys[4] = { shift, 0x41, 0x23, 0x07 };
+	int keys[4] = { 0x71, 0x41, 0x23, 0x07 };
+	memset(st, 0, sizeof st);
+	for(int k = 0; k < 4; k++) set_key(st, keys[k]);
+	CHECK(ginp_abort_chord(st), "chord");
+	/* any three of the four: no abort */
+	for(int drop = 0; drop < 4; drop++) {
 		memset(st, 0, sizeof st);
-		for(int k = 0; k < 4; k++) set_key(st, keys[k]);
-		CHECK(ginp_abort_chord(st), "model %d: chord", model);
-		/* any three of the four: no abort */
-		for(int drop = 0; drop < 4; drop++) {
-			memset(st, 0, sizeof st);
-			for(int k = 0; k < 4; k++) if(k != drop) set_key(st, keys[k]);
-			CHECK(!ginp_abort_chord(st), "model %d: without key %d", model, drop);
-		}
-		/* the other model's SHIFT does not count */
-		memset(st, 0, sizeof st);
-		set_key(st, g_is_cg100 ? 0x81 : 0x71);
-		for(int k = 1; k < 4; k++) set_key(st, keys[k]);
-		CHECK(!ginp_abort_chord(st), "model %d: wrong SHIFT", model);
+		for(int k = 0; k < 4; k++) if(k != drop) set_key(st, keys[k]);
+		CHECK(!ginp_abort_chord(st), "without key %d", drop);
 	}
+	/* the fx-CG50's SHIFT position (SETTINGS here) does not count */
+	memset(st, 0, sizeof st);
+	set_key(st, 0x81);
+	for(int k = 1; k < 4; k++) set_key(st, keys[k]);
+	CHECK(!ginp_abort_chord(st), "wrong SHIFT");
 	/* Through a real KIUDATA scan: CGDoom layout, row r is byte r^1 */
-	g_is_cg100 = true;
 	memset((void *)cgd_host_keysc, 0, sizeof cgd_host_keysc);
 	memset(st, 0, sizeof st);
 	set_key(st, 0x71); set_key(st, 0x41); set_key(st, 0x23); set_key(st, 0x07);
@@ -328,29 +322,25 @@ static void test_wait_raw_key(void)
 	CHECK(code == -1, "raw key timeout with a frozen clock");
 }
 
-/* Final review: safe start = DEL (0x44, same matrix position on both
-   models) held when the add-in starts, read from a raw scan */
+/* Final review: safe start = DEL (0x44) held when the add-in starts, read
+   from a raw scan */
 static void test_safe_start(void)
 {
 	uint8_t st[12];
-	for(int model = 0; model < 2; model++) {
-		g_is_cg100 = model;
-		memset((void *)cgd_host_keysc, 0, sizeof cgd_host_keysc);
-		CHECK(!ginp_safe_start(), "model %d: no key, no safe start", model);
-		memset(st, 0, sizeof st);
-		set_key(st, 0x44);
-		for(int i = 0; i < 6; i++)
-			cgd_host_keysc[i] = (uint16_t)(st[2*i] << 8 | st[2*i + 1]);
-		CHECK(ginp_safe_start(), "model %d: DEL held", model);
-		/* The launch key (EXE, or OK on the fx-CG100) is not it */
-		memset(st, 0, sizeof st);
-		set_key(st, 0x15); set_key(st, 0x84);
-		for(int i = 0; i < 6; i++)
-			cgd_host_keysc[i] = (uint16_t)(st[2*i] << 8 | st[2*i + 1]);
-		CHECK(!ginp_safe_start(), "model %d: EXE/OK held is not safe start", model);
-	}
 	memset((void *)cgd_host_keysc, 0, sizeof cgd_host_keysc);
-	g_is_cg100 = true;
+	CHECK(!ginp_safe_start(), "no key, no safe start");
+	memset(st, 0, sizeof st);
+	set_key(st, 0x44);
+	for(int i = 0; i < 6; i++)
+		cgd_host_keysc[i] = (uint16_t)(st[2*i] << 8 | st[2*i + 1]);
+	CHECK(ginp_safe_start(), "DEL held");
+	/* The launch key (EXE or OK) is not it */
+	memset(st, 0, sizeof st);
+	set_key(st, 0x15); set_key(st, 0x84);
+	for(int i = 0; i < 6; i++)
+		cgd_host_keysc[i] = (uint16_t)(st[2*i] << 8 | st[2*i + 1]);
+	CHECK(!ginp_safe_start(), "EXE/OK held is not safe start");
+	memset((void *)cgd_host_keysc, 0, sizeof cgd_host_keysc);
 }
 
 int main(void)

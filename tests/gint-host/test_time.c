@@ -33,7 +33,6 @@ static int fails = 0;
 
 /* ---- stubs ---- */
 
-bool g_is_cg100 = true;
 volatile uint16_t cgd_host_keysc[6];
 void sleep(void) {}
 

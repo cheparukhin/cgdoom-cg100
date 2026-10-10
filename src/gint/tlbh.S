@@ -12,8 +12,7 @@
    which does not exist on the fx-CG100.
 
    1. cgd_tlbh_start..cgd_tlbh_end: miss handler, copied by tlb.c over
-   gint's at VBR+0x400 (fx-CG100 only; the fx-CG50 needs gint's handler for
-   the OS demand paging). For a TEA in [0x00300000, 0x00700000) it reloads
+   gint's at VBR+0x400. For a TEA in [0x00300000, 0x00700000) it reloads
    the page from the snapshot taken at startup (PTEH/PTEL + ldtlb, the
    sequence of mpm/loader.c MMU_Map), counts the miss and returns with rte.
    Anything else goes to VBR+0x100 like gint's handler does (panic screen).
@@ -30,8 +29,7 @@
    (P1) and the table is a P1 heap buffer.
 
    Position independent: copied as a block, literals are PC-relative, and
-   the table address is patched into cgd_tlbh_table after the copy. The
-   block also carries cgd_tlbh_set_mmucr (round 3.1), a P1 MMUCR writer.
+   the table address is patched into cgd_tlbh_table after the copy.
 
    2. cgd_tlb_apply: performs a list of UTLB loads (gtlb_op_t). tlb.c calls
    it through its P2 alias with interrupts masked, so that moving the entry
@@ -97,24 +95,6 @@ _cgd_tlbh_start:
 .Lpteh:	.long	0xff000000		/* PTEH; PTEL at +4 */
 _cgd_tlbh_table:
 .Ltable: .long	0			/* patched by tlb.c */
-
-/* void set_mmucr(uint32_t mmucr), called by tlb.c at its copy in the VBR
-   area (gint review round 3.1): MMUCR = r4, then icbi, run from P1 as the
-   SH-4A requires for an MMUCR write. No ldtlb, nothing translated. Only
-   used when the P2 executor below is unavailable, to keep the URB inside
-   the slots MPM rewrites (tlb.c, contain_urb). Interrupts masked by the
-   caller. Never reached by the miss handler above (rte/jmp before it). */
-	.global	_cgd_tlbh_set_mmucr
-_cgd_tlbh_set_mmucr:
-	mov.l	.Lmmucr1, r1
-	mov.l	r4, @r1			/* MMUCR */
-	mov.l	.Lp2base1, r1
-	icbi	@r1
-	rts
-	nop
-	.align	2
-.Lmmucr1:	.long	0xff000010
-.Lp2base1:	.long	0xa0000000
 _cgd_tlbh_end:
 
 /* void cgd_tlb_apply(gtlb_op_t const *ops, int n, uint32_t mmucr)

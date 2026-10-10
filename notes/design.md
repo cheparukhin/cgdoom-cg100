@@ -216,3 +216,37 @@ default; auto frameskip.
   colfunc(); r_things.c `colfunc = R_DrawTranslatedColumn` → `colfunc = transcolfunc`; R_ExecuteSetViewSize selects
   colfunc/basecolfunc/fuzzcolfunc/transcolfunc/spanfunc by detailshift. Leave a single clearly-marked place where an
   SH4 build (`#ifdef __sh__` and not `CGD_NO_SH4`) selects the *_SH4 versions (done in the SH4 integration: `CGD_SH4` in r_draw.h; engine-changes.md "SH4 integration").
+
+## 9. Scope (2026-10-11) — overrides earlier sections
+
+The target is the fx-CG100 / Graph Math+ with OS 02.00 ("02.00.0000"), mpm.bin 1.1 and the packed shareware
+`doom1.wad`, single player. Removed as modes beyond that target:
+- fx-CG50 support (the "bonus" of the header above): its OS path, syscall trampoline, OS-heap forwarding,
+  keymap presets, experimental RAM and memory warnings. On any other model or OS string, `main()` shows
+  "Unsupported calculator" and returns before any OS call, UTLB or heap change.
+- The "experimental OS" tables for fx-CG100 OS 01.00 and 02.10.
+- RAM discovery for older mpm.bin builds (Feb-2025, dynload, pre-Feb-2025: private arenas) and the URB
+  containment that only did something under Feb-2025 without the executor. Those builds are now refused
+  at startup (`CGD_MIN_TOTAL_HEAP` 3 MiB; 1.1 leaves about 5.5 MiB by calculation, Feb-2025 about 2 MiB).
+- The debug options *WAD access: BFile reads* and *Trust unaligned lumps* (BFile reads remain the
+  automatic fallback). *Developer info* stays until the first hardware run (its after-game screen is the
+  only place the stack peak, zone peak and UTLB repairs of a game can be seen).
+Old `CGDOOM.CFG` lines for removed options (`WADMethod`, `TrustUnalignedLumps`, `CG.Model`, `CG.ExtraRAM`)
+are ignored.
+
+**Later: restore OS 02.10** once MPM's installer supports it (as of 2026-10-11 it does not; the bundled
+mpm.bin 1.1 already selects its 02.10 table, `ref/mpm/start.c:40`). The pinned gint has no 02.10 table
+(API 0, the dead fx-CG50 gate), so CGDoom needs its own: `use_os210_table()` and the `OS210_BFILE_*`
+addresses in `src/gint/sys.c` at commit 447de85 (11 entries, Bfile_GetBlockAddress included). Accept
+"02.10.0000" in `gsys_init()` with that table, as a supported OS (no prompt). If gint gains a 02.10 API
+by then (Kin1009's fork has one, `ref/extra/Kin1009_gint` commit ee12efd), use its BFile wrappers instead
+and keep only the block-address entry. Settle `BFile_Write` first: mpm's `casiowin.yaml:35` says 0x80396a92,
+libsyscall and Kin1009's gint say 0x80396a06; only 0x80396a06 is +0x62A68 from 02.00 like every other
+entry. A wrong address fails at the first file write (settings and saves at exit). Disassembling both
+addresses in a 02.10 OS image against 02.00's 0x80333f9e would decide it without hardware.
+
+**New-display units** (bootcode 2025.0304.1404, OS 02.00.xx1x / 02.10 / 02.20) need nothing in CGDoom's
+display code: it only uses gint's `r61524_start_frame()` (both controllers) and the data port. Open
+outside CGDoom: MPM's installer, OS addresses for 02.00.0010 (unknown everywhere; MPM TODO) and 02.20,
+and gint's world-switch `hsave`/`hrestore`, which save only the old controller's window registers
+(0x210-0x213).

@@ -8,21 +8,16 @@
 
 #include <string.h>
 
-char const *gfatal_hint(char const *msg, bool cg100)
+char const *gfatal_hint(char const *msg)
 {
 	if(!msg)
 		return NULL;
 	/* z_zone.c: "Z_Malloc(%d) failure" (the WAD or the level does not
 	   fit in the zones) */
-	if(strstr(msg, "Z_Malloc")) {
-		if(cg100)
-			return "Out of memory for this WAD or level. Untick 'Copy "
-				"WAD to RAM if it fits' (Advanced) to leave more for "
-				"the game, or play a smaller WAD.";
-		return "Out of memory for this WAD or level. On OS 3.60 or "
-			"older, enable 'Use experimental RAM' (Advanced); after an "
-			"earlier session, reset the calculator first.";
-	}
+	if(strstr(msg, "Z_Malloc"))
+		return "Out of memory for this WAD or level. Untick 'Copy WAD "
+			"to RAM if it fits' (Advanced) to leave more for the game, "
+			"or play a smaller WAD.";
 	/* g_game.c: "Demo is from a different game version (%d)", "Demo is
 	   damaged: ..."; m_misc.c: "M_ReadFile: cannot open %s (%d)" for a
 	   demo lump */

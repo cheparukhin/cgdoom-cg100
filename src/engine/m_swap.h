@@ -39,9 +39,8 @@ unsigned long	SwapLONG(const unsigned long);
    are static inline (they were out-of-line calls on every patch column).
 
    SHORTFromBytes / INTFromBytes read a little-endian value byte by byte and
-   accept any alignment: WAD data can be misaligned (mapped lumps with
-   TrustUnalignedLumps, fields inside maptexture_t), and SH4 faults on
-   misaligned 16/32-bit loads. */
+   accept any alignment: WAD data can be misaligned (fields inside
+   maptexture_t), and SH4 faults on misaligned 16/32-bit loads. */
 static inline unsigned short SHORTFromBytes(const unsigned char *pData)
 {
   unsigned short w = pData[1];

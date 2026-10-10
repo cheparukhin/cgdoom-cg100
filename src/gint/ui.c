@@ -309,8 +309,7 @@ bool ui_confirm(char const *title, char const *text)
 			title_bar(title);
 			ui_wrap(MARGIN_X, top_y() + 4, UI_W - 2 * MARGIN_X, UI_FG,
 				text);
-			footer(g_is_cg100 ? "OK/EXE: yes    BACK: no"
-				: "EXE: yes    EXIT: no");
+			footer("OK/EXE: yes    BACK: no");
 			ui_end();
 		}
 		k = ginp_getkey();

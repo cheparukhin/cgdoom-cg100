@@ -205,28 +205,3 @@ uint32_t gtlb_mmucr_with_urb(uint32_t mmucr, int urb)
 	mmucr &= ~((63u << 18) | (63u << 10) | (1u << 2));
 	return mmucr | ((uint32_t)(urb & 63) << 18);
 }
-
-int gtlb_plan_contain_urb(int8_t const *slot_orig, int urb)
-{
-	/* gint review round 3.1: without the P2 executor nothing can unpin or
-	   drop entries at exit, so the miss handler's reloads (ldtlb at
-	   MMUCR.URC, any slot below URB) must stay inside the slots MPM's next
-	   launch rewrites: the leading slots 0..k-1 that held snapshot pages
-	   at startup (k = 48 under Feb-2025, 55 under v1.1 and dynload). URB=0
-	   means no boundary (URC runs through all 64 slots). Returns the URB
-	   to use, or urb itself when no change is needed or possible (fewer
-	   than GTLB_MIN_REPLACEABLE slots would be left to the OS). */
-	int eff = (urb <= 0 || urb > GTLB_SLOTS) ? GTLB_SLOTS : urb;
-	int k = 0;
-	while(k < GTLB_SLOTS) {
-		bool held = false;
-		for(int p = 0; p < GTLB_PAGES && !held; p++)
-			held = (slot_orig[p] == k);
-		if(!held)
-			break;
-		k++;
-	}
-	if(k >= eff || k < GTLB_MIN_REPLACEABLE)
-		return urb;
-	return k;
-}

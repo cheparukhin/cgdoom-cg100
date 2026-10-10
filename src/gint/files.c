@@ -443,9 +443,8 @@ typedef struct {
    there, so the buffer is allocated there too. That is safe: kmalloc is
    plain code over RAM arenas, and os_flush() already uses heap memory (the
    pending copies, the scratch area) in this world. The arenas make no OS
-   call on the fx-CG100, where "_os" refuses everything (no_osheap.c). On
-   the fx-CG50 the OS heap syscalls are valid in either world. malloc()
-   returns P1 memory, as for the read cache. */
+   call: "_os" refuses everything (no_osheap.c). malloc() returns P1
+   memory, as for the read cache. */
 static backup_t backup_take(uint16_t const *path, int size)
 {
 	backup_t b = { NULL, -1 };
@@ -608,8 +607,6 @@ int gfs_flush(void)
 {
 	if(g_npend == 0)
 		return 0;
-	if(!gsys_files_supported())
-		return g_npend;
 	/* Never write storage while flash pointers into the WAD are in use */
 	if(gwad_map_live())
 		return -1;
@@ -648,7 +645,7 @@ int gfs_flush(void)
 
 int PL_FileSize(const char *name)
 {
-	if(!name || !gsys_files_supported())
+	if(!name)
 		return -1;
 
 	pending_t *p = pending_find(name);
@@ -662,7 +659,7 @@ int PL_FileSize(const char *name)
 
 int PL_FileRead(const char *name, void *buf, int size)
 {
-	if(!name || size < 0 || (size > 0 && !buf) || !gsys_files_supported())
+	if(!name || size < 0 || (size > 0 && !buf))
 		return -1;
 
 	pending_t *p = pending_find(name);
@@ -712,7 +709,7 @@ int PL_FileRead(const char *name, void *buf, int size)
 
 int PL_FileWrite(const char *name, const void *buf, int size)
 {
-	if(!name || size < 0 || (size > 0 && !buf) || !gsys_files_supported())
+	if(!name || size < 0 || (size > 0 && !buf))
 		return -1;
 	/* Files we create must have strict 8.3 names (the engine produces
 	   them); anything else is a bug: report and refuse */
@@ -784,7 +781,7 @@ int PL_FileWrite(const char *name, const void *buf, int size)
 
 int PL_FileDelete(const char *name)
 {
-	if(!name || !gsys_files_supported())
+	if(!name)
 		return -1;
 	if(!gfs_valid_83(name)) {
 		PL_Log("PL_FileDelete: '%s' is not 8.3\n", name);
@@ -887,8 +884,6 @@ int gfs_list(gfs_entry_t *wads, int wad_max, int *wad_count,
 	*wad_count = 0;
 	*demo_count = 0;
 	gfs_list_more = 0;
-	if(!gsys_files_supported())
-		return -1;
 
 	list_ctx_t ctx = {
 		.l = {

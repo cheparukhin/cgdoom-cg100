@@ -99,3 +99,7 @@
 - [x] Release bundle: dist/ (CGDoom.g3a, cgdoom.bin, tools/wadtool.py, README.md, LICENSE, CREDITS.md, SHA256SUMS; sums verified).
 - [ ] Still open, needs a human/hardware: whole-system review; README final content check (a README.md exists, 26 KB,
       shipped as is); on-calculator verification (MPM + CG100/CG50: speed, keys, WAD load) -- never run on hardware here.
+
+## Later
+- [ ] Restore OS 02.10 once MPM's installer supports it: recipe and the open `BFile_Write` address in
+      notes/design.md §9.

@@ -30,8 +30,9 @@
       The map is valid until the next storage write: all writes are delayed
       until after PL_WadClose() (files.c refuses to flush while it is live).
 
-   3. BFile (CGDoom's "BFile" WAD method, or when nothing else works): every
-      read is a world-switched BFile_Read. Slow; reference behaviour.
+   3. BFile (when nothing else works: no RAM image and the block map is
+      unavailable or did not match the file): every read is a world-switched
+      BFile_Read. Slow.
 
    The file stays open until PL_WadClose() in every mode (gwad_quit() on
    the abort() path, gint review round 3.1). */
@@ -45,7 +46,6 @@
 #include <string.h>
 
 gwad_stats_t gwad_stats;
-bool gwad_force_bfile = false;
 
 #define BLOCK_SHIFT 12
 #define BLOCK_SIZE  (1 << BLOCK_SHIFT)
@@ -718,9 +718,7 @@ static bool map_verify(void)
 
 int PL_WadOpen(const char *name)
 {
-	if(!name || !gsys_files_supported())
-		return GWAD_ERR_FS;
-	if(strlen(name) >= GFS_LIST_NAME)
+	if(!name || strlen(name) >= GFS_LIST_NAME)
 		return GWAD_ERR_NAME;
 
 	if(W.mode != GWAD_NONE) {
@@ -760,9 +758,7 @@ int PL_WadOpen(const char *name)
 	strcpy(W.name, name);
 	gwad_stats.size = W.size;
 
-	if(gwad_force_bfile)
-		W.mode = GWAD_BFILE;
-	else if(g_opt.wad_in_ram && try_ram_image())
+	if(g_opt.wad_in_ram && try_ram_image())
 		W.mode = GWAD_RAM;
 	else if(g_os.block && build_map()) {
 		W.mode = GWAD_MAP;
@@ -776,7 +772,7 @@ int PL_WadOpen(const char *name)
 	else
 		W.mode = GWAD_BFILE;
 
-	if(W.mode != GWAD_RAM && g_opt.wad_in_ram && !gwad_force_bfile)
+	if(W.mode != GWAD_RAM && g_opt.wad_in_ram)
 		gwad_stats.ram_failed = true;
 	gwad_stats.mode = W.mode;
 	return W.size;
@@ -785,8 +781,6 @@ int PL_WadOpen(const char *name)
 char const *gwad_error_text(int rc)
 {
 	switch(rc) {
-	case GWAD_ERR_FS:
-		return "File access is not supported on this OS.";
 	case GWAD_ERR_NAME:
 		return "The file name is too long or has characters CGDoom "
 			"cannot use. Rename it (for example doom1.wad).";

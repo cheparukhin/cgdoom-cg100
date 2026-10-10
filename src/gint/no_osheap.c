@@ -12,47 +12,34 @@
 
    Defining kmalloc_arena_osheap here makes the linker take this definition
    and never pull gint's arena_osheap.o (nothing else is in that object).
-   The same g3a runs on both models, so the arena still forwards to the OS
-   heap on the fx-CG50, where it is legitimate (~1 MB more heap). The model
-   comes from gint[HWCALC], which hw_detect() sets before kinit() runs, so
-   it is valid for every allocation (g_is_cg100 is only set in main()).
-   On the fx-CG100 every request fails (NULL), and free/realloc of pointers
-   that no other arena owns are ignored: gint's arena_owning() hands such
-   pointers to this arena (start == end == NULL matches anything).
+   Every request fails (NULL), and free/realloc of pointers that no other
+   arena owns are ignored: gint's arena_owning() hands such pointers to this
+   arena (start == end == NULL matches anything).
 
-   gmem_init() still removes "_os" on the fx-CG100 (diagnostics show it). */
+   gmem_init() still removes "_os" (diagnostics show it). */
 
 #include <gint/kmalloc.h>
-#include <gint/hardware.h>
 #include <stddef.h>
-
-/* gint's OS heap syscall wrappers (kernel/syscalls.S) */
-extern void *__malloc(size_t size);
-extern void *__realloc(void *ptr, size_t newsize);
-extern void __free(void *ptr);
-
-static int os_heap_usable(void)
-{
-	return gint[HWCALC] != HWCALC_FXCG100;
-}
 
 static void *cgd_osheap_malloc(size_t size, void *data)
 {
+	(void)size;
 	(void)data;
-	return os_heap_usable() ? __malloc(size) : NULL;
+	return NULL;
 }
 
 static void *cgd_osheap_realloc(void *ptr, size_t newsize, void *data)
 {
+	(void)ptr;
+	(void)newsize;
 	(void)data;
-	return os_heap_usable() ? __realloc(ptr, newsize) : NULL;
+	return NULL;
 }
 
 static void cgd_osheap_free(void *ptr, void *data)
 {
+	(void)ptr;
 	(void)data;
-	if(os_heap_usable())
-		__free(ptr);
 }
 
 kmalloc_arena_t kmalloc_arena_osheap = {

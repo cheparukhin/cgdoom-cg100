@@ -60,14 +60,6 @@ int CGD_WriteDelayedFile(int i);
 /* Write all pending delayed files. Returns the number of failed writes. */
 int CGD_FlushDelayedWrites(void);
 
-/* WAD access method (platform-interpreted; kept for the settings file) */
-enum {
-    /* Read lumps through the file API every time */
-    CGDOOM_WAD_BFILE = 0,
-    /* Map the file into memory and reference lumps in place when possible */
-    CGDOOM_WAD_MMAP = 1,
-};
-
 //---
 // CGDoom options
 //---
@@ -81,12 +73,6 @@ enum {
 typedef struct {
     /* Enable technical detail screens (platform). */
     int DeveloperInfo;
-    /* File access method (see above; platform). */
-    int WADMethod;
-    /* If set, mapped lumps that are not 4-aligned are also referenced in
-       place instead of being copied to the heap. Safe for the C engine (all
-       WAD fields are read bytewise) but not for code doing aligned loads. */
-    int TrustUnalignedLumps;
     /* Skip title screen and get straight to gameplay. */
     int AutoStart;
     /* Enable demos in the title screen (most are for previous versions of

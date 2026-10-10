@@ -13,13 +13,13 @@
      row 7: SHIFT 71 ALPHA 72  VARIABLE 73 DOWN 74     CATALOG 75  TOOLS 76
      row 6: X,O,T 61 FRAC 62   SQRT 63     ^ 64        x^2 65      e^x 66
      row 5: , 51     sin 52    cos 53      tan 54      ( 55        ) 56
-   rows 4..1 are the same keys as on the fx-CG50, except (1,3) = FORMAT
-   (was (-)), and AC is 0x07 (gint keydev.c CG100_keymap, MPM, gpSP).
+   rows 4..1 are the digit/operator block as on the fx-CG50, except (1,3) =
+   FORMAT (was (-)), and AC is 0x07 (gint keydev.c CG100_keymap, MPM, gpSP).
 
    The Doom menu key (KEY_ESCAPE) is hardwired to KEYCODE_MENU (0x84) in the
    engine, which is the OK key in the middle of the fx-CG100 D-pad. If the
    engine exports `int CGD_EscapeKeycode` (requested), we set it to BACK
-   (0x82) on the fx-CG100; otherwise OK stays the menu key and is left
+   (0x82); otherwise OK stays the menu key and is left
    unbound by our presets. With BACK as the menu key, OK is a second Enter
    key in the Doom menu (CGD_EnterKeycode2, final review) as long as no
    action is bound to it. */
@@ -137,20 +137,10 @@ static const gkm_preset_t presets_cg100[] = {
 	{ "Strafe arrows (CG100)", keymap_cg100_strafe },
 };
 
-static const gkm_preset_t presets_cg50[] = {
-	{ "Thumbs only",  CGD_Keymap_ThumbsOnly },
-	{ "Full hands",   CGD_Keymap_FullHands },
-	{ "CGDoom 0.3",   CGD_Keymap_CGDoom_0_03 },
-};
-
 gkm_preset_t const *gkm_presets(int *count)
 {
-	if(g_is_cg100) {
-		*count = sizeof presets_cg100 / sizeof *presets_cg100;
-		return presets_cg100;
-	}
-	*count = sizeof presets_cg50 / sizeof *presets_cg50;
-	return presets_cg50;
+	*count = sizeof presets_cg100 / sizeof *presets_cg100;
+	return presets_cg100;
 }
 
 /* fx-CG100 legends, indexed like the engine's tables: 6 * (9 - row) +
@@ -171,9 +161,6 @@ char const *gkm_key_name(int code)
 {
 	if(code < 0)
 		return "(none)";
-	if(!g_is_cg100)
-		return CGD_PhysicalKey_DisplayName(code);
-
 	if(code == KEYCODE_ACON)
 		code = 0x45;
 	int row = code >> 4, c = code & 0xf;
@@ -194,7 +181,7 @@ bool gkm_menu_key_configurable(void)
 
 int gkm_menu_key(void)
 {
-	if(g_is_cg100 && gkm_menu_key_configurable())
+	if(gkm_menu_key_configurable())
 		return CG100_BACK;
 	return KEYCODE_MENU;
 }
@@ -206,14 +193,14 @@ int gkm_menu_key(void)
    is 0x72. */
 
 /* Engine hook (final review): OK, the select key of every launcher screen,
-   also acts as Enter in the Doom menu on the fx-CG100 (unless the keymap
-   binds it to an action). Only when BACK is the menu key: otherwise OK is
-   KEY_ESCAPE (KEYCODE_MENU). Weak, like CGD_EscapeKeycode. */
+   also acts as Enter in the Doom menu (unless the keymap binds it to an
+   action). Only when BACK is the menu key: otherwise OK is KEY_ESCAPE
+   (KEYCODE_MENU). Weak, like CGD_EscapeKeycode. */
 extern int CGD_EnterKeycode2 __attribute__((weak));
 
 int gkm_enter_key2(void)
 {
-	if(g_is_cg100 && gkm_menu_key() != CG100_OK)
+	if(gkm_menu_key() != CG100_OK)
 		return CG100_OK;
 	return -1;
 }
@@ -224,7 +211,7 @@ void gkm_apply_engine_hooks(void)
 		CGD_EscapeKeycode = gkm_menu_key();
 	if(&CGD_EnterKeycode2 != 0)
 		CGD_EnterKeycode2 = gkm_enter_key2();
-	CGD_AlphaKeycode = g_is_cg100 ? CG100_ALPHA : KEYCODE_ALPHA;
+	CGD_AlphaKeycode = CG100_ALPHA;
 }
 
 int gkm_find_binding(int16_t const *map, int code, int except)
@@ -246,15 +233,8 @@ int gkm_rebind_check(int code, char const **why)
 
 	/* The keys that mean "back" in every launcher screen cancel the
 	   capture (gint review round 1: pressing BACK/HOME to back out used to
-	   bind that key). On the fx-CG50 only MENU (the Doom menu key, never
-	   bindable anyway) cancels: EXIT is bound by the CGDoom 0.03 and
-	   thumbs-only presets, and refusing it meant it could never be bound
-	   again once unbound (gint review round 2). */
-	if(g_is_cg100) {
-		if(code == CG100_BACK || code == CG100_HOME)
-			return GKM_BIND_CANCEL;
-	}
-	else if(code == KEYCODE_MENU)
+	   bind that key) */
+	if(code == CG100_BACK || code == CG100_HOME)
 		return GKM_BIND_CANCEL;
 
 	/* AC/ON: SHIFT+7+3+AC/ON is the emergency abort chord (time.c), and
@@ -265,9 +245,9 @@ int gkm_rebind_check(int code, char const **why)
 	}
 	/* The Doom menu key (KEY_ESCAPE) is not part of the keymap: binding
 	   it would trigger the menu along with the action. In a real build
-	   the cancel keys above already include it (BACK on the fx-CG100,
-	   MENU on the fx-CG50); this only fires when the engine lacks the
-	   CGD_EscapeKeycode hook and OK (0x84) stays the fx-CG100 menu key.
+	   the cancel keys above already include it (BACK); this only fires
+	   when the engine lacks the CGD_EscapeKeycode hook and OK (0x84) stays
+	   the menu key.
 	   The text names the key (final review: it said "OK" whatever the
 	   menu key was). */
 	if(code == gkm_menu_key()) {

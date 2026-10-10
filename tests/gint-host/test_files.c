@@ -35,14 +35,11 @@ static void *t_malloc(size_t n)
 #include "files.c"
 #undef malloc
 
-bool g_is_cg100 = true;
-gos_kind_t g_os_kind = GOS_CG100_200;
 char g_os_version[11] = "02.00.0000";
 gos_api_t g_os;
 uint32_t g_entry_r15;
 gopt_t g_opt;
 gtlb_stats_t gtlb_stats;
-bool gsys_files_supported(void) { return true; }
 void gvid_release(void) {}
 void gvid_note_os_activity(void) {}
 void gtlb_repair(void) {}
@@ -259,14 +256,14 @@ static void test_wad(char const *path)
 	  CHECK(gwad_has_lump("MAP01") != gwad_has_lump("E1M1"), "MAP01 xor E1M1"); }
 	PL_WadClose();
 
-	/* BFile mode */
-	gwad_force_bfile = true;
+	/* BFile mode: no RAM image and no block map (g_os.block is NULL) */
+	g_opt.wad_in_ram = 0;
 	rc = PL_WadOpen("TEST.WAD");
 	CHECK(rc == sz && gwad_stats.mode == GWAD_BFILE, "bfile open");
 	uint8_t hdr[12]; CHECK(PL_WadRead(hdr, 0, 12) == 12 && !memcmp(hdr, data, 12), "bfile hdr");
 	CHECK(PL_WadMap(0, 12) == NULL, "bfile map");
 	PL_WadClose();
-	gwad_force_bfile = false;
+	g_opt.wad_in_ram = 1;
 	free(data);
 }
 

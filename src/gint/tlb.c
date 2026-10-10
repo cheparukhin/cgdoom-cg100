@@ -39,17 +39,8 @@
    exit() AND after abort() (raise -> _Exit longjmp), which skips atexit
    handlers; that covers the chord's hang fallback (time.c) and EXIT on
    gint's panic screen.
-   Without the P2 executor (gint review round 3.1) nothing can drop the
-   handler's reloads at exit, so gtlb_init() instead lowers URB to the
-   leading slots MPM rewrites (48 under Feb-2025; nothing to do under v1.1
-   and dynload) with a plain MMUCR write from P1 (cgd_tlbh_set_mmucr, in
-   the handler's block) and keeps it there after world switches, up to and
-   including kquit (MPM rewrites the whole MMUCR when the add-in returns).
 
-   Planning is pure logic in tlbplan.c (host-tested, tests/gint-host).
-
-   fx-CG50: nothing is done. The OS demand-pages the add-in from flash
-   through gint's handler (syscall 12), which must stay. */
+   Planning is pure logic in tlbplan.c (host-tested, tests/gint-host). */
 
 #include "cgd_gint.h"
 
@@ -86,15 +77,10 @@ static gtlb_op_t *g_ops = NULL;
 static void (*g_apply)(gtlb_op_t const *ops, int n, uint32_t mmucr) = NULL;
 /* First pinned slot (= MMUCR.URB while pinned), GTLB_SLOTS if none */
 static int g_pin_lo = GTLB_SLOTS;
-/* MMUCR writer in the VBR area (P1 copy of cgd_tlbh_set_mmucr) and the URB
-   it keeps without the executor (0: none), gint review round 3.1 */
-static void (*g_set_mmucr)(uint32_t mmucr) = NULL;
-static int g_urb_cap = 0;
 
 gtlb_stats_t gtlb_stats = { .misses = &g_no_misses };
 
 extern char cgd_tlbh_start[], cgd_tlbh_end[], cgd_tlbh_table[];
-extern char cgd_tlbh_set_mmucr[];
 extern void cgd_tlb_apply(gtlb_op_t const *ops, int n, uint32_t mmucr);
 
 static uint32_t page_size(uint32_t data)
@@ -125,7 +111,6 @@ static void install_handler(void)
 	synco();
 	cpu_atomic_end();
 
-	g_set_mmucr = (void *)(dst + (cgd_tlbh_set_mmucr - cgd_tlbh_start));
 	gtlb_stats.handler = true;
 }
 
@@ -139,10 +124,6 @@ static void read_view(gtlb_view_t *v)
 
 void gtlb_read_view(gtlb_view_t *v)
 {
-	if(!g_is_cg100) {
-		memset(v, 0, sizeof *v);
-		return;
-	}
 	cpu_atomic_start();
 	read_view(v);
 	cpu_atomic_end();
@@ -194,29 +175,6 @@ static void apply(gtlb_op_t const *ops, int n, uint32_t mmucr)
 		g_apply(ops, n, mmucr);
 }
 
-/* Without the executor: keep MMUCR.URB at most g_urb_cap (gint review
-   round 3.1). A plain MMUCR write from P1, no ldtlb. Interrupts masked. */
-static bool urb_above(int urb, int cap)
-{
-	return (urb == 0 ? GTLB_SLOTS : urb) > cap;
-}
-
-static void contain_urb(void)
-{
-	if(!g_set_mmucr)
-		return;
-	cpu_atomic_start();
-	uint32_t mmucr = MMUCR;
-	int urb = gtlb_mmucr_urb(mmucr);
-	int cap = gtlb_plan_contain_urb(g_slot_orig, urb);
-	if(cap != urb) {
-		g_set_mmucr(gtlb_mmucr_with_urb(mmucr, cap));
-		g_urb_cap = cap;
-		gtlb_stats.urb_cap = cap;
-	}
-	cpu_atomic_end();
-}
-
 /* Exit normalisation, see the header comment. Called from main.c's
    destructor (after the WAD file is closed) so that it also runs on the
    abort() path: gint start2 runs .dtors before kquit on both paths; the
@@ -226,15 +184,7 @@ void gtlb_quit(void)
 	if(!g_table || gtlb_stats.pages == 0)
 		return;
 
-	/* No executor (gint review round 3.1): nothing was pinned and nothing
-	   can be unpinned; the handler's reloads stayed below g_urb_cap, in
-	   slots MPM's next launch rewrites. The URB is deliberately NOT
-	   restored: kquit still runs from our image with this handler
-	   installed, and a reload there must not land in 48..53 either. The
-	   cap is only ever set under the Feb-2025 family (k = 48), whose
-	   MMU_SetEnabled(false) after the add-in returns writes the whole
-	   MMUCR (URB 63), and MMU_SetEnabled(true) sets URB 54 again before
-	   the next launch (loader.c in 68e7f6e, a1a2cc3, 0fb6cec, e99a7d1). */
+	/* No executor: nothing was pinned and nothing can be unpinned */
 	if(!g_apply)
 		return;
 
@@ -284,8 +234,6 @@ static void pin_image(void)
 
 void gtlb_init(bool safe)
 {
-	if(!g_is_cg100)
-		return;
 	gtlb_stats.safe = safe;
 
 	g_table = malloc(GTLB_PAGES * sizeof *g_table + 4);
@@ -332,13 +280,8 @@ void gtlb_init(bool safe)
 	gtlb_stats.executor = safe ? false : setup_executor();
 	if(gtlb_stats.executor && CGD_TLB_PIN)
 		pin_image();
-	/* gint review round 3.1: keep the handler (gint's would jump to the
-	   fx-CG50 syscall gate), but keep its reloads where MPM rewrites */
-	if(!gtlb_stats.executor) {
-		contain_urb();
-		PL_Log("UTLB: no executor; URB %d%s\n", g_urb_cap ? g_urb_cap
-			: gtlb_stats.urb_orig, g_urb_cap ? " (lowered)" : "");
-	}
+	if(!gtlb_stats.executor)
+		PL_Log("UTLB: no executor; URB %d\n", gtlb_stats.urb_orig);
 }
 
 void gtlb_repair(void)
@@ -347,24 +290,9 @@ void gtlb_repair(void)
 		return;
 
 	/* No executor: no safe way to write the UTLB (see apply()); the miss
-	   handler still covers the gint world. Only put the URB back under
-	   g_urb_cap if the OS raised it (gint review round 3.1). */
-	if(!g_apply) {
-		if(g_urb_cap <= 0 || !g_set_mmucr)
-			return;
-		gtlb_stats.checks++;
-		cpu_atomic_start();
-		uint32_t mmucr = MMUCR;
-		bool fix = urb_above(gtlb_mmucr_urb(mmucr), g_urb_cap);
-		if(fix)
-			g_set_mmucr(gtlb_mmucr_with_urb(mmucr, g_urb_cap));
-		cpu_atomic_end();
-		if(fix) {
-			gtlb_stats.urb_fixes++;
-			PL_Log("UTLB: URB reset to %d\n", g_urb_cap);
-		}
+	   handler still covers the gint world */
+	if(!g_apply)
 		return;
-	}
 	gtlb_stats.checks++;
 
 	static gtlb_view_t v;

@@ -7,9 +7,10 @@
    CG branch, MPM maps 8 user RAM pages). Before main() runs, kinit() takes
    the 177.5 KB VRAM, the two world buffers and the driver flags from the
    default arenas and fxlibc's constructors allocate too: about 182 KB. On
-   the fx-CG100 there is no _ostk and, under dynload MPM, no _ld1, so these
-   come from _uram only (no_osheap.c makes the OS heap fail instead of
-   calling OS code). Keep at least 192 KiB of _uram: if .data + .bss grow
-   past this line, startup would run out of memory before main(). */
+   the fx-CG100 there is no _ostk, and _uram is the first default arena
+   (then mpm.bin's _ld1; no_osheap.c makes the OS heap fail instead of
+   calling OS code). Keep at least 192 KiB of _uram, so that startup never
+   depends on what the loader announces: if .data + .bss grow past this
+   line, _uram alone could not hold these allocations. */
 ASSERT(_euram <= 0x0814c000,
   "CGDoom: .data+.bss too large: gint's _uram keeps < 192 KiB for kinit (see src/gint/uram_check.ld)")
