@@ -116,6 +116,7 @@ P_SpawnMobj
 void 	P_RemoveMobj (mobj_t* th);
 boolean	P_SetMobjState (mobj_t* mobj, statenum_t state);
 void	P_SetFastMonsters (boolean fast);
+int	P_SargRunTics (void);
 void 	P_MobjThinker (mobj_t* mobj);
 
 void	P_SpawnPuff (fixed_t x, fixed_t y, fixed_t z);

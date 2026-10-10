@@ -104,10 +104,11 @@ static void game_state_line(const char *what, int tic)
     const player_t *p = &players[consoleplayer];
     fprintf(stderr, "GAMELOG %-9s tic=%d gametic=%d map=E%dM%d state=%d "
         "leveltime=%d health=%d armor=%d kills=%d/%d items=%d/%d "
-        "secrets=%d/%d demoplayback=%d idle=%d\n", what, tic, gametic,
-        gameepisode, gamemap, (int)gamestate, leveltime, p->health,
-        p->armorpoints, p->killcount, totalkills, p->itemcount, totalitems,
-        p->secretcount, totalsecret, (int)demoplayback, CGD_IsPaused());
+        "secrets=%d/%d demoplayback=%d skill=%d sargtics=%d idle=%d\n", what,
+        tic, gametic, gameepisode, gamemap, (int)gamestate, leveltime,
+        p->health, p->armorpoints, p->killcount, totalkills, p->itemcount,
+        totalitems, p->secretcount, totalsecret, (int)demoplayback,
+        (int)gameskill, P_SargRunTics(), CGD_IsPaused());
 }
 
 static void gamelog_tic(int tic)

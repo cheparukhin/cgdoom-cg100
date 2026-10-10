@@ -188,6 +188,34 @@ test-map-limit-asan: host-asan
 	 sh $(ROOT)/tests/map-limit.sh -bin $(ASAN_BUILD)/cgdoom-host \
 	   -out $(ASAN_BUILD)/tests/maplimit
 
+# Special keys on the title screen, before any level (tests/title-keys.sh)
+.PHONY: test-title-keys test-title-keys-asan
+test-unit: test-title-keys
+test-asan: test-title-keys-asan
+
+test-title-keys: host
+	@sh $(ROOT)/tests/title-keys.sh -bin $(HOST_BUILD)/cgdoom-host
+
+test-title-keys-asan: host-asan
+	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+	 sh $(ROOT)/tests/title-keys.sh -bin $(ASAN_BUILD)/cgdoom-host \
+	   -out $(ASAN_BUILD)/tests/titlekeys
+
+# Fast monsters after loading a save (tests/skill-load.sh)
+.PHONY: test-skill-load test-skill-load-asan
+test-unit: test-skill-load
+test-asan: test-skill-load-asan
+
+test-skill-load: host
+	@sh $(ROOT)/tests/skill-load.sh -bin $(HOST_BUILD)/cgdoom-host
+
+test-skill-load-asan: host-asan
+	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+	 sh $(ROOT)/tests/skill-load.sh -bin $(ASAN_BUILD)/cgdoom-host \
+	   -out $(ASAN_BUILD)/tests/skillload
+
 #---
 # Engine portability check with the SH compiler (big-endian, 32-bit)
 #---

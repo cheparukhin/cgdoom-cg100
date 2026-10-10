@@ -439,9 +439,21 @@ void ST_refreshBackground(void)
 }
 
 
+/* CGDoom special keys (i_system.c). plyr is set by ST_Start(), when the
+   first level starts: on the title screen before that there is no player.
+   The setting keys still apply there, without a message; cheat and noclip
+   do nothing (external review: a NULL write, a crash on the calculator). */
+static void ST_SpecialMessage(char *message)
+{
+  if (plyr)
+    plyr->message = message;
+}
+
 void CGD_Cheat(void)
 {
   int i;
+  if (!plyr)
+    return;
   plyr->cheats ^= CF_GODMODE;
   if (plyr->cheats & CF_GODMODE)
   {
@@ -471,6 +483,8 @@ void CGD_Cheat(void)
 
 void CGD_SwitchClip(void)
 {
+  if (!plyr)
+    return;
   plyr->cheats ^= CF_NOCLIP;
   if(plyr->cheats & CF_NOCLIP)
   {
@@ -494,7 +508,7 @@ void CGD_FreeMem(void)
       Z_FreeMemory(i) >> 10, Z_ZoneSize(i) >> 10);
   }
 
-  plyr->message = message;
+  ST_SpecialMessage(message);
 }
 
 /* Frameskip key: fixed 0 -> 1 -> 2 -> 3 -> auto -> fixed 0 (step 3; auto
@@ -519,7 +533,7 @@ void CGD_CycleFrameskip(void)
     sprintf(message, "Frameskip: auto (max %d)", CGD_AutoFrameskip);
   else
     sprintf(message, "Frameskip: %d", CGD_Frameskip);
-  plyr->message = message;
+  ST_SpecialMessage(message);
 }
 
 void CGD_CycleGamma(void)
@@ -529,7 +543,7 @@ void CGD_CycleGamma(void)
   I_SetPalette(NULL);
 
   extern char gammamsg[5][26];
-  plyr->message = gammamsg[usegamma];
+  ST_SpecialMessage(gammamsg[usegamma]);
 }
 
 void CGD_ProfilerResults(void)
@@ -541,7 +555,7 @@ void CGD_ProfilerResults(void)
     ((unsigned int)prof_time(CGD_Perf.DisplayInterface) + 500) / 1000,
     ((unsigned int)prof_time(CGD_Perf.LumpLoading) + 500) / 1000,
     ((unsigned int)prof_time(CGD_Perf.UnalignedLumpLoading) + 500) / 1000);
-  plyr->message = message;
+  ST_SpecialMessage(message);
 }
 
 // Respond to keyboard input events,

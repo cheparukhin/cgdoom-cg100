@@ -1536,3 +1536,32 @@ Vanilla trusted its savegames and demos: three memory-safety bugs, each reproduc
 - The buffer is too small for some stock levels: with the calculator's struct sizes (simulator, a 1 MiB buffer to
   measure) Freedoom E3M3 needs 185,610 bytes at its start, E4M2 213,886 and Doom II MAP12 243,898 (MAP20 124,634,
   MAP29 80,558). These saves are now refused ("level too large"); before, they wrote past the buffer.
+
+## External review fixes (2026-10-11)
+
+A review (ChatGPT, made before the fx-CG100 scope cleanup) reported six bugs. Two can happen on the target
+(fx-CG100, shareware `doom1.wad`, single player) and are fixed; the other four cannot and are left.
+
+- **Special keys before the first level (`st_stuff.c`):** the status bar's `plyr` is set by `ST_Start()`, so on
+  the title screen before any level it is NULL, and frameskip, gamma, memory statistics, cheat, noclip and the
+  profiler report wrote through it (a crash on the calculator; the host's ASan/UBSan run reports the NULL access).
+  The setting keys now apply without a message there; cheat and noclip do nothing. Test: `make test-title-keys`
+  (`tests/title-keys.sh`, `tests/input/title-keys.txt`; the host input script gained a `profiler` key).
+- **Fast monsters after a load (`G_DoLoadGame`):** vanilla set `gameskill` to the save's skill before `G_InitNew`,
+  which switches the fast monsters by comparing the old and the new skill. Each calculator launch is a fresh
+  session, so a Nightmare save loaded from the title had normal-speed monsters, and a normal save loaded during
+  a Nightmare game kept fast ones. `G_InitNew` now gets the save's skill while `gameskill` still holds the current
+  one. Demos never load saves (demo sync unchanged). `P_SargRunTics()` reports the demon run-state tics for the
+  host's `-gamelog` (new fields `skill=` and `sargtics=`, before `idle=`). Test: `make test-skill-load`
+  (`tests/skill-load.sh`: a fresh session loads a Nightmare save, a Nightmare game loads a normal save, and the
+  reverse).
+
+Left, with the reason:
+- Boss cube in flight after a load (`A_SpawnFly`, NULL `target`): Doom II boss brain only (already listed above).
+- Stopped perpetual platforms not archived (`P_ArchiveSpecials`, vanilla): a platform only stops through
+  linedef types 54/89, which no shareware map has (nor perpetual platforms, 53/87).
+- Settings written without the platform's `CG.*` lines when `PL_FileWrite()` cannot copy them: only reached if a
+  ~1.4 KiB malloc fails right after `CGD_SaveSettings()`'s 2 KiB one succeeded (it stops with an error otherwise);
+  the model marker whose loss reset the keymap no longer exists.
+- Texture patch indices not range-checked (`R_InitTextures`, vanilla): needs a corrupted texture table inside an
+  otherwise valid WAD; the release WAD is built from a checksummed download.

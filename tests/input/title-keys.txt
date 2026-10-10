@@ -1,0 +1,21 @@
+# Special keys on the title screen, before any level (tests/title-keys.sh).
+# Each key is pressed once: a segment without it comes in between.
+10
+1 frameskip
+2
+1 gamma
+2
+1 freemem
+2
+1 cheat
+2
+1 noclip
+2
+1 fps
+2
+1 decvp
+2
+1 incvp
+2
+1 profiler
+200

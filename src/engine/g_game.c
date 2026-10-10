@@ -1087,14 +1087,18 @@ void G_DoLoadGame (void)
         return;
     }
 
-    gameskill = skill;
+    /* CGDoom: gameskill keeps the current skill until G_InitNew, which
+       switches the fast monsters by comparing the two (external review:
+       vanilla set it first, so a Nightmare save loaded from the title of a
+       fresh session had normal-speed monsters, and a normal save loaded
+       during a Nightmare game kept fast ones). Demos never load saves. */
     gameepisode = episode;
     gamemap = map;
     for (i=0 ; i<MAXPLAYERS ; i++)
         playeringame[i] = ingame[i];
 
     // load a base level
-    G_InitNew (gameskill, gameepisode, gamemap);
+    G_InitNew (skill, gameepisode, gamemap);
 
     // get the times
     a = *save_p++;

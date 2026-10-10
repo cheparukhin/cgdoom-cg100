@@ -98,6 +98,13 @@ static inline int P_StateTics (statenum_t state)
   return states[state].tics;
 }
 
+// Tics of a demon's first run state: 2, or 1 with fast monsters (host
+// -gamelog, tests/skill-load.sh)
+int P_SargRunTics (void)
+{
+  return P_StateTics (S_SARG_RUN1);
+}
+
 // mobj->info->speed, as patched by P_SetFastMonsters
 static fixed_t P_MissileSpeed (const mobj_t *mo)
 {
