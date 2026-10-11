@@ -363,10 +363,19 @@ static void test_settings_nomem(void)
 		&& file_is("SET.CFG", "Version=1\nCG.Old=1\n", 20), "old settings untouched");
 	CHECK(gfs_last_failure(text, &rc) && !strcmp(text, "SET.CFG")
 		&& rc == GFS_ERR_NO_MEMORY, "failure named %s %d", text, rc);
-	CHECK(gfs_failure_text(text, sizeof text, 0) && strstr(text, "settings SET.CFG")
-		&& strstr(text, "previous settings") && !strstr(text, "DelaySaves"),
-		"exit text: %s", text);
+	CHECK(gfs_failure_text(text, sizeof text, 0) && !strcmp(text, "NOT SAVED: "
+		"settings SET.CFG (no memory to keep it). The previous settings stay "
+		"in use."), "exit text: %s", text);
 	printf("settings nomem: %s\n", text);
+
+	/* main.c: CGD_SaveSettings() could not even allocate its buffer, so
+	   PL_FileWrite() was not called; the same text */
+	reset_failures();
+	gfs_note_failure("SET.CFG", GFS_ERR_NO_MEMORY);
+	CHECK(gfs_failure_text(text, sizeof text, 0) && strstr(text, "settings SET.CFG")
+		&& strstr(text, "previous settings stay in use") && !strstr(text, "lost"),
+		"noted: %s", text);
+	reset_failures();
 
 	/* With memory: written whole */
 	gfs_settings_appender = appender;

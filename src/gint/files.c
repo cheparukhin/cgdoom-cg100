@@ -289,6 +289,11 @@ static void note_failure(char const *name, int result)
 	g_flush_failures++;
 }
 
+void gfs_note_failure(char const *name, int result)
+{
+	note_failure(name, result);
+}
+
 int gfs_pending_count(void)
 {
 	return g_npend;
@@ -337,7 +342,10 @@ bool gfs_failure_text(char *text, size_t size, int flush_result)
 		   engine then writes while the WAD map is live), or for the
 		   settings file (whose old version is then untouched) */
 		bool nomem = (g_fail_result == GFS_ERR_NO_MEMORY);
-		bool settings = !strcmp(file_kind(g_fail_name), "settings ");
+		/* A settings file without memory was never written: the file
+		   in storage is the previous one */
+		bool settings = nomem
+			&& !strcmp(file_kind(g_fail_name), "settings ");
 		char reason[48];
 		if(nomem)
 			snprintf(reason, sizeof reason, "no memory to keep it");
@@ -348,7 +356,10 @@ bool gfs_failure_text(char *text, size_t size, int flush_result)
 		/* What is left in storage. With a single failure, the kept
 		   count is the named file's. */
 		char fate[72];
-		if(g_flush_kept <= 0)
+		if(settings && !more)
+			snprintf(fate, sizeof fate, "The previous settings stay in "
+				"use.");
+		else if(g_flush_kept <= 0)
 			snprintf(fate, sizeof fate, "%s",
 				more ? "They are lost." : "It is lost.");
 		else if(g_flush_kept >= g_flush_failures)
@@ -359,12 +370,12 @@ bool gfs_failure_text(char *text, size_t size, int flush_result)
 			snprintf(fate, sizeof fate, "%d of them kept their "
 				"previous version, the others are lost.",
 				g_flush_kept);
-		snprintf(text, size, "NOT SAVED: %s%s%s (%s). %s %s",
+		char const *advice = settings ? ""
+			: nomem ? " Set DelaySaves=1 in CGDOOM.CFG."
+			: " Free some storage space before playing again.";
+		snprintf(text, size, "NOT SAVED: %s%s%s (%s). %s%s",
 			file_kind(g_fail_name), g_fail_name,
-			more ? " and other files" : "", reason, fate,
-			nomem && settings ? "The previous settings stay in use."
-			: nomem ? "Set DelaySaves=1 in CGDOOM.CFG."
-			: "Free some storage space before playing again.");
+			more ? " and other files" : "", reason, fate, advice);
 	}
 	else {
 		/* No failure was counted: gfs_flush() refused to write at all

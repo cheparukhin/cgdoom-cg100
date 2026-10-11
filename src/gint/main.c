@@ -191,9 +191,19 @@ static void save_settings_if_changed(void)
 		&& !memcmp(&g_saved_opts, &g_opt, sizeof g_opt))
 		return;
 
+	int failures = gfs_flush_failures();
 	gfs_settings_appender = settings_appender;
-	CGD_SaveSettings(&CGD_Options);
+	int rc = CGD_SaveSettings(&CGD_Options);
 	gfs_settings_appender = NULL;
+	/* Not queued (external review: CGD_SaveSettings() without memory for
+	   its buffer, or PL_FileWrite() refusing): shown at exit, unless the
+	   file layer counted it already, and the baseline stays, so that a
+	   later call tries again */
+	if(rc < 0) {
+		if(gfs_flush_failures() == failures)
+			gfs_note_failure(CGDOOM_SETTINGS_FILE, GFS_ERR_NO_MEMORY);
+		return;
+	}
 
 	memcpy(&g_saved_engine_opts, &CGD_Options, sizeof CGD_Options);
 	g_saved_opts = g_opt;

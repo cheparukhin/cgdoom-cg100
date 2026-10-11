@@ -1562,8 +1562,10 @@ A review (ChatGPT, made before the fx-CG100 scope cleanup) reported six bugs. Th
   a game, where the savegame copies were queued first and could take the heap (block-map mode). Now:
   `end_game_session()` queues the settings before the saves; `PL_FileWrite()` refuses a settings file it cannot
   copy whole (counted for the exit screen: "The previous settings stay in use", the file in storage untouched);
-  `CGD_SaveSettings()` returns -1 instead of a fatal `CGD_malloc` error when its buffer cannot be allocated.
-  Test: `tests/gint-host/test_files.c` (`test_settings_nomem`).
+  `CGD_SaveSettings()` returns -1 instead of a fatal `CGD_malloc` error when its buffer cannot be allocated, and
+  main.c's `save_settings_if_changed()` then reports it at exit (`gfs_note_failure`, unless the file layer counted
+  it already) and keeps its baseline, so a later call tries again (second follow-up review: the result was
+  ignored and the settings marked as saved). Test: `tests/gint-host/test_files.c` (`test_settings_nomem`).
 
 Left, with the reason:
 - Boss cube in flight after a load (`A_SpawnFly`, NULL `target`): Doom II boss brain only (already listed above).

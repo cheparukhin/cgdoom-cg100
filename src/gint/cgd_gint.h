@@ -289,6 +289,8 @@ void gfs_drop_read_cache(void);
 /* Name and result of the first failed operation of the last gfs_flush()
    with failures (false if there was none) */
 bool gfs_last_failure(char name[GFS_NAME_MAX], int *result);
+/* Count a file the caller could not even hand over (shown at exit) */
+void gfs_note_failure(char const *name, int result);
 
 /* While set, the settings file written by CGD_SaveSettings() gets the
    platform's own "CG.*" lines appended (see main.c). */
