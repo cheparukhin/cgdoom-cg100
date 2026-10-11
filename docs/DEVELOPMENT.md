@@ -178,7 +178,7 @@ Finally, gint's `kquit` restores the OS clock, the LCD window and the drivers.
   static arrays; allocate big renderer arrays at init (design §8).
   - The current build has `.bss` 72 KiB, `.data` 2.8 KiB, `.text` 188 KiB, `.rodata` 142 KiB and
     `.ilram` 1552 B (of about 4 KiB).
-  - The binary is 343,236 B and the g3a 371,912 B. The binary limit is 2 MiB (gint's linker script).
+  - The binary is 343,344 B and the g3a 372,020 B. The binary limit is 2 MiB (gint's linker script).
 - **Heap:**
   - Only the arenas gint creates: `_uram` and the `_ld1` that mpm.bin 1.1 announces (about 5.5 MiB). No
     RAM address is hard-coded. Older mpm.bin builds announce less or none (critique §B3) and are not

@@ -776,9 +776,12 @@ static void dev_info_after(void)
      every such case, tests/demo-unbegun.sh.)
      The launcher makes recording imply a direct start without title demos
      (launcher()), so demobuffer is never replaced by a played demo lump.
-   - The delayed saves (savegames, the demo) go to the file layer.
    - The settings are queued: the engine changes view size, low detail and
-     flat floors in game (r_main.c CGD_Set*) and never saves them itself. */
+     flat floors in game (r_main.c CGD_Set*) and never saves them itself.
+     Before the saves (external review): their copies may take most of the
+     heap, and the settings copy then failed.
+   - The delayed saves (savegames, the demo) go to the file layer (a save
+     that cannot be copied is written at once, with everything pending). */
 static void end_game_session(void)
 {
 	static bool demo_done = false;
@@ -788,7 +791,6 @@ static void end_game_session(void)
 		demo_done = true;
 		G_CheckDemoStatus();
 	}
-	CGD_FlushDelayedWrites();
 	/* The user's title-screen setting, not this launch's (final review) */
 	if(g_title_saved) {
 		CGD_Options.AutoStart = g_title_autostart;
@@ -796,6 +798,7 @@ static void end_game_session(void)
 		g_title_saved = false;
 	}
 	save_settings_if_changed();
+	CGD_FlushDelayedWrites();
 }
 
 static void game_entry(void)

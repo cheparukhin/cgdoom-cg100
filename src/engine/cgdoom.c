@@ -116,8 +116,12 @@ void CGD_DefaultOptions(CGDoom_Options *o)
 
 int CGD_SaveSettings(const CGDoom_Options *o)
 {
-	/* ~30 bytes per keymap entry plus a few lines of options */
-	char *out_start = CGD_malloc(2048);
+	/* ~30 bytes per keymap entry plus a few lines of options. Not
+	   CGD_malloc: without memory the settings are not saved, which is no
+	   reason for a fatal error at the end of a game (external review) */
+	char *out_start = malloc(2048);
+	if(!out_start)
+		return -1;
 	char *out = out_start;
 
 	/* Version identifcation (just in case something goes wrong) */

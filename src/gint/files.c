@@ -334,8 +334,10 @@ bool gfs_failure_text(char *text, size_t size, int flush_result)
 		return false;
 	if(g_flush_failures > 0 && g_fail_name[0]) {
 		/* The no-memory refusal only happens with DelaySaves=0 (the
-		   engine then writes while the WAD map is live) */
+		   engine then writes while the WAD map is live), or for the
+		   settings file (whose old version is then untouched) */
 		bool nomem = (g_fail_result == GFS_ERR_NO_MEMORY);
+		bool settings = !strcmp(file_kind(g_fail_name), "settings ");
 		char reason[48];
 		if(nomem)
 			snprintf(reason, sizeof reason, "no memory to keep it");
@@ -359,8 +361,9 @@ bool gfs_failure_text(char *text, size_t size, int flush_result)
 				g_flush_kept);
 		snprintf(text, size, "NOT SAVED: %s%s%s (%s). %s %s",
 			file_kind(g_fail_name), g_fail_name,
-			more ? " and other files" : "", reason, fate, nomem
-			? "Set DelaySaves=1 in CGDOOM.CFG."
+			more ? " and other files" : "", reason, fate,
+			nomem && settings ? "The previous settings stay in use."
+			: nomem ? "Set DelaySaves=1 in CGDOOM.CFG."
 			: "Free some storage space before playing again.");
 	}
 	else {
@@ -755,8 +758,20 @@ int PL_FileWrite(const char *name, const void *buf, int size)
 		return -1;
 	}
 
-	/* No memory for a copy: write right now (with everything pending),
-	   unless the WAD map is live */
+	/* No memory for a copy. The settings file cannot be written from the
+	   caller's buffer, which lacks the platform's CG.* lines (external
+	   review: they were dropped and success reported): refuse it, and the
+	   file in storage stays as it is. main.c queues the settings before
+	   the end-of-game saves take their copies, so this needs a heap that
+	   was already full. */
+	if(extra_len > 0) {
+		PL_Log("PL_FileWrite: no memory to keep '%s'\n", name);
+		note_failure(name, GFS_ERR_NO_MEMORY);
+		return -1;
+	}
+
+	/* Write right now (with everything pending), unless the WAD map is
+	   live */
 	if(gwad_map_live()) {
 		PL_Log("PL_FileWrite: no memory to delay '%s'\n", name);
 		note_failure(name, GFS_ERR_NO_MEMORY);

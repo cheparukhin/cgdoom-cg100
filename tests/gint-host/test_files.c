@@ -338,6 +338,48 @@ static void reset_failures(void)
 	g_fail_result = 0;
 }
 
+/* External review: with no memory for its copy, the settings file is
+   refused (counted for the exit screen, the file in storage untouched)
+   instead of being written without the platform's CG.* lines */
+static void test_settings_nomem(void)
+{
+	char text[256] = "", name[GFS_NAME_MAX];
+	int rc = 0;
+	/* The session's failures so far, put back afterwards */
+	int f = g_flush_failures, k = g_flush_kept, r = g_fail_result;
+	strcpy(name, g_fail_name);
+	char const *sname = gfs_settings_name;
+	reset_failures();
+
+	add_file("SET.CFG", "Version=1\nCG.Old=1\n", 20);
+	gfs_settings_name = "SET.CFG";
+	gfs_settings_appender = appender;
+	g_malloc_fail_over = 8;
+	int w = PL_FileWrite("SET.CFG", "Version=1\n", 10);
+	g_malloc_fail_over = -1;
+	gfs_settings_appender = NULL;
+	CHECK(w < 0, "settings without memory refused (%d)", w);
+	CHECK(gfs_pending_count() == 0 && gfs_flush() == 0
+		&& file_is("SET.CFG", "Version=1\nCG.Old=1\n", 20), "old settings untouched");
+	CHECK(gfs_last_failure(text, &rc) && !strcmp(text, "SET.CFG")
+		&& rc == GFS_ERR_NO_MEMORY, "failure named %s %d", text, rc);
+	CHECK(gfs_failure_text(text, sizeof text, 0) && strstr(text, "settings SET.CFG")
+		&& strstr(text, "previous settings") && !strstr(text, "DelaySaves"),
+		"exit text: %s", text);
+	printf("settings nomem: %s\n", text);
+
+	/* With memory: written whole */
+	gfs_settings_appender = appender;
+	CHECK(PL_FileWrite("SET.CFG", "Version=1\n", 10) == 10, "settings write");
+	gfs_settings_appender = NULL;
+	CHECK(gfs_flush() == 0 && file_is("SET.CFG", "Version=1\nCG.Test=1\n", 20), "settings whole");
+
+	rm_file("SET.CFG");
+	gfs_settings_name = sname;
+	g_flush_failures = f; g_flush_kept = k; g_fail_result = r;
+	strcpy(g_fail_name, name);
+}
+
 /* gint review round 1: os_flush() failure paths. A replacement that does
    not fit puts the previous version back (test_replace_rollback); these are
    the failures where that cannot work either, and nothing may be left
@@ -859,6 +901,7 @@ int main(int argc, char **argv)
 	test_replace_rollback();
 	test_flush_mixed();
 	test_nomem();
+	test_settings_nomem();
 	test_demo_exit();
 	test_refusal_counted();
 	test_list_more();

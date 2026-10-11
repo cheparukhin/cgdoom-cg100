@@ -1539,8 +1539,8 @@ Vanilla trusted its savegames and demos: three memory-safety bugs, each reproduc
 
 ## External review fixes (2026-10-11)
 
-A review (ChatGPT, made before the fx-CG100 scope cleanup) reported six bugs. Two can happen on the target
-(fx-CG100, shareware `doom1.wad`, single player) and are fixed; the other four cannot and are left.
+A review (ChatGPT, made before the fx-CG100 scope cleanup) reported six bugs. Three can happen on the target
+(fx-CG100, shareware `doom1.wad`, single player) and are fixed; the other three cannot and are left.
 
 - **Special keys before the first level (`st_stuff.c`):** the status bar's `plyr` is set by `ST_Start()`, so on
   the title screen before any level it is NULL, and frameskip, gamma, memory statistics, cheat, noclip and the
@@ -1555,13 +1555,19 @@ A review (ChatGPT, made before the fx-CG100 scope cleanup) reported six bugs. Tw
   host's `-gamelog` (new fields `skill=` and `sargtics=`, before `idle=`). Test: `make test-skill-load`
   (`tests/skill-load.sh`: a fresh session loads a Nightmare save, a Nightmare game loads a normal save, and the
   reverse).
+- **Settings without the platform's lines (`PL_FileWrite`, gint):** when no copy of the settings file could be
+  allocated, the no-memory fallback wrote the engine's buffer alone (no `CG.*` lines: clock, display, frameskip...)
+  and returned success. The follow-up review reproduced it with a 2,600-byte heap: `CGD_SaveSettings()`'s 2 KiB
+  buffer is still held while the ~0.7 KiB copy is allocated. On the calculator the likely trigger was the end of
+  a game, where the savegame copies were queued first and could take the heap (block-map mode). Now:
+  `end_game_session()` queues the settings before the saves; `PL_FileWrite()` refuses a settings file it cannot
+  copy whole (counted for the exit screen: "The previous settings stay in use", the file in storage untouched);
+  `CGD_SaveSettings()` returns -1 instead of a fatal `CGD_malloc` error when its buffer cannot be allocated.
+  Test: `tests/gint-host/test_files.c` (`test_settings_nomem`).
 
 Left, with the reason:
 - Boss cube in flight after a load (`A_SpawnFly`, NULL `target`): Doom II boss brain only (already listed above).
 - Stopped perpetual platforms not archived (`P_ArchiveSpecials`, vanilla): a platform only stops through
   linedef types 54/89, which no shareware map has (nor perpetual platforms, 53/87).
-- Settings written without the platform's `CG.*` lines when `PL_FileWrite()` cannot copy them: only reached if a
-  ~1.4 KiB malloc fails right after `CGD_SaveSettings()`'s 2 KiB one succeeded (it stops with an error otherwise);
-  the model marker whose loss reset the keymap no longer exists.
 - Texture patch indices not range-checked (`R_InitTextures`, vanilla): needs a corrupted texture table inside an
   otherwise valid WAD; the release WAD is built from a checksummed download.
