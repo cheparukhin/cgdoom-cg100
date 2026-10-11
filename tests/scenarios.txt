@@ -22,6 +22,10 @@ demo1       -iwad $WADS/freedoom1.wad -playdemo DEMO1 -tics 2000
 # 547 drawsegs and 179 vissprites per frame (vanilla: 128/256/128; the old
 # engine stopped with "R_FindPlane: no more visplanes")
 e2m4-limits -iwad $WADS/freedoom1.wad -warp 2 4 -tics 700 -input builtin:noclip
+# Ordinary play that overflowed the unused wall-texture midpoints in
+# R_StoreWallRange (external review, 2026-10-11): the ASan/UBSan run stopped
+# at tic ~1500; the frames are those of the unfixed engine
+e2m5-walk   -iwad $WADS/freedoom1.wad -warp 2 5 -tics 2400 -input builtin:walk -skill 4
 
 # Doom II (Freedoom phase 2)
 map01       -iwad $WADS/freedoom2.wad -warp 1 -tics 900 -input builtin:explore

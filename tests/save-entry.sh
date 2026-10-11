@@ -116,6 +116,50 @@ ls "$nd/ro"/*.DSG > /dev/null 2>&1 && fail "read-only dir got a save"
 grep -q "not written" "$nd/rw.log" && fail "a good save reported as failed (see $nd/rw.log)"
 ls "$nd/rw"/*_0.DSG > /dev/null 2>&1 || fail "no immediate save in $nd/rw"
 
+# External review (2026-10-11): fire held while the save menu opens and
+# released during the name entry must not stay pressed in the game after
+# the save. The run is recorded (-record 0): the menu tics are not in the
+# demo, so its last ticcmds are the ones after the menu closed, and none
+# may carry BT_ATTACK (1).
+st=$OUT/sticky
+rm -rf "$st"; mkdir -p "$st" || exit 2
+cat > "$st/input.txt" <<'EOS'
+20
+3 fire
+1 fire menu
+3 fire
+1 fire back
+3 fire
+1 fire back
+3 fire
+1 fire back
+3 fire
+1 fire enter
+3 fire
+1 fire enter
+3 fire
+10
+1 enter
+100000
+EOS
+"$BIN" -iwad "$WADS/freedoom1.wad" -warp 1 1 -skill 1 -tics 160 -record 0 \
+    -input "$st/input.txt" -data "$st" > "$st/run.log" 2>&1 ||
+    fail "sticky-key run failed (see $st/run.log)"
+lmp=$(ls "$st"/*D00.LMP 2>/dev/null)
+[ -n "$lmp" ] || fail "sticky-key run: no demo in $st"
+ls "$st"/*_0.DSG > /dev/null 2>&1 || fail "sticky-key run: no save in $st"
+sticky=$(python3 -I - "$lmp" <<'EOS'
+import sys
+d = open(sys.argv[1], 'rb').read()[13:]
+cmds = [d[i:i+4] for i in range(0, len(d) - 3, 4)]
+fired = [c[3] & 1 for c in cmds]
+# fire held at first, none in the last 60 ticcmds (after the menu)
+print('ok' if any(fired) and len(fired) > 60 and not any(fired[-60:]) else
+      'tics %d, fire in the last 60: %d' % (len(fired), sum(fired[-60:])))
+EOS
+)
+[ "$sticky" = ok ] || fail "fire stays pressed after the save ($sticky, see $st)"
+
 echo "PASS saveentry (pre-filled E1M1/MAP01, typed 'A1 B0', escape, load," \
-    "CGD_IsPaused, DelaySaves=0 failure)"
+    "CGD_IsPaused, DelaySaves=0 failure, keys released while typing)"
 exit 0

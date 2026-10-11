@@ -671,6 +671,7 @@ void R_StoreWallRange ( int start, int stop )
         // bottom of texture
         rw_toptexturemid = vtop - viewz;
       }
+      rw_toptexturemid += sidedef->rowoffset;
     }
     if (worldlow > worldbottom)
     {
@@ -685,9 +686,14 @@ void R_StoreWallRange ( int start, int stop )
       }
       else	// top of texture at top
         rw_bottomtexturemid = worldlow;
+      rw_bottomtexturemid += sidedef->rowoffset;
     }
-    rw_toptexturemid += sidedef->rowoffset;
-    rw_bottomtexturemid += sidedef->rowoffset;
+    /* CGDoom: the row offset is added inside each block (external review).
+       Vanilla added it to both midpoints of every two-sided wall, so the
+       global of an absent upper or lower part kept growing until it
+       overflowed (signed overflow, UB). Such a midpoint is never used
+       (toptexture/bottomtexture are only set in these blocks): no output
+       change (tests/scenarios.txt e2m5-walk). */
 
     // allocate space for masked texture tables
     if (sidedef->midtexture)

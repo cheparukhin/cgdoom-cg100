@@ -178,7 +178,7 @@ Finally, gint's `kquit` restores the OS clock, the LCD window and the drivers.
   static arrays; allocate big renderer arrays at init (design §8).
   - The current build has `.bss` 72 KiB, `.data` 2.8 KiB, `.text` 188 KiB, `.rodata` 142 KiB and
     `.ilram` 1552 B (of about 4 KiB).
-  - The binary is 343,764 B and the g3a 372,440 B. The binary limit is 2 MiB (gint's linker script).
+  - The binary is 343,924 B and the g3a 372,600 B. The binary limit is 2 MiB (gint's linker script).
 - **Heap:**
   - Only the arenas gint creates: `_uram` and the `_ld1` that mpm.bin 1.1 announces (about 5.5 MiB). No
     RAM address is hard-coded. Older mpm.bin builds announce less or none (critique §B3) and are not
@@ -286,9 +286,9 @@ There is no hardware, so correctness rests on three things:
 
 | Command | What it checks |
 |---|---|
-| `make test-host` | The 36 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
-| `make test-asan` | The same 36 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys and skill-load tests |
-| `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load` |
+| `make test-host` | The 37 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
+| `make test-asan` | The same 37 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys and skill-load tests |
+| `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly, also with the Doom menu opened while recording), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load` |
 | `make test-title-keys` | Every special key (frameskip, gamma, memory statistics, cheat, noclip, FPS, view size, profiler) pressed on the title screen before any level: no access through the missing player (ASan/UBSan in `test-asan`) |
 | `make test-skill-load` | Fast monsters follow the skill of a loaded save: a fresh session loading a Nightmare save, a Nightmare game loading a normal save, and the reverse (`-gamelog` `skill=` / `sargtics=`) |
 | `make test-map-limit` | `-warp 33` on `freedoom2.wad` starts MAP32: the launcher stops at MAP32 and `G_InitNew` limits a Doom II map to 32, since the engine's HUD titles, par times and intermission names end there. Also part of `test-unit`; `test-asan` runs it under ASan. |
@@ -298,7 +298,7 @@ There is no hardware, so correctness rests on three things:
 | `make -C src/engine/sh4/test run` | Asm vs the C reference: randomized and bit-exact, with stray-write, stack-canary and calling-convention checks; `asmcheck` |
 | `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
-| `make test-sim-full` | All 36 scenarios in the simulator vs the goldens (about 4 min) |
+| `make test-sim-full` | All 37 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
 
 Other targets:

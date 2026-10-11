@@ -386,4 +386,21 @@ void I_StartTic (void)
         e.data1 = (keys[i] < 0) ? -keys[i] : keys[i];
         D_PostEvent(&e);
     }
+
+    /* External review: the gameplay keys released during save-name entry
+       still reach G_Responder as key-ups (vanilla's events always did; the
+       menu ignores key-ups). Otherwise an action held when the entry began
+       (fire, a move) stayed down in gamekeydown afterwards. ESCAPE and
+       ENTER are in both sets and were handled above. */
+    if(entering)
+    {
+        for(int i = 0; base_keys[i]; i++)
+        {
+            if(base_keys[i] == KEY_ESCAPE || base_keys[i] == KEY_ENTER
+                || !CGD_KeyWasJustReleased(base_keys[i]))
+                continue;
+            event_t e = { .type = ev_keyup, .data1 = base_keys[i] };
+            D_PostEvent(&e);
+        }
+    }
 }

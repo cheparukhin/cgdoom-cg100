@@ -1573,3 +1573,28 @@ Left, with the reason:
   linedef types 54/89, which no shareware map has (nor perpetual platforms, 53/87).
 - Texture patch indices not range-checked (`R_InitTextures`, vanilla): needs a corrupted texture table inside an
   otherwise valid WAD; the release WAD is built from a checksummed download.
+
+## Whole-project review fixes (2026-10-11, external review of commit 3ea7949)
+
+Five findings; three apply to the target and are fixed, two cannot happen with the shareware WAD.
+
+- **Keys released during save-name entry (`I_StartTic`):** in text entry the events came from the text-key set
+  only, so the release of a gameplay key (fire, a move) held when the entry began produced no key-up and the
+  action stayed down in `gamekeydown` after the save. The gameplay keys' releases are now posted during the entry
+  too (the menu ignores key-ups; vanilla's events always carried them). Test: `tests/save-entry.sh` (fire held
+  through the save menu, released while typing; no `BT_ATTACK` in the recorded ticcmds after the menu).
+- **Menu opened while recording a demo (`G_Ticker`, `P_MenuPaused`):** the menu pauses the level (`P_Ticker`) but
+  not playback, and vanilla recorded a ticcmd for every tic, so the demo desynced from the first menu tic. While
+  the menu pauses the level, a recording now takes no ticcmd at all (no build, no write, no special buttons; a
+  pause or save request waits in `sendpause`/`sendsave` for the first tic after the menu). Recording only:
+  playback and demo sync are unchanged. Test: `tests/demo-roundtrip.sh` (the per-tic game states of a recording
+  with the menu opened for 40 tics and of its playback are identical).
+- **Unused wall-texture midpoints overflowing (`R_StoreWallRange`):** vanilla added `sidedef->rowoffset` to both
+  globals for every two-sided wall, so the midpoint of an absent upper/lower part kept growing until signed
+  overflow (UB; the ASan/UBSan build stopped in ordinary play on shareware E1M8 and Freedoom E2M5). The offset is
+  now added inside the block that sets each midpoint; an unset midpoint is never used, so no frame changes. Test:
+  the new golden scenario `e2m5-walk` (generated before the fix).
+
+Left: stopped platforms (see the external review fixes above: no shareware map can stop a platform) and the fire
+flicker light (`T_FireFlicker`, sector type 17, is not archived, vanilla): no shareware sector has type 17. The
+review's noclip sweep (coordinate overflows far outside the maps) is out of scope.

@@ -147,3 +147,10 @@ after the old desynced death. That wipe is gone now. `e1m1x-auto` is `e1m1-exit`
   cover doom1 E1M1-E1M9, freedoom1 E1M9, E2M3, E3M6, E4M2 and E4M5, and freedoom2 MAP01, 07, 11, 15, 20, 24, 29 and
   30, at skills 1-5.
 - `make test-sim-full`, `make test-asan`: every golden is reproduced.
+
+## 2026-10-11 — new golden `e2m5-walk` (no other golden changed)
+
+Freedoom1 E2M5, `builtin:walk`, 2400 tics: ordinary play in which the ASan/UBSan build stopped on a signed overflow
+of an unused wall-texture midpoint in `R_StoreWallRange` (external review; shareware E1M8 hits it too). The golden
+was generated with the engine before the fix, and the fixed engine reproduces it: the fix (the row offset added only
+to a midpoint that is set) does not change any frame. The other 36 goldens are unchanged.

@@ -152,6 +152,15 @@ void P_RunThinkers (void)
 // P_Ticker
 //
 
+// pause if in menu and at least one tic has been run
+// (vanilla: not during demo playback, which the menu must not stop).
+// CGDoom: also read by G_Ticker, which records no ticcmd for these tics.
+boolean P_MenuPaused (void)
+{
+  return !netgame && menuactive && !demoplayback
+    && players[consoleplayer].viewz != 1;
+}
+
 void P_Ticker (void)
 {
 
@@ -159,13 +168,8 @@ void P_Ticker (void)
   if (paused)
     return;
 
-  // pause if in menu and at least one tic has been run
-  // (vanilla: not during demo playback, which the menu must not stop)
-  if ( !netgame && menuactive && !demoplayback
-    && players[consoleplayer].viewz != 1)
-  {
+  if (P_MenuPaused ())
     return;
-  }
 
   if (playeringame[0])
     P_PlayerThink (&players[0]);

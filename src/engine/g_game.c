@@ -507,7 +507,13 @@ void G_Ticker (void)
 
   // get commands
   // check for special buttons
-  if (playeringame[0]) 
+  // CGDoom (external review): while the menu pauses the level (P_Ticker),
+  // a recording takes no ticcmd at all. Playback, where the menu never
+  // pauses, must run exactly the tics the recording ran; vanilla recorded
+  // these and the demo desynced. A pause or save request made meanwhile
+  // waits in sendpause/sendsave for the first tic after the menu.
+  if (playeringame[0]
+    && !(demorecording && gamestate == GS_LEVEL && P_MenuPaused ()))
   { 
     cmd = &players[0].cmd;
 
