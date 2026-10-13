@@ -6,11 +6,13 @@ Tags used throughout:
 - **[V]** verified in source code (path:line given) or in a primary forum post by the developer.
 - **[G]** guess or inference. The reasoning is given.
 
-All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/Users/cheparukhin/casio_doom/ref/extra/` (cloned for this report):
+Doom-related clones remain under `/Users/cheparukhin/casio_doom/ref/`. MPM and its
+forks moved to `/Users/cheparukhin/casio-mpm-220/ref/`; table paths are relative
+to the Doom repository root:
 
 | Local path | Upstream | HEAD date |
 |---|---|---|
-| `ref/mpm` (main, origin/dev, origin/dynload) | git.planet-casio.com/PlaneteCasio/mpm | main cbd1a41, 2026-08-17 (v1.1) |
+| `../casio-mpm-220/ref/mpm` (main, origin/dev, origin/dynload) | git.planet-casio.com/PlaneteCasio/mpm | main cbd1a41, 2026-08-17 (v1.1) |
 | `ref/gint` (dev) | Lephenixnoir/gint | 463f180 (2.11.0-91) |
 | `ref/extra/gpsp-sh4-jit` | github.com/KaraRyougi/gpsp-sh4-jit | d72a09c, release v00.10.0804 (2026-08-05) |
 | `ref/extra/CalcLoverHK_nesizm` (branch fxsdk) | git.planet-casio.com/CalcLoverHK/nesizm | bff20cc, 2026-09-11 (v1.10) |
@@ -19,8 +21,8 @@ All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/U
 | `ref/extra/CalcLoverHK_libsyscall` | git.planet-casio.com/CalcLoverHK/libsyscall | 653ce22, 2026-08-31 |
 | `ref/extra/CalcLoverHK_Add-in_Push` | git.planet-casio.com/CalcLoverHK/Add-in_Push | 84f2151, 2026-09-13 |
 | `ref/extra/CalcLoverHK_Xtune` | git.planet-casio.com/CalcLoverHK/Xtune (Ptune4) | 2026-04-10 |
-| `ref/extra/CalcLoverHK_mpm` | CalcLoverHK fork of MPM | same as main |
-| `ref/extra/Kin1009_gint`, `Kin1009_mpm`, `Kin1009_mpm-cfg` | git.planet-casio.com/Kin1009/* | 2026-09-26 |
+| `../casio-mpm-220/ref/extra/CalcLoverHK_mpm` | CalcLoverHK fork of MPM | same as main |
+| `ref/extra/Kin1009_gint`, `/Users/cheparukhin/casio-mpm-220/ref/extra/Kin1009_mpm`, `../casio-mpm-220/ref/extra/Kin1009_mpm-cfg` | git.planet-casio.com/Kin1009/* | 2026-09-26 |
 | `ref/extra/Slyvtt_SquishIt`, `Slyvtt_OutRun`, `Slyvtt_casio-emu` | git.planet-casio.com/Slyvtt/* | 2026-03-28, 2025-02-25, 2023 |
 | `ref/extra/Lephenixnoir_CGDoom` | git.planet-casio.com/Lephenixnoir/CGDoom | same as `ref/CGDoom`, plus `in330-backup` |
 | `ref/extra/ClassPadDev_CPDoom` | git.planet-casio.com/ClassPadDev/CPDoom | 2025-03-08 (fx-CP400, not CG100) |
@@ -71,7 +73,7 @@ All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/U
 | User storage | "4.5 MB" in user docs. A measured free storage figure of 4,793,072 B was reported on hpmuseum (that page returned 403, so I could not fetch it myself). Lephe (2026-02-06): there is no way to enlarge it and probably never will be. | [V] forum; [G] for the exact byte count |
 | Storage restore | KaraRyougi restored his CG100 storage to 11,820 KiB with an **unreleased** tool, held back because of regulatory concerns. | [V] Cemetech post p=317309 |
 | Syscall table | **Removed.** There is nothing usable at 0x80020070. Every former syscall must be called at its OS-version-specific address. | [V] Lephenixnoir, MPM thread p10 30/07/2025 |
-| OS version string | At 0x80020020 (P1) / 0xa0020020 (P2). Values: `"01.00.0000"`, `"02.00.0000"`, `"02.00.0010"` (=2.00.1, new display), `"02.10.0000"`. The user-visible build ("02.00.0202", "02.00.2202") is *not* in that string. | [V] `mpm/start.c:27-44`; installer error "Unknown OS (2.10.0000)" (forum p15) |
+| OS version string | At 0x80020020 (P1) / 0xa0020020 (P2). Values: `"01.00.0000"`, `"02.00.0000"`, `"02.00.0010"` (=2.00.1, new display), `"02.10.0000"`. The user-visible build ("02.00.0202", "02.00.2202") is *not* in that string. | [V] `/Users/cheparukhin/casio-mpm-220/ref/mpm/start.c:27-44`; installer error "Unknown OS (2.10.0000)" (forum p15) |
 | Model detection | gint: stack ≥ 0x8c000000 and model string at 0x80000300 not in {"810A","811A","810F"} ⇒ `HWCALC_FXCG100` (= 9). | [V] `gint/src/kernel/hardware.c:139-146`, `include/gint/hardware.h:114-115` |
 | Display panel | 396×224 panel. The OS VRAM is 384×216. 2025 boot units have a new controller (ID 0x32/0x52) and older OSes leave the screen black on them. | [V] gint commit 2700096; forum p17–p18 |
 | Exam mode | MPM does not launch in exam mode. | [V] beta announcement topic18626 |
@@ -83,10 +85,10 @@ All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/U
 ### 2.1 What it is
 - **Two parts. [V]**
   - A **closed-source OS patch**, installed by `mpm-installer-1.0bw.exe` through the OS-update USB mode. It makes **TOOLS** on the HOME screen load the raw binary `\\fls0\mpm.bin` at **0x8c700000** and jump to it.
-  - The **open-source `mpm.bin`**: an add-in menu and loader. Sources are in `ref/mpm`.
-- MPM itself is built with the fxSDK toolchain only. It is not a gint program. **[V]** `ref/mpm/README.md`
+  - The **open-source `mpm.bin`**: an add-in menu and loader. Sources are in `../casio-mpm-220/ref/mpm`.
+- MPM itself is built with the fxSDK toolchain only. It is not a gint program. **[V]** `../casio-mpm-220/ref/mpm/README.md`
 
-### 2.2 How it loads and runs an add-in (main branch, v1.1, `ref/mpm/main.c`)
+### 2.2 How it loads and runs an add-in (main branch, v1.1, `../casio-mpm-220/ref/mpm/main.c`)
 - **[V] Lists `\\fls0\*.g3a`** with `CW_BFile_FindFirst`.
   - It accepts any non-folder file type, because g3a files written by add-ins have type 0x01, not 0x41 (`main.c:48-52`).
   - It requires a file size ≥ 0x7002 (`main.c:54`).
@@ -127,7 +129,7 @@ All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/U
 | Kin1009 "1.2 Modded" | same as main | same as main | yes | same as main | community fork (AI-assisted, low confidence) |
 
 - **[V]** dynload: `git show origin/dynload:main.c` lines 187-228 and 396-397.
-- **[V]** The gpSP release `mpm.bin` and Parisse's `mpm/mpm.bin` are both exactly 12,820 B (GitHub API and HTTP HEAD).
+- **[V]** The gpSP release `mpm.bin` and Parisse's `/Users/cheparukhin/casio-mpm-220/ref/mpm/mpm.bin` are both exactly 12,820 B (GitHub API and HTTP HEAD).
 - **[V]** gpSP's linker script says mpm.bin lives at 0x8c700000..0x8c703214 (0x3214 = 12,820 B).
 - **[G]** So both are the same dynload build.
 
@@ -369,7 +371,7 @@ All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/U
 
 ## 4. Lessons for loading a multi-MB WAD on CG100
 
-1. **Use `Bfile_GetBlockAddress` (OS 2.00: 0x80333cf2; OS 2.10: 0x8039675a; OS 1.00: 0x8023ffb2) per 4 KiB block. Do the whole query in one OS-world visit.** **[V]** gpSP; addresses from `mpm/casiowin.yaml:37`
+1. **Use `Bfile_GetBlockAddress` (OS 2.00: 0x80333cf2; OS 2.10: 0x8039675a; OS 1.00: 0x8023ffb2) per 4 KiB block. Do the whole query in one OS-world visit.** **[V]** gpSP; addresses from `/Users/cheparukhin/casio-mpm-220/ref/mpm/casiowin.yaml:37`
    - With gint: one `gint_world_switch(GINT_CALL(fn, ctx))` where `fn` loops over all blocks.
    - This matters doubly when overclocked, because of the RTC drift.
 2. **Accept only P1/P2 pointers that are 4-aligned. Use the P1 (0x8…) alias for cached reads. Treat P0 results as "not mappable".** **[V]** gpSP field crashes with TEA 0x001129xx
@@ -379,7 +381,7 @@ All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/U
 5. **Invalidate the operand cache (`ocbi` per 32 B line) for re-mapped blocks.** **[V]** gpSP
 6. **Unaligned 16/32-bit loads fault on hardware (EXC 0x0E0)** but not in casio-emu. CGDoom's "TrustUnalignedLumps" option is a known hazard. **[V]** gpSP note; CGDoom option
 7. **Storage budget.** 4.5 MB total ⇒ ship the 3.39 MB stripped `doom.wad`. Optionally support a compressed WAD format (per-lump LZ4 or zx7 pages à la Prizoop `.gbz`) decompressed into the ~5.5 MiB `_ld1` heap. **[G]** The design is a suggestion; the numbers are [V].
-8. **Code runs from RAM on the CG100** (MPM copies the whole image and maps it with 64 KiB TLB pages), not from flash as on the CG50. **[V]** `mpm/main.c:241-263`
+8. **Code runs from RAM on the CG100** (MPM copies the whole image and maps it with 64 KiB TLB pages), not from flash as on the CG50. **[V]** `/Users/cheparukhin/casio-mpm-220/ref/mpm/main.c:241-263`
    - **[G]** Expect faster instruction fetch than the CG50 and no ROM TLB-miss stalls. gpSP even copies hot code into RAM on the CG50 (`hottext.c`) to get this effect.
 
 ---
@@ -401,7 +403,7 @@ All local clones live under `/Users/cheparukhin/casio_doom/ref/` (given) and `/U
 | 1 | 71 0 | 61 . | 51 ×10ˣ | 41 FORMAT (was (−)) | 31 EXE | – |
 
 Notes:
-- AC is tested by MPM as `*(u16*)0xa44b0000 == 1` (KEYSC KIUDATA0, row 0) (`mpm/main.c:192-200`). gpSP maps skin code 34 to `KEY_ACON`. **[V]**
+- AC is tested by MPM as `*(u16*)0xa44b0000 == 1` (KEYSC KIUDATA0, row 0) (`/Users/cheparukhin/casio-mpm-220/ref/mpm/main.c:192-200`). gpSP maps skin code 34 to `KEY_ACON`. **[V]**
 - ON is at the old F1 matrix position. gint dev reads it as `KEY_ON`. Old gint builds did not see it. **[V]**
 - `GetKey` cannot see ON; `GetKeyWait_OS` can (Parisse). **[V]**
 - Default game layouts used by precedents **[V]**:
@@ -445,7 +447,7 @@ Notes:
    - Every other BFile entry differs by exactly +0x62A68 between 2.00 and 2.10. 0x80333f9e + 0x62A68 = 0x80396a06, so **[G]** 0x80396a06 is right and the mpm entry is probably wrong or a different function.
 4. **`_ld1` vs hard-coded 0x8c200000** (see §2.3). The dynload MPM passes no `_ld1`. The main MPM does, and gint writes heap metadata at 0x8c200000. **[V]** for the code; [G] for the conflict scenario.
 5. **Add-in code sits at the top of RAM.** A fixed high arena can overwrite your own code once the binary grows. gpSP's "0x8c655300 ceiling" is an instance of this. **[G]** (§3.1)
-6. **NULL is mapped** (virtual page 0 → flash at physical 0, user RW) by MPM. Null-pointer bugs do not fault. **[V]** `mpm/main.c:262-263`
+6. **NULL is mapped** (virtual page 0 → flash at physical 0, user RW) by MPM. Null-pointer bugs do not fault. **[V]** `/Users/cheparukhin/casio-mpm-220/ref/mpm/main.c:262-263`
    - **[G]** Stray writes there hit the NOR bus.
 7. **`Bfile_GetBlockAddress` may return P0 addresses**, and block addresses change after any FS write. **[V]** gpSP
 8. **OS draws its file-busy indicator into LCD GRAM** during BFile calls. **[V]** gpSP
@@ -495,7 +497,7 @@ Notes:
 
 ### 9.2 Install the MPM OS patch (Windows only; a VM works)
 1. Get `mpm-installer-1.0bw.exe` (zip on Planète Casio, e.g. `https://www.planet-casio.com/storage/forums/mpm-installer-1.0bw-199064.zip`) and `mpm.bin`.
-   - Use the forum zip, the release asset of the add-in you use, or build `ref/mpm` with `fxsdk build-cg` using fxsdk/fxlibc @dev.
+   - Use the forum zip, the release asset of the add-in you use, or build `../casio-mpm-220/ref/mpm` with `fxsdk build-cg` using fxsdk/fxlibc @dev.
 2. Requirements: 64-bit Windows. Windows 8+ has WinUSB built in; on Vista/7 install WinUSB via **Zadig**. In a VM, attach the calculator's USB device to the VM.
 3. Connect the USB cable. On the calculator popup choose **OS Update** ("2: Mise à jour SE").
 4. Open `cmd` and run `mpm-installer-1.0bw.exe`.
@@ -529,7 +531,7 @@ Notes:
 - **No public Linux installer** (a dev build exists but is private).
 
 ### 9.5 Developer fast loop
-- MPM main has **Add-in Push** built in: press SETTINGS in MPM, then on the PC run `Add-in_Push/cli` (`main.c`, built on Cahute). It strips the 0x7000 g3a header and sends a 4-byte big-endian size plus the body; maximum 6 MB. **[V]** `CalcLoverHK_Add-in_Push/cli/main.c`; `mpm/main.c:473-484`
+- MPM main has **Add-in Push** built in: press SETTINGS in MPM, then on the PC run `Add-in_Push/cli` (`main.c`, built on Cahute). It strips the 0x7000 g3a header and sends a 4-byte big-endian size plus the body; maximum 6 MB. **[V]** `CalcLoverHK_Add-in_Push/cli/main.c`; `/Users/cheparukhin/casio-mpm-220/ref/mpm/main.c:473-484`
 - `fxsdk build-cg-push` / `fxlink -pw` target the CG50 Add-in Push helper. **[V]** `fxsdk/fxsdk/fxsdk.sh:36-41,292-300`
   - **[G]** It may need the CLI above for the CG100.
 
@@ -547,15 +549,16 @@ Notes:
 
 ## Sources
 
-Local code (all paths relative to `/Users/cheparukhin/casio_doom/ref/`):
-- `mpm/main.c`, `mpm/start.c`, `mpm/loader.c`, `mpm/addins.c`, `mpm/casiowin.yaml`, `mpm/loader-cg.x`, `mpm/reloc.S`; `git show origin/dynload:main.c`
+Local code (paths relative to `/Users/cheparukhin/casio_doom/ref/`, except the
+explicit absolute MPM paths):
+- `/Users/cheparukhin/casio-mpm-220/ref/mpm/main.c`, `/Users/cheparukhin/casio-mpm-220/ref/mpm/start.c`, `/Users/cheparukhin/casio-mpm-220/ref/mpm/loader.c`, `/Users/cheparukhin/casio-mpm-220/ref/mpm/addins.c`, `/Users/cheparukhin/casio-mpm-220/ref/mpm/casiowin.yaml`, `/Users/cheparukhin/casio-mpm-220/ref/mpm/loader-cg.x`, `/Users/cheparukhin/casio-mpm-220/ref/mpm/reloc.S`; `git show origin/dynload:main.c`
 - `gint/src/kernel/{kernel.c,start.c,hardware.c,osmenu.c,syscalls.S}`, `gint/src/cpg/{overclock.c,cpg.c}`, `gint/src/keysc/keydev.c`, `gint/include/gint/{keycodes.h,hardware.h,mmu.h}`, `gint/src/render-cg/dvram.c`, `gint/src/kmalloc/kmalloc.c`, commit 2700096
 - `extra/gpsp-sh4-jit/ports/fxcg100/gint-gpsp/{CMakeLists.txt,fxcg100_gpsp.ld,src/nor_rom.c,src/nor_filestream.c,src/overclock.c,src/no_osheap.c,src/gint_platform.c,src/main.c,src/gpsp_runner.c}`, `ports/fxcg100/{README.md,fxcg100_keys.c,fxcg100_config.c,fxcg100_platform.h}`, `docs/{fxcg100-port-plan.md,performance-history.md}`, `README.md`
 - `extra/CalcLoverHK_nesizm/{CMakeLists.txt,casiowin.yaml,src/nes_cart.cpp,src/nes.h,src/main.cpp}`, commit 3e7a9eb; `extra/CalcLoverHK_prizoop/{src/mbc.cpp,src/rom.cpp,src/display_directlcd.cpp,src/screen_play.cpp}`, commit 5a4f353
 - `extra/CalcLoverHK_fxcraft/{CMakeLists.txt,prizm.ld,casiowin.yaml,src/engine.c,src/fastBdisp.c,src/DMA_Transfer.c,src/controls.c,src/controls.h}`, commits 46b4922, 99eefab
 - `extra/CalcLoverHK_libsyscall/{CMakeLists.txt,prizm.ld,libcw/crt0.S,libcw/reloc.S,libcw/casiowin.S,libcw/GetKey.c,libcw/GetKey.h.in}`
 - `extra/CalcLoverHK_Add-in_Push/{README.md,cli/main.c}`; `extra/CalcLoverHK_Xtune/{README.md,config.h.in}`
-- `extra/Kin1009_gint` (commits ee12efd, 376c55c), `extra/Kin1009_mpm`, `extra/Kin1009_mpm-cfg/README.md`
+- `extra/Kin1009_gint` (commits ee12efd, 376c55c), `/Users/cheparukhin/casio-mpm-220/ref/extra/Kin1009_mpm`, `/Users/cheparukhin/casio-mpm-220/ref/extra/Kin1009_mpm-cfg/README.md`
 - `extra/Slyvtt_SquishIt/src/core/squishit.c`, `extra/Slyvtt_OutRun/src/main.cc`
 - `CGDoom/cgdoom/{cgdoom.c,cgdoom-kbd.c,cgdoom-frag.h}`, `git show origin/in330-backup:README.md`
 - `extra/ClassPadDev_CPDoom/{README.md,linker.ld}`

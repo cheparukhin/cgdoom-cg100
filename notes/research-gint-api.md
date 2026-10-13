@@ -6,7 +6,7 @@ Sources read (local clones, all on `dev` or `main`):
 |---|---|---|
 | `ref/gint` | `dev` @ `463f180` (2026-10-09), version string `2.11.0-91` | Same hash is installed in `/Users/cheparukhin/casio_doom/toolchain/share/fxsdk/sysroot/sh3eb-elf/include/gint/config.h` (`GINT_HASH 0x463f180`) |
 | `ref/fxsdk` | `dev` @ `a6e46eb` (2026-08-25) | |
-| `ref/mpm` | `main` @ `cbd1a41` (MPM 1.1, 2026-08-17) | `origin/dev` = main; `origin/dynload` holds one old commit |
+| `../casio-mpm-220/ref/mpm` | `main` @ `cbd1a41` (MPM 1.1, 2026-08-17) | `origin/dev` = main; `origin/dynload` holds one old commit |
 | `ref/fxlibc` | `dev` @ `a690306` | |
 | `ref/extra/gint-prs` | Fresh clone of gint, plus `refs/pull/*` | Used to inspect unmerged PRs #50 and #64 |
 | `ref/extra/libfxcg` | GitHub `Jonimoose/libfxcg` @ `daa76d9` | Used for the CG50 syscall `0x1DAA` |
@@ -23,7 +23,7 @@ Legend:
 1. **No CG100-specific build target.** [V] The fx-CG100 runs the same `fxsdk build-cg` g3a as the fx-CG50. gint detects the model at runtime, so code should test `gint[HWCALC] == HWCALC_FXCG100` (value 9; see `include/gint/hardware.h:115` and `src/kernel/hardware.c:139-146`).
 2. **CG100 OS calls go through a per-OS-version table of fixed addresses** (`src/kernel/syscalls.S:150-273`). [V] gint dev only knows OS **01.00** (API 1) and **02.00** (API 2) (`src/kernel/kernel.c:47-56`). On **OS 02.10**, which MPM 1.1 supports, gint selects API 0, the fx-CG50 syscall gate at `0x80020070`. [I] Any BFile call, any OS-heap malloc, and `GetVRAMAddress` will then jump into garbage. **The DOOM port must patch this** (§4.4); MPM's `casiowin.yaml` already lists the 2.10 addresses.
 3. **Direct memory pointers to file data exist, but gint does not wrap them.**
-   - On the CG100, MPM calls `BFile_Block(fd, offset, void **ptr)` at `0x8023ffb2` (OS 1.00), `0x80333cf2` (2.00) and `0x8039675a` (2.10) [V] (`ref/mpm/casiowin.yaml:37`).
+   - On the CG100, MPM calls `BFile_Block(fd, offset, void **ptr)` at `0x8023ffb2` (OS 1.00), `0x80333cf2` (2.00) and `0x8039675a` (2.10) [V] (`../casio-mpm-220/ref/mpm/casiowin.yaml:37`).
    - On the CG50 the equivalent is syscall **`0x1DAA`**, `int Bfile_GetBlockAddress(int handle, int blockAddress, unsigned char **outPtr)`. It returns a direct pointer to a 4 KiB-aligned block of the file [V] (`ref/extra/libfxcg/include/fxcg/file.h:45-52`).
    - gint's own TODO lists "support read-only files backed with GetBlockAddress() on fx-CG" [V] (`ref/gint/TODO`).
    - This allows a zero-copy WAD that is much faster to set up than CGDoom's flash sector search (§4.3).
@@ -198,7 +198,7 @@ Things to avoid:
 
 **Status bar and frame.**
 - gint has **no API** for the OS status bar or frame [V]. `___ConfigureStatusArea` is declared `.global` in `syscalls.S:51` but has no CG implementation. The OS status bar is simply not drawn while gint owns the display; you own all 396x224 pixels.
-- On the CG100, after the add-in returns, MPM redraws its frame with `CW_DrawFrameC3(0)` and re-renders the add-in list [V] (`ref/mpm/main.c:499-503`, commit `05ec271`).
+- On the CG100, after the add-in returns, MPM redraws its frame with `CW_DrawFrameC3(0)` and re-renders the add-in list [V] (`../casio-mpm-220/ref/mpm/main.c:499-503`, commit `05ec271`).
 - On exit, gint restores the window registers through `drv_r61524.hrestore` [V]. On the CG50 the OS redraws its own screen.
 - Nothing extra is needed when leaving. CGDoom's `I_ShutdownGraphics` `SetWindow(6,0,384,216)` is the equivalent of what gint does automatically [I].
 
@@ -267,7 +267,7 @@ CG100 additions (lines 89-103):
 | 3 | 4 | 5 | 6 | MUL | DIV | — |
 | 2 | 1 | 2 | 3 | ADD | SUB | — |
 | 1 | 0 | DOT | EXP | **FORMAT** (where the CG50 has NEG) | EXE | — |
-| 0 | AC is `KEY_ACON` (row 0, col 0); MPM reads `KEYSC[0]==1` as "the AC key" (`ref/mpm/main.c:192-198`) [V] | | | | | |
+| 0 | AC is `KEY_ACON` (row 0, col 0); MPM reads `KEYSC[0]==1` as "the AC key" (`../casio-mpm-220/ref/mpm/main.c:192-198`) [V] | | | | | |
 
 **Inconsistency (derived from the code [I]):**
 - `keymatrix_to_keycode()`, which produces `ev.key`, only translates **rows 7-9** plus row 1/col 3. Rows 5-6 keep the **legacy CG50 codes**. Pressing the physical x^y key (r6 c3) gives `ev.key == KEY_SIN` (0x64), and the physical sin key (r5 c5) gives `ev.key == KEY_FD`, which is the same value as `KEY_FORMAT`.
@@ -406,19 +406,19 @@ A `0` entry means `_CASIOWIN_call` jumps to `gint_panic(0x10c0)` (`syscalls.S:17
 2. `_CASIOWIN_call` loads `table[id*3 + API]`.
 3. If `API==0`, the value is a syscall number and it jumps to the CG50 gate at `0x80020070`. Otherwise it is a direct function address and it `jmp`s there; a value of 0 means a missing call, which panics.
 4. `_CASIOWIN_call` is a **local** symbol (`t` in `nm`), so it cannot be reused. `gint_set_CASIOWIN_API(int)` and `gint_get_CASIOWIN_API(void)` are exported but only accept 0..2.
-5. Unlike MPM's `_CASIOWIN_call` (`ref/mpm/casiowin.S:43-63`), gint does **not** turn off the MMU around OS calls. MPM's comment says "The OS will crash in many spots if we keep it on".
+5. Unlike MPM's `_CASIOWIN_call` (`../casio-mpm-220/ref/mpm/casiowin.S:43-63`), gint does **not** turn off the MMU around OS calls. MPM's comment says "The OS will crash in many spots if we keep it on".
 
 **API selection** [V] (`src/kernel/kernel.c:47-56`):
 - Version string `"01.00"` at `0x80020020` selects API 1.
-- `CG100 && "02.00"` selects API 2. This 5-character prefix also matches `02.00.0010`, for which MPM has no addresses (`ref/mpm/start.c:37-39`).
+- `CG100 && "02.00"` selects API 2. This 5-character prefix also matches `02.00.0010`, for which MPM has no addresses (`../casio-mpm-220/ref/mpm/start.c:37-39`).
 - Anything else selects API 0. This includes **CG100 OS 02.10**, which then crashes on the first OS call [I].
 
 ### 4.3 Direct (memory-mapped) access to file data
 
 **CG50:** syscall `0x1DAA`, `int Bfile_GetBlockAddress(int handle, int blockAddress, unsigned char **outPtr);`. libfxcg's comment [V] (`ref/extra/libfxcg/include/fxcg/file.h:45-52`): "Given a file handle and a 4 KB aligned block address within the file, returns the direct memory access pointer for that file. !Warning! This address is no longer valid if any OS file operations are performed."
 
-**CG100:** MPM declares `int CW_BFile_Block(int fd, int whence, void **block_ptr);` [V] (`ref/mpm/casiowin.h:171-172`), at the addresses listed in §4.2.
-- MPM uses it with offsets `0`, `0x1000`, `0x2000`, ... and reads up to 0x1000 bytes per returned pointer (`ref/mpm/addins.c:22-42, 57-67`), so a block is 4 KiB.
+**CG100:** MPM declares `int CW_BFile_Block(int fd, int whence, void **block_ptr);` [V] (`../casio-mpm-220/ref/mpm/casiowin.h:171-172`), at the addresses listed in §4.2.
+- MPM uses it with offsets `0`, `0x1000`, `0x2000`, ... and reads up to 0x1000 bytes per returned pointer (`../casio-mpm-220/ref/mpm/addins.c:22-42, 57-67`), so a block is 4 KiB.
 - MPM **keeps the pointers after `BFile_Close` and after opening other files** to draw icons later [V]. In practice the pointers survive read-only activity [I].
 - Its address sits between `BFile_Seek` and `BFile_GetPos` in every OS image, exactly where `0x1DAA` sits between `0x1DA9` (Seek) and `0x1DAB` (GetPos) in the CG50 numbering. That strongly suggests the same function [I].
 - The meaning of a positive return value is unknown; only `rc < 0` is treated as an error [G].
@@ -511,9 +511,9 @@ Allocator facts [V]:
 
 | Arena | fx-CG50 | fx-CG100 (MPM) |
 |---|---|---|
-| `_uram` (default) | Static user RAM after `.data`/`.bss`/`.gint.bss`, up to `uram + uram_size - 16 KiB`. User RAM is 512 KiB mapped at `0x08100000`; the arena is addressed via P1 `mmu_uram()` (kernel.c:79-87, 113-123). | Same. MPM maps 8 x 64 KiB pages `0x08100000` -> `0x8c160000` (`CW_AppMemory`, `ref/mpm/casiowin.yaml:71`; `main.c:258-260`) [V] |
+| `_uram` (default) | Static user RAM after `.data`/`.bss`/`.gint.bss`, up to `uram + uram_size - 16 KiB`. User RAM is 512 KiB mapped at `0x08100000`; the arena is addressed via P1 `mmu_uram()` (kernel.c:79-87, 113-123). | Same. MPM maps 8 x 64 KiB pages `0x08100000` -> `0x8c160000` (`CW_AppMemory`, `../casio-mpm-220/ref/mpm/casiowin.yaml:71`; `main.c:258-260`) [V] |
 | `_ostk` (default) | 350 KiB at `0x8c0f0000` (`0x880f0000` on Prizm and the emulator), part of the OS stack. Disabled by building gint with `GINT_NO_OS_STACK` (kernel.c:126-139). **gint's VRAM (177,504 B) is allocated here.** | **Disabled** on the CG100 (kernel.c:127) |
-| `_ld1`.. `_ld4` (default) | — | Built from MPM's load info (kernel.c:141-166). MPM 1.1 passes `{1,1, 0x10,0x8c200000, 0x11,loadAddress, 0}` (`ref/mpm/main.c:345-357`), where `loadAddress = (0x8c7f0000 - (g3a_size - 0x7000)) & ~0xffff` (main.c:211-229). Examples: a 1,000,000-byte binary gives `0x8c6f0000`, i.e. **4.94 MiB**; a 512 KiB binary gives **5.44 MiB**. The binary itself may be at most `0x370000` bytes (main.c:212) |
+| `_ld1`.. `_ld4` (default) | — | Built from MPM's load info (kernel.c:141-166). MPM 1.1 passes `{1,1, 0x10,0x8c200000, 0x11,loadAddress, 0}` (`../casio-mpm-220/ref/mpm/main.c:345-357`), where `loadAddress = (0x8c7f0000 - (g3a_size - 0x7000)) & ~0xffff` (main.c:211-229). Examples: a 1,000,000-byte binary gives `0x8c6f0000`, i.e. **4.94 MiB**; a 512 KiB binary gives **5.44 MiB**. The binary itself may be at most `0x370000` bytes (main.c:212) |
 | `_os` (default, last) | OS heap via syscall `0x1f44` etc. | OS heap via direct calls; **crashes on OS 2.10** with gint dev |
 
 How gint receives MPM's information [V]:
@@ -680,7 +680,7 @@ generate_g3a(TARGET cgdoom OUTPUT "CGDoom.g3a" NAME "CGDoom"
 **Is there a CG100-specific target or g3a variant?** [V] **No.**
 - fxsdk dev has `build-fx`, `build-cg`, `build-cg-push` (FastLoad, linked at `0x8c200000` for the CG50 "Add-In Push" app), `build-fxg3a` and `build-cp` (fx-CP400 `.hh3`).
 - A search for `cg100`, `mathplus`, `fxcg100` and `mpm` in fxsdk finds nothing; `hh3` refers only to the fx-CP.
-- On the CG100, MPM loads any non-folder `\\fls0\*.g3a` of at least 0x7002 bytes (`ref/mpm/main.c:31-68`). It skips the 0x7000-byte header and calls `0x00300000` with `(0x4d504d30, loadinfo)`.
+- On the CG100, MPM loads any non-folder `\\fls0\*.g3a` of at least 0x7002 bytes (`../casio-mpm-220/ref/mpm/main.c:31-68`). It skips the 0x7000-byte header and calls `0x00300000` with `(0x4d504d30, loadinfo)`.
 - MPM also has a USB push mode: press **SETTINGS** in the MPM menu, then run `fxlink -pw <file>.bin` (same protocol as `fxlink/modes/push.c`; MPM `main.c:473-484`). MPM maps the pushed image at `0x00300000`, so push the **normal `build-cg/<target>.bin`**, not the `build-cg-push` output linked at `0x8c200000` [I].
 
 ---

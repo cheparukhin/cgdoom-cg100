@@ -47,6 +47,8 @@ build() {
 }
 
 # test_files.c #includes files.c (malloc interposed)
+build test_sys "$HERE/test_sys.c" "$G/sys.c" \
+	&& run sys "$OUT/test_sys"
 build test_files   "$HERE/test_files.c" "$G/wad.c" \
 	&& run files "$OUT/test_files" $CGD_TEST_WADS
 build test_wadmap "$HERE/test_wadmap.c" "$G/files.c" \

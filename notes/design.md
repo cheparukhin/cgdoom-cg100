@@ -217,7 +217,7 @@ default; auto frameskip.
   colfunc/basecolfunc/fuzzcolfunc/transcolfunc/spanfunc by detailshift. Leave a single clearly-marked place where an
   SH4 build (`#ifdef __sh__` and not `CGD_NO_SH4`) selects the *_SH4 versions (done in the SH4 integration: `CGD_SH4` in r_draw.h; engine-changes.md "SH4 integration").
 
-## 9. Scope (2026-10-11) — overrides earlier sections
+## 9. Scope (2026-10-11) — historical; OS scope updated by §10
 
 The target is the fx-CG100 / Graph Math+ with OS 02.00 ("02.00.0000"), mpm.bin 1.1 and the packed shareware
 `doom1.wad`, single player. Removed as modes beyond that target:
@@ -235,7 +235,7 @@ Old `CGDOOM.CFG` lines for removed options (`WADMethod`, `TrustUnalignedLumps`, 
 are ignored.
 
 **Later: restore OS 02.10** once MPM's installer supports it (as of 2026-10-11 it does not; the bundled
-mpm.bin 1.1 already selects its 02.10 table, `ref/mpm/start.c:40`). The pinned gint has no 02.10 table
+mpm.bin 1.1 already selects its 02.10 table, `../casio-mpm-220/ref/mpm/start.c:40`). The pinned gint has no 02.10 table
 (API 0, the dead fx-CG50 gate), so CGDoom needs its own: `use_os210_table()` and the `OS210_BFILE_*`
 addresses in `src/gint/sys.c` at commit 447de85 (11 entries, Bfile_GetBlockAddress included). Accept
 "02.10.0000" in `gsys_init()` with that table, as a supported OS (no prompt). If gint gains a 02.10 API
@@ -250,3 +250,20 @@ display code: it only uses gint's `r61524_start_frame()` (both controllers) and 
 outside CGDoom: MPM's installer, OS addresses for 02.00.0010 (unknown everywhere; MPM TODO) and 02.20,
 and gint's world-switch `hsave`/`hrestore`, which save only the old controller's window registers
 (0x210-0x213).
+
+
+## 10. Unified OS build (2026-10-13) — overrides earlier OS scope
+
+The default add-in contains exact OS 02.00.0000 (API 2) and 02.20.0000 (API 3)
+paths. OS 02.20.0202 remains untested on hardware and requires its matching MPM
+patch/menu. No separate experimental Doom build is maintained.
+
+The toolchain exports gint commit 463f180 and applies the versioned patch in
+`tools/gint/cgdoom-compat.patch`, including the new LCD world-switch workaround.
+The normal build requires that runtime and rejects unknown OS versions.
+
+OS 2.10 remains disabled pending verification of the conflicting BFile_Write
+addresses noted in §9. Existing source tables make it feasible, but save writes
+must not use an inferred address. Verify against an actual 2.10 image, then extend
+the pinned runtime, the startup gate and their tests together. A matching MPM
+installation and hardware validation remain separate requirements.

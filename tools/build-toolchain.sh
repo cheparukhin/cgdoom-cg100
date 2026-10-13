@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the SuperH toolchain + fxSDK + fxlibc + gint (dev branch, which has
-# fx-CG100 / Graph Math+ support) into ./toolchain, without touching the system.
+# Builds the SuperH toolchain + fxSDK + fxlibc + pinned gint with CGDoom's
+# OS compatibility patch into ./toolchain, without touching the system.
 #
 #   tools/build-toolchain.sh            # everything
 #   tools/build-toolchain.sh gint       # rebuild just one step
@@ -13,7 +13,7 @@ PREFIX="$ROOT/toolchain"
 SRC="$ROOT/ref"
 WORK="$ROOT/toolchain-build"
 SYSROOT="$PREFIX/share/fxsdk/sysroot"
-JOBS="$(sysctl -n hw.ncpu 2>/dev/null || nproc)"
+JOBS="${CGDOOM_BUILD_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"
 
 BINUTILS_VERSION=2.42
 GCC_VERSION=14.1.0
@@ -112,13 +112,22 @@ step_fxlibc() {
 }
 
 step_gint() {
-  log "gint (dev, fx-CG100 support)"
-  cd "$SRC/gint"
-  git checkout -q dev
-  rm -rf build-cg
-  fxsdk build-cg -c
-  fxsdk build-cg -j"$JOBS"
-  fxsdk build-cg install
+  log "gint (pinned, CGDoom OS 2.00/2.20 compatibility)"
+  local commit=463f180ffb71ccdcef05c928ad19f2a480b14bc1
+  local source="$WORK/gint-cgdoom-src"
+  local build="$WORK/gint-cgdoom-build"
+  git -C "$SRC/gint" cat-file -e "$commit^{commit}"
+  # Export the pinned source; never patch or change the upstream checkout.
+  rm -rf "$source" "$build"
+  mkdir -p "$source"
+  git -C "$SRC/gint" archive "$commit" | tar -x -C "$source"
+  patch -F0 -p1 -d "$source" < "$ROOT/tools/gint/cgdoom-compat.patch"
+  cmake -S "$source" -B "$build" \
+    -DCMAKE_TOOLCHAIN_FILE="$PREFIX/lib/cmake/fxsdk/FXCG50.cmake" \
+    -DCMAKE_MODULE_PATH="$PREFIX/lib/cmake/fxsdk" \
+    -DFXSDK_CMAKE_MODULE_PATH="$PREFIX/lib/cmake/fxsdk"
+  cmake --build "$build" -j"$JOBS"
+  cmake --install "$build"
 }
 
 step_sim() {

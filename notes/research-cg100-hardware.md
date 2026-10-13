@@ -348,7 +348,7 @@ Max add-in size in 1.1: binary ≤ **0x370000 = 3,604,480 B** (g3a ≤ 3,633,152
 ## Sources
 
 - Local source:
-  - `/Users/cheparukhin/casio_doom/ref/mpm` (main.c, loader.c, loader-cg.x, reloc.S, start.c, casiowin.yaml/.S/.h, addins.c; branches main/dev = cbd1a41, dynload = 1dd901e; commit 68e7f6e).
+  - `/Users/cheparukhin/casio-mpm-220/ref/mpm` (main.c, loader.c, loader-cg.x, reloc.S, start.c, casiowin.yaml/.S/.h, addins.c; branches main/dev = cbd1a41, dynload = 1dd901e; commit 68e7f6e).
   - `/Users/cheparukhin/casio_doom/ref/gint` (dev 463f180).
   - `/Users/cheparukhin/casio_doom/ref/fxsdk` (dev a6e46eb).
   - `/Users/cheparukhin/casio_doom/ref/CGDoom` (src-cg/platform.h, cgdoom/cgdoom.c, i_system.c).

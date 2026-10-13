@@ -16,6 +16,14 @@ project(CGDoom VERSION 1.0 LANGUAGES C ASM)
 include(GenerateG3A)
 find_package(Gint 2.11 REQUIRED)
 
+# One add-in contains every supported OS table. Require the matching runtime
+# installed by tools/build-toolchain.sh; a stock gint silently lacks OS 2.20.
+file(STRINGS "${GINT_CONFIG_PATH}" CGDOOM_GINT_COMPAT
+  REGEX "^#define GINT_CGDOOM_OS_COMPAT 1$")
+if(NOT CGDOOM_GINT_COMPAT)
+  message(FATAL_ERROR "CGDoom needs its OS-compatible gint runtime. Run tools/build-toolchain.sh gint, then configure again.")
+endif()
+
 # Sources: picked up automatically (new engine files and SH4 assembly too)
 file(GLOB ENGINE_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.c")

@@ -5,7 +5,7 @@
    was loaded (about 5.5 MiB with the bundled build). Older mpm.bin builds
    (the public Feb-2025 zip, the "dynload" build shipped by gpSP and KhiCAS)
    announce at most about 2 MiB, and CGDoom does not look for the rest: main()
-   refuses them (CGD_MIN_TOTAL_HEAP) and asks for mpm.bin 1.1.
+   refuses them (CGD_MIN_TOTAL_HEAP) and asks for an OS-matching MPM 1.1-based menu.
 
    The OS heap arena "_os" is removed so that exhausted mallocs return NULL
    instead of calling OS functions (no_osheap.c already refuses everything).

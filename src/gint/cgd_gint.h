@@ -89,8 +89,8 @@ extern gos_api_t   g_os;            /* valid if gsys_supported() */
 extern uint32_t    g_entry_r15;     /* stack pointer at main() entry */
 
 void gsys_init(void);
-/* fx-CG100 with OS "02.00.0000" (CASIOWIN API 2), the only firmware MPM
-   installs on. Anything else: no OS call, no MMU or heap change. */
+/* fx-CG100 with exact OS 02.00.0000 (API 2) or 02.20.0000 (API 3).
+   Anything else: no platform OS call, MMU or heap change. */
 bool gsys_supported(void);
 char const *gsys_model_name(void);
 

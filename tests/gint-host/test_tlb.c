@@ -38,7 +38,7 @@ static void hw_load(int slot, uint32_t pteh, uint32_t ptel)
 	hw.data[slot] = ptel;
 }
 
-/* mpm.bin variants (ref/mpm history) */
+/* mpm.bin variants (upstream MPM history) */
 enum { MPM_V11, MPM_DYNLOAD, MPM_FEB2025, MPM_KINDS };
 static char const *mpm_name[MPM_KINDS] = { "v1.1", "dynload", "Feb-2025" };
 static int mpm_rom_pages(int kind) { return kind == MPM_FEB2025 ? 48 : 55; }

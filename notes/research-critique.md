@@ -367,7 +367,7 @@ Report all of these through `fxlink` text and/or on screen:
 
 - Local, verified in this pass:
   - `ref/gint` `463f180`: `src/cpg/cpg.c`, `src/cpg/overclock.c`, `src/kernel/{world.c,kernel.c,start.c,hardware.c,tlbh.S,inth.S}`, `src/dma/dma.c`, `src/keysc/{keydev.c,keysc.c}`, `src/mmu/mmu.c`, `src/render-cg/{dvram.c,dupdate.c}`, `src/r61524/r61524.c`, `src/fs/fugue/fugue.c`, `include/gint/{clock.h,mmu.h,bfile.h,kmalloc.h}`, `fxcg50.ld.c`.
-  - `ref/mpm` (`main.c`, `loader.c`, `start.c`, `casiowin.yaml`, `loader-cg.x`, commit `e99a7d1`, `origin/dynload:main.c`).
+  - `../casio-mpm-220/ref/mpm` (`main.c`, `loader.c`, `start.c`, `casiowin.yaml`, `loader-cg.x`, commit `e99a7d1`, `origin/dynload:main.c`).
   - `ref/extra/gint-prs.git` (PR 62 fygue history: `f1bf037`, `c99a18d`).
   - `ref/extra/gpsp-sh4-jit` (`ports/fxcg100/gint-gpsp/src/{nor_rom.c,gint_platform.c,main.c}`, `fxcg100_gpsp.ld`, `ports/fxcg100/README.md`, `docs/performance-history.md`).
   - `ref/fxsdk/fxlink/modes/push.c`.

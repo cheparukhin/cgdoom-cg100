@@ -32,7 +32,7 @@ src/engine/sh4/        SH4AL-DSP assembly: column/span drawers, palette expansio
 src/gint/              fx-CG100 platform on gint: launcher, video, input, time, files, WAD, memory, UTLB
 src/host/              headless macOS/clang platform; also compiled for the simulator with -DPL_SIM
 src/sim/               GDB SH simulator harness: crt0, linker script, trap syscalls, libc glue, profilers
-tools/                 build-toolchain.sh, build-mpm.sh, wadtool.py
+tools/                 build-toolchain.sh, wadtool.py
 tests/                 golden CRCs and scenarios, unit tests, tests/gint-host (platform logic on the host)
 assets/                g3a icons
 notes/                 design, research, reviews, change logs
@@ -123,7 +123,7 @@ Rules:
 | File | Role |
 |---|---|
 | `main.c` | Entry point, launcher, game start, the single exit path, `PL_Fatal`, idle exit, quit-chord polling, destructor |
-| `sys.c` | Model check and a full 10-character OS-string check: the fx-CG100 with `02.00.0000` (gint API 2) only. Builds the BFile call table |
+| `sys.c` | Model check and a full 10-character OS-string check: the fx-CG100 with `02.00.0000` (gint API 2) or `02.20.0000` (API 3). Builds the BFile call table |
 | `memory.c` | Removes the `_os` arena. `PL_GetZones` (malloc reserve 768 KiB) over gint's arenas: `_uram` and mpm.bin 1.1's `_ld1` |
 | `wad.c` | `PL_Wad*`, three back-ends: **RAM image** (primary), **flash block map** (`Bfile_GetBlockAddress`, checked against the file at open), **BFile** reads (fallback) |
 | `files.c` | World-switched BFile helpers (P1 bounce buffers), `PL_File*`, delayed writes flushed in one world switch at exit (a replacement that does not fit puts the old file back from RAM), failure reporting |
@@ -210,18 +210,17 @@ gint world. **Safe start** (DEL held) uses that path on purpose.
 
 **Toolchain.** This needs cmake, libpng, libusb, ncurses and Python 3 with Pillow.
 `tools/build-toolchain.sh` was written for macOS with Homebrew (its library paths are Homebrew's; on Linux
-it may need adjusting). It builds sh-elf binutils 2.42, GCC 14.1, OpenLibm, fxlibc, gint (dev branch, which
-has the fx-CG100 support) and the fxSDK into `toolchain/`, from clones in `ref/`. `ref/`, `toolchain/`,
+it may need adjusting). It builds sh-elf binutils 2.42, GCC 14.1, OpenLibm, fxlibc, gint (pinned source plus this project's OS compatibility patch) and the fxSDK into `toolchain/`, from clones in `ref/`. `ref/`, `toolchain/`,
 `test-wads/` and the build directories are gitignored.
 
 ```sh
 tools/build-toolchain.sh            # everything (or one step: fxsdk binutils gcc openlibm fxlibc gint)
 tools/build-toolchain.sh sim        # optional: GDB's SH simulator, for the simulator tests
-tools/build-mpm.sh                  # optional: mpm.bin 1.1 from the pinned MPM commit -> build-mpm/mpm.bin
 ```
 
-The release was built and tested against these upstream revisions. `tools/build-toolchain.sh` checks out
-the `dev` branch tip of fxsdk, gint and fxlibc, so check out these commits after cloning to reproduce it:
+The original release used these upstream revisions. `tools/build-toolchain.sh` still checks out
+`dev` for fxsdk and fxlibc; check out the listed commits to reproduce those versions. The gint step
+exports its pinned commit and applies `tools/gint/cgdoom-compat.patch` without changing the clone:
 
 | Path | Repository | Commit |
 |---|---|---|
@@ -232,7 +231,47 @@ the `dev` branch tip of fxsdk, gint and fxlibc, so check out these commits after
 | `ref/sh-elf-gcc` | `git.planet-casio.com/Lephenixnoir/sh-elf-gcc` | `fdbc1be7a84e88f45f9b768b7428ff33b77eb9bb` |
 | `ref/sh-elf-binutils` | `git.planet-casio.com/Lephenixnoir/sh-elf-binutils` | `a963554d12c0236ee10c7545daa4c422bf107de6` |
 | `ref/CGDoom` | `git.planet-casio.com/Lephenixnoir/CGDoom` (upstream engine) | `8516c16d9d3c65b45882433b74abdef171265c99` |
-| `ref/mpm` | `git.planet-casio.com/PlaneteCasio/mpm` | `cbd1a414d96b55e14adc20a88e2140f2c8723b5a` |
+| MPM (built by casio-mpm-220) | `git.planet-casio.com/PlaneteCasio/mpm` (`mpm.bin` 1.1) | `cbd1a414d96b55e14adc20a88e2140f2c8723b5a` |
+
+### OS compatibility
+
+One `CGDoom.g3a` runs on OS 02.00 and OS 02.20; there is no OS-specific build. gint picks its OS-call
+table at startup, and `sys.c` then accepts only the exact internal versions below. Stock gint has no
+OS 02.20 table, so `tools/build-toolchain.sh gint` exports gint `463f180` and applies
+`tools/gint/cgdoom-compat.patch` (the clone in `ref/gint` is left unchanged). The patch:
+
+- adds a fourth column to gint's OS-call table, with the OS 02.20 addresses (API 3);
+- selects API 2 and API 3 only on the exact strings `02.00.0000` and `02.20.0000` (stock gint accepts any
+  `02.00` prefix);
+- skips gint's LCD window save and restore during world switches on the new display controllers (IDs
+  `0x32` and `0x52`). gint wrote the old controller's registers 0x210-0x213, which are other commands on
+  the new one. OS 02.20 sets its own window before every screen update, so nothing needs restoring.
+
+CMake refuses a stock gint, and CGDoom links against a symbol only the patched gint exports. After
+updating an existing toolchain, run `tools/build-toolchain.sh gint` once.
+
+| User-visible OS | Internal string | CGDoom | MPM |
+|---|---|---|---|
+| 02.00.0202 / 02.00.2202 | `02.00.0000` | Accepted, API 2 | MPM installer and `mpm.bin` 1.1 |
+| 02.20.0202 | `02.20.0000` | Accepted, API 3 | Experimental casio-mpm-220 patch and `mpm.bin`, never installed on a calculator |
+| 02.10 | `02.10.0000` | Refused | None; see below |
+| 02.00.xx1x and others | other strings | Refused | None |
+
+The OS 02.20 addresses come from the stock image with SHA-256
+`1413bb39864b9590c80c3ba761b7a1791d5701b9f4fb3fc25c6d7bd9e89d95e7`. They were checked against it: the
+code at each address matches the OS 02.00 function (64 bytes, PC-relative fields masked), and the BFile
+wrappers that look alike call inner functions that all moved by the same offset. MPM itself (the OS
+patch, both `mpm.bin` builds and the firmware research) lives in
+[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). **OS 02.20 still needs a hardware test:**
+startup on both display controllers, WAD access, a game, settings and save write and reload, world
+switches, exit and relaunch.
+
+**OS 02.10 is feasible, but not enabled by guessing.** MPM 1.1 already contains a
+2.10 table. Its `BFile_Write` is `0x80396a92`, while Kin1009's gint commit `ee12efd`
+uses `0x80396a06` (the same delta as the adjacent BFile routines). Before enabling
+it, compare both addresses with the known write routine in an actual 2.10 image,
+check the remaining table, and validate loading under a compatible MPM setup.
+No 2.10 image was available locally during this change. See `notes/design.md` §10.
 
 **Test WADs.** The host and simulator tests use Freedoom 0.13.0 (BSD license):
 
@@ -296,7 +335,8 @@ There is no hardware, so correctness rests on three things:
 | `make check-sh` | Every engine file compiles with sh-elf-gcc |
 | `make test-demosync` | Optional. DEMO1-3 of the shareware DOOM v1.9 `doom1.wad` named by `CGD_DOOM1_WAD` must play in sync: the per-tic game-state traces are compared with `tests/demosync/*.ckpt`, which were checked tic by tic against linuxdoom-1.10. Skipped when the variable is not set. `make test-demosync-sim` runs it in the simulator. |
 | `make -C src/engine/sh4/test run` | Asm vs the C reference: randomized and bit-exact, with stray-write, stack-canary and calling-convention checks; `asmcheck` |
-| `sh tests/gint-host/run.sh` | 10 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
+| `sh tests/gint-host/run.sh` | 11 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: sys (model/OS/API gate, table reset and open wrapper), expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
+| `python3 -m unittest discover -s tests -p 'test_gint_runtime.py' -v` | After rebuilding gint: exercises its actual patched OS selection and old/new LCD world-switch callbacks on the host |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
 | `make test-sim-full` | All 37 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
@@ -368,7 +408,7 @@ from frame 42 to the end, with view size 10 and full detail. They exclude the ho
 | All storage writes deferred to exit; `PL_WadClose` first | A write moves flash records and invalidates the block map | critique §B2, `cgdoom.h` |
 | A file of the same size is overwritten in place, a file of another size is replaced by remove + create + write. Either way the old file is kept in RAM first and written back if the new one does not fit | create + rename would need room for both copies when storage is nearly full, and `BFile_Rename` would be one more OS entry point never tested on hardware. Without memory for the backup, the replacement still goes ahead, so a failure then loses the old file | `files.c` (`os_flush`) |
 | Block map checked against the file at open | A wrong pointer would make the game read garbage; on a mismatch, CGDoom uses BFile reads instead | final review §16 |
-| Model and full OS-string check before any OS call; anything but the fx-CG100 with `02.00.0000` quits | gint matches only `02.00`, which wrongly accepts 02.00.0010; other OS versions would reach the dead fx-CG50 gate; the g3a also starts on the fx-CG50 | critique §B6, `sys.c` |
+| Model and full OS-string check before any OS call; anything but the fx-CG100 with exact `02.00.0000` or `02.20.0000` quits | An unknown OS table would reach the dead fx-CG50 gate; the g3a also starts on the fx-CG50 | critique §B6, `sys.c` |
 | mpm.bin 1.1 only; `_os` removed | 1.1 announces 5.5 MiB to gint; older builds hid RAM that needed per-build discovery. Out-of-memory must return NULL, not call the OS | critique §B3, `memory.c` |
 | UTLB pinning + repair + exit restore; safe start | The OS can evict code pages during world switches; stale entries can reset the next launch | design §7, `tlb.c` |
 | Raw KEYSC only; matrix codes; weak hooks for menu, Enter and ALPHA keys | gint remaps CG100 rows 5–9; CGDoom keymaps are matrix codes | design §7–8, `input.c` |
@@ -418,12 +458,12 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 
 **Prepare**
 
-1. Calculator: fx-CG100 / Graph Math+, OS 02.00.0202 or 02.00.2202, MPM with **mpm.bin 1.1**. Note the
-   OS from HOME → System → Version, and the free storage from the Memory app.
+1. Calculator: fx-CG100 / Graph Math+ with MPM from casio-mpm-220: OS 02.00.0202 or 02.00.2202 with
+   **mpm.bin 1.1**, or OS 02.20.0202 with its patch and `mpm.bin`. Note the OS from HOME → System →
+   Version, and the free storage from the Memory app.
 2. On the PC, run `python3 tools/wadtool.py fetch-wad DOOM1.WAD --save-original doom1.wad`, then
-   `python3 tools/wadtool.py verify doom1.wad DOOM1.WAD`. Build `mpm.bin` 1.1 with
-   `tools/build-mpm.sh`.
-3. Copy `mpm.bin`, `CGDoom.g3a` and `DOOM1.WAD` to the storage root.
+   `python3 tools/wadtool.py verify doom1.wad DOOM1.WAD`.
+3. Copy `CGDoom.g3a` and `DOOM1.WAD` to the storage root, next to MPM's `mpm.bin`.
 
 **Startup and launcher**
 
@@ -440,7 +480,7 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 **Diagnostics**
 
 7. System page: record every line. Expected:
-   - "fx-CG100/Graph Math+, OS 02.00.0000";
+   - "fx-CG100/Graph Math+, OS 02.00.0000" or "OS 02.20.0000", matching the installed OS;
    - a loadinfo line;
    - "UTLB pinned N pages: URB x (was 54)";
    - "Tic timer: TMU n (35 Hz)";

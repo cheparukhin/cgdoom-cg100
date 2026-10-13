@@ -18,12 +18,14 @@ and of nDoom.
 ## Platform and tools
 
 - **gint** (kernel, drivers, display, timers, DMA, USB) and the **fxSDK** (build system, `fxgxa`,
-  `fxconv`, `fxlink`): Lephenixnoir and contributors, Planète Casio. This port uses gint's dev branch,
-  which supports the fx-CG100.
+  `fxconv`, `fxlink`): Lephenixnoir and contributors, Planète Casio. This port uses gint dev commit
+  `463f180` with `tools/gint/cgdoom-compat.patch` for the OS 2.20 call table and new LCD callbacks.
+  The 2.20 addresses and LCD workaround originate from the companion `casio-mpm-220` project.
 - **fxlibc**, the C library: the Vhex-Kernel-Core project.
 - **OpenLibm**, built as part of the toolchain.
 - **MPM** (Math+ Mod: the OS patch and `mpm.bin`, the add-in loader): the MPM authors, including
-  Lephenixnoir and CalcLoverHK, Planète Casio. Without MPM, add-ins cannot run on the fx-CG100.
+  Lephenixnoir and CalcLoverHK, Planète Casio. Without MPM, add-ins cannot run on the fx-CG100. MPM is
+  not part of this project; [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220) distributes it.
 - **GCC, binutils and the GDB SuperH simulator** (GNU). The simulator runs the SH4 build for bit-exact
   tests and instruction counts.
 
@@ -63,12 +65,9 @@ listed above:
 
 ## Files bundled in the release zip
 
-The release zip's `calculator/` folder also carries two files that are not part of this project and are
-not covered by its GPL. They are included for convenience, and will be removed on request.
+The release zip's `calculator/` folder also carries a file that is not part of this project and is not
+covered by its GPL. It is included for convenience, and will be removed on request.
 
-- **`mpm.bin`**: MPM's add-in menu and loader, built unmodified from MPM commit `cbd1a41` ("bump minor
-  version to 1.1", `git.planet-casio.com/PlaneteCasio/mpm`) by `tools/build-mpm.sh`. The MPM repository
-  has no license file; all rights stay with the MPM authors.
 - **`DOOM1.WAD`**: the shareware DOOM v1.9 data, © 1994 id Software, packed by `tools/wadtool.py`. The
   sound effects, music, GENMIDI/DMXGUS and ENDOOM were removed, and every other lump is unchanged. John
   Carmack wrote in 1999 that "The DOOM shareware wad is freely distributable", as quoted in Debian's

@@ -2,7 +2,7 @@
 
    Startup (before any OS call):
      record r15 and check the model and OS string (sys.c): anything but the
-     fx-CG100 with OS 02.00 -> message, exit, with nothing else set up.
+     fx-CG100 with OS 02.00/02.20 -> message, exit, with nothing else set up.
      Then remove the OS heap arena (memory.c), snapshot the UTLB and install
      the TLB-miss handler (tlb.c), start the timers, allocate the frame
      buffer and the private stack. Too little heap -> message, exit.
@@ -1202,8 +1202,8 @@ static int unsupported(void)
 	ui_init();
 	char t[300];
 	snprintf(t, sizeof t, "CGDoom only runs on the fx-CG100 / Graph Math+ "
-		"under MPM, with OS 02.00.0202 or 02.00.2202 (the versions MPM can "
-		"be installed on). This calculator: %s, OS %s.", gsys_model_name(),
+		"under MPM, with OS 02.00.0202, 02.00.2202 or 02.20.0202. This "
+		"calculator: %s, OS %s.", gsys_model_name(),
 		g_os_version);
 	ui_message_timeout("Unsupported calculator", t, GINP_IDLE_MS);
 	gtime_quit();
@@ -1264,8 +1264,9 @@ int main(void)
 		if(gmem_total_free() < CGD_MIN_TOTAL_HEAP) {
 			char t[300];
 			snprintf(t, sizeof t, "Only %u KiB of RAM are available. "
-				"Install the mpm.bin 1.1 of the CGDoom release zip and "
-				"try again.", (unsigned)(gmem_total_free() >> 10));
+				"Install the mpm.bin for your OS (1.1 on OS 02.00) "
+				"and try again.",
+				(unsigned)(gmem_total_free() >> 10));
 			ui_message("Not enough memory", t, true);
 		}
 		else {

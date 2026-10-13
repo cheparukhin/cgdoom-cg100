@@ -1,11 +1,11 @@
 # CGDoom user guide
 
 The [README](../README.md) covers installing CGDoom from the release zip. This guide is the full
-reference: compatibility, MPM details, WAD files, every launcher option, all keymaps, saves and demos,
+reference: compatibility, which `mpm.bin`, WAD files, every launcher option, all keymaps, saves and demos,
 diagnostics and troubleshooting.
 
 - [Compatibility](#compatibility)
-- [MPM in detail](#mpm-in-detail)
+- [Which mpm.bin](#which-mpmbin)
 - [WAD files](#wad-files)
 - [The launcher](#the-launcher)
 - [Controls](#controls)
@@ -19,54 +19,36 @@ diagnostics and troubleshooting.
 
 ### Check your calculator
 
-- **fx-CG100 / Graph Math+:** HOME → System → Version must show **02.00.0202** or **02.00.2202**. These are the
-  versions the MPM installer accepts. It does not accept 01.00, 02.00.xx1x (for example 02.00.0212), 02.10
-  or 02.20.
-- On 02.10, 02.20 or 02.00.xx1x, check the bootcode date:
-  1. Turn the calculator off (**SHIFT**, then **AC**).
-  2. Hold **HOME + ×10ˣ + AC**, then press **ON** and keep all four held until a window appears.
-  3. Release the keys. Press **SETTINGS**, then **9** to confirm, then **4 (VERSION)**. Note: entering
-     this menu resets the setup preferences (language, country, brightness, power, battery) when you exit;
-     your calculations, programs and files are kept.
-  4. Read **DateA**. If it is `2017.0106.2008` (old display), you can downgrade to 02.00.0202 and then
-     install MPM. If it is `2025.0304.1404` (new display), MPM cannot be installed on this unit yet. Do not
-     downgrade: the screen stays black.
-  5. To leave the test menu, press the **RESTART** button on the back. Your data is kept; the calculator
-     asks for the language and other start-up settings again.
-- **Do not install Casio OS updates on an MPM calculator.** Any OS update removes the patch, and the
-  newer OS versions (2.10, 2.20) are not supported by the installer yet.
+One `CGDoom.g3a` runs on the fx-CG100 / Graph Math+ with these OS versions (HOME → System → Version),
+each with its own MPM. [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220) distributes MPM
+and explains how to install it, how to tell the old display from the new one, and what to do on other
+OS versions.
 
-Inside CGDoom, the Diagnostics show the OS as `02.00.0000`. That is the internal string of both
-supported builds, so it is normal. On any other OS string, or on another model, CGDoom shows
-"Unsupported calculator" and quits without touching anything.
+- **02.00.0202 / 02.00.2202:** MPM's Windows installer with `mpm.bin` 1.1.
+- **02.20.0202:** an experimental MPM patch with its matching `mpm.bin`. The patch has never been
+  installed on a calculator.
+- **02.10 and 02.00.xx1x:** no MPM yet. CGDoom refuses to run on them.
+
+Inside CGDoom, the Diagnostics show the OS as `02.00.0000` or `02.20.0000`. That is the OS's internal
+string, so it differs from HOME → System → Version, which is normal. On any other OS string, or on
+another model, CGDoom shows "Unsupported calculator" and quits without touching anything.
 
 ### fx-CG50 / Graph 90+E
 
 Not supported. The `.g3a` starts from the fx-CG50's main MENU, shows "Unsupported calculator" and quits.
 On the fx-CG50, use [Lephenixnoir's CGDoom](https://git.planet-casio.com/Lephenixnoir/CGDoom).
 
-## MPM in detail
+## Which mpm.bin
 
-MPM, the Math+ Mod, has two parts: an **OS patch**, installed once from a Windows PC (the README has the
-steps), and **`mpm.bin`**, the add-in menu, which is a file at the root of the storage memory.
-
-The installer is a closed-source Windows program, and there is no macOS or Linux version. From a Mac, use a
-Windows PC, or a Windows VM with the calculator's USB device attached to it. MPM's instructions allow a VM,
-but nobody has confirmed it on Apple Silicon. Copying files only needs USB mass storage, which works from
-any OS.
-
-**Which `mpm.bin`.** CGDoom needs `mpm.bin` 1.1, the build in the release zip. It hands add-ins about
-5.5 MiB of RAM in one block (a figure from reading the loader's source, not a measurement), enough to copy a
-packed `doom1.wad` to RAM with about 300 KiB to spare by calculation.
+MPM has two parts: an **OS patch**, and **`mpm.bin`**, the add-in menu at the root of the storage memory.
+CGDoom needs `mpm.bin` 1.1 on OS 02.00, or the OS 02.20 `mpm.bin` from casio-mpm-220, which is built from
+1.1. Version 1.1 hands add-ins about 5.5 MiB of RAM in one block (a figure from reading the loader's source,
+not a measurement), enough to copy a packed `doom1.wad` to RAM with about 300 KiB to spare by calculation.
 
 - Older builds (the public Feb-2025 zip, the "dynload" build of gpSP and KhiCAS) announce at most about
   2 MiB, and CGDoom does not look for the rest. They are not supported: with less than 3 MiB free, CGDoom
-  stops at startup with "Not enough memory" and asks for mpm.bin 1.1.
+  stops at startup with "Not enough memory" and asks for the `mpm.bin` matching the OS.
 - The Advanced screen shows how much RAM is free.
-- MPM publishes no binary releases. The release zip's `mpm.bin` is built unmodified from the MPM
-  repository (`git.planet-casio.com/PlaneteCasio/mpm`, commit `cbd1a41`) by `tools/build-mpm.sh`.
-- KhiCAS and gpSP ship their own "dynload" `mpm.bin`. Whether they run under 1.1 has not been checked, so
-  keep a copy of the `mpm.bin` you replace.
 
 ## WAD files
 
@@ -338,8 +320,8 @@ it with the Diagnostics pages.
 |---|---|
 | Black screen or reset when you launch CGDoom | Launch it again while you hold **DEL** (safe start), then report it. Check that your OS and MPM are supported (see [Compatibility](#compatibility)). |
 | "No *.wad file in the storage root." | Copy the WAD over USB to the top folder of the storage memory, not to a subfolder or `@MainMem`. The name must end in `.wad`. |
-| "Unsupported calculator" | CGDoom only runs on the fx-CG100 / Graph Math+ with the OS versions that MPM supports (02.00.0202 / 02.00.2202). |
-| "Not enough memory ... Install the mpm.bin 1.1" | Your `mpm.bin` leaves less than 3 MiB (an older build). Install mpm.bin 1.1 from the release zip. |
+| "Unsupported calculator" | CGDoom only runs on the fx-CG100 / Graph Math+ with OS 02.00.0202, 02.00.2202 or 02.20.0202 (see [Compatibility](#compatibility)). |
+| "Not enough memory ... Install the mpm.bin for your OS" | Your `mpm.bin` leaves less than 3 MiB (an older build). Install the `mpm.bin` for your OS from casio-mpm-220 (see [Which mpm.bin](#which-mpmbin)). |
 | "Cannot open DOOM1.WAD." with a reason | *Too small*, *truncated* or *could not be opened*: the copy is incomplete, so copy it again. *Not a WAD file*: the file is not a WAD. *Name too long or has characters CGDoom cannot use*: rename it, for example to `doom1.wad`. |
 | "DOOM1.WAD has no map E2M1" | The shareware WAD only has episode 1. Change *Start at episode/map*. |
 | "Z_Malloc ... failure" (out of memory) | Check that you use mpm.bin 1.1. Untick Advanced → *Copy WAD to RAM if it fits* to leave more memory to the game, or use a smaller WAD. |
@@ -367,5 +349,6 @@ it with the Diagnostics pages.
   - The title demos are still off by default.
 - **Storage.** About 4.5 MB of storage means only shareware-sized WADs fit on the fx-CG100.
 - **One game per launch.** After a game, CGDoom returns to MPM.
-- **fx-CG100 with mpm.bin 1.1 only.** Other models, OS versions and `mpm.bin` builds are not supported.
+- **fx-CG100 only, with OS 02.00 or 02.20 and an `mpm.bin` built from 1.1.** Other models, OS versions and
+  `mpm.bin` builds are not supported.
 - **Ptune4 F5** can crash some units.

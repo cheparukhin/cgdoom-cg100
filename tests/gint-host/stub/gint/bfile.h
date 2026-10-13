@@ -12,4 +12,15 @@
 #define BFile_Type_DotDot 9
 #define BFile_Type_Volume 10
 struct BFile_FileInfo { uint16_t index, type; uint32_t file_size, data_size, property; void *address; };
+int BFile_Open(uint16_t const *path, int mode);
+int BFile_Close(int fd);
+int BFile_Size(int fd);
+int BFile_Read(int fd, void *buf, int size, int whence);
+int BFile_Write(int fd, void const *buf, int size);
+int BFile_Create(uint16_t const *path, int type, int *size);
+int BFile_Remove(uint16_t const *path);
+int BFile_FindFirst(uint16_t const *pattern, int *handle, uint16_t *found,
+    struct BFile_FileInfo *info);
+int BFile_FindNext(int handle, uint16_t *found, struct BFile_FileInfo *info);
+int BFile_FindClose(int handle);
 #endif
