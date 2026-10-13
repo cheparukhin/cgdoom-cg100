@@ -10,7 +10,7 @@ launcher, fx-CG100 keymaps, overclocking and SH4 assembly renderers.
 
 ## Install
 
-You need an fx-CG100 or Graph Math+ with OS **02.00.0202** or **02.00.2202** (Settings → About), its USB
+You need an fx-CG100 or Graph Math+ with OS **02.00.0202** or **02.00.2202** (HOME → System → Version), its USB
 cable, and a Windows PC once, to install MPM.
 
 **1. Install MPM (once).** MPM is the community mod that lets the calculator run add-ins. Its installer is

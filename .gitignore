@@ -25,3 +25,6 @@
 # Local staging for copying to a calculator (contains a WAD)
 /calculator/
 __pycache__/
+
+# Casio OS updaters (proprietary, local analysis only)
+os_images/

@@ -419,7 +419,7 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 **Prepare**
 
 1. Calculator: fx-CG100 / Graph Math+, OS 02.00.0202 or 02.00.2202, MPM with **mpm.bin 1.1**. Note the
-   OS from Settings → About, and the free storage from the Memory app.
+   OS from HOME → System → Version, and the free storage from the Memory app.
 2. On the PC, run `python3 tools/wadtool.py fetch-wad DOOM1.WAD --save-original doom1.wad`, then
    `python3 tools/wadtool.py verify doom1.wad DOOM1.WAD`. Build `mpm.bin` 1.1 with
    `tools/build-mpm.sh`.

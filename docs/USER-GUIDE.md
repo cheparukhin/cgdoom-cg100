@@ -19,15 +19,20 @@ diagnostics and troubleshooting.
 
 ### Check your calculator
 
-- **fx-CG100 / Graph Math+:** Settings → About must show **02.00.0202** or **02.00.2202**. These are the
+- **fx-CG100 / Graph Math+:** HOME → System → Version must show **02.00.0202** or **02.00.2202**. These are the
   versions the MPM installer accepts. It does not accept 01.00, 02.00.xx1x (for example 02.00.0212), 02.10
   or 02.20.
 - On 02.10, 02.20 or 02.00.xx1x, check the bootcode date:
-  1. With the calculator off, hold **HOME + ×10ˣ + AC** and press **ON**.
-  2. Press **SETTINGS**, then **9** (nothing is erased), then **4 (VERSION)**.
-  3. Read **DateA**. If it is `2017.0106.2008` (old display), you can downgrade to 02.00.0202 and then
+  1. Turn the calculator off (**SHIFT**, then **AC**).
+  2. Hold **HOME + ×10ˣ + AC**, then press **ON** and keep all four held until a window appears.
+  3. Release the keys. Press **SETTINGS**, then **9** to confirm, then **4 (VERSION)**. Note: entering
+     this menu resets the setup preferences (language, country, brightness, power, battery) when you exit;
+     your calculations, programs and files are kept.
+  4. Read **DateA**. If it is `2017.0106.2008` (old display), you can downgrade to 02.00.0202 and then
      install MPM. If it is `2025.0304.1404` (new display), MPM cannot be installed on this unit yet. Do not
      downgrade: the screen stays black.
+  5. To leave the test menu, press the **RESTART** button on the back. Your data is kept; the calculator
+     asks for the language and other start-up settings again.
 - **Do not install Casio OS updates on an MPM calculator.** Any OS update removes the patch, and the
   newer OS versions (2.10, 2.20) are not supported by the installer yet.
 
@@ -318,7 +323,7 @@ it with the Diagnostics pages.
 
 **What to report.** Please open an issue on GitHub, and include:
 
-- the calculator model and OS version (from Settings → About);
+- the calculator model and OS version (from HOME → System → Version);
 - the `mpm.bin` build you use;
 - the WAD (name and size) and how you prepared it;
 - what you did and what happened. Copy the exact text of any error screen. A fatal error screen shows the
