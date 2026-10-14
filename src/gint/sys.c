@@ -3,8 +3,8 @@
    One build accepts OS 02.00.0000 (API 2) and 02.20.0000 (API 3).
    User-visible 02.00.0202/2202 and 02.20.0202 use these internal strings.
    The pinned runtime patch in tools/gint selects the table before main(),
-   and handles the new LCD controllers during world switches. OS 2.20 still
-   needs hardware testing and an OS-compatible MPM installation.
+   and handles the new LCD controllers during world switches. OS 2.20 needs
+   the casio-mpm-220 MPM; it plays on an fx-CG100 with the new display.
 
    Unknown revisions (including 02.00.0010) and other calculator models are
    refused before platform OS calls. gint wraps the BFile functions except

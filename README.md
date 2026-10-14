@@ -4,25 +4,22 @@ DOOM for the Casio fx-CG100 and Graph Math+, running through the Math+ Mod (MPM)
 the fx-CG50 DOOM engine, to the [gint](https://git.planet-casio.com/Lephenixnoir/gint) kernel, with a
 launcher, fx-CG100 keymaps, overclocking and SH4 assembly renderers.
 
-> **Status: not yet run on a real calculator.** It was built and tested on a PC (a host build, an SH-4
-> simulator and unit tests), so the first runs on hardware may fail. If it does not work, see
-> [If something goes wrong](#if-something-goes-wrong).
+> **Status: plays normally on an fx-CG100 with the new display and OS 02.20.** Saves, the overclock and
+> display-mode settings, OS 02.00 and the old display have not been tried on hardware yet. If something
+> does not work, see [If something goes wrong](#if-something-goes-wrong).
 
 ## Install
 
-You need an fx-CG100 or Graph Math+ with OS **02.00.0202**, **02.00.2202** or **02.20.0202** (HOME →
-System → Version), with MPM installed for that OS.
+You need an fx-CG100 or Graph Math+ with MPM.
 
 **1. Install MPM.** MPM (the Math+ Mod) is the community mod that lets the calculator run add-ins: an OS
-patch, plus `mpm.bin`, the add-in menu at the root of the storage memory. It is distributed separately,
-by [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220), which has the steps for each OS:
+patch, plus `mpm.bin`, the add-in menu at the root of the storage memory. Install it with
+[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). It updates a calculator on an OS older than 2.20
+(such as 02.10 or 02.00) to OS 02.20 with MPM, and currently needs a Mac.
 
-- **OS 02.00.0202 / 02.00.2202:** MPM's Windows installer and `mpm.bin` 1.1. CGDoom needs 1.1; older
-  builds leave it too little RAM.
-- **OS 02.20.0202:** an experimental OS patch and its matching `mpm.bin`. **This patch has never been
-  installed on a calculator.**
-- Other versions (02.10, 02.00.xx1x) cannot run MPM yet. casio-mpm-220 explains how to check your
-  calculator and what its options are.
+If your calculator already runs MPM on OS 02.00.0202 or 02.00.2202, CGDoom runs there too, with
+`mpm.bin` 1.1 from the [v1.0-beta5 release](https://github.com/cheparukhin/cgdoom-cg100/releases/tag/v1.0-beta5).
+Older builds leave it too little RAM.
 
 **2. Copy the files.** Download the zip from [Releases](https://github.com/cheparukhin/cgdoom-cg100/releases)
 and unzip it. Connect the calculator in **USB flash drive** mode, and copy both files in the zip's

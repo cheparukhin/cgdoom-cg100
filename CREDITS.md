@@ -25,7 +25,8 @@ and of nDoom.
 - **OpenLibm**, built as part of the toolchain.
 - **MPM** (Math+ Mod: the OS patch and `mpm.bin`, the add-in loader): the MPM authors, including
   Lephenixnoir and CalcLoverHK, Planète Casio. Without MPM, add-ins cannot run on the fx-CG100. MPM is
-  not part of this project; [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220) distributes it.
+  not part of this project; [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220) distributes its
+  OS 02.20 port.
 - **GCC, binutils and the GDB SuperH simulator** (GNU). The simulator runs the SH4 build for bit-exact
   tests and instruction counts.
 

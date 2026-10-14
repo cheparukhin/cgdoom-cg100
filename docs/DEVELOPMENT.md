@@ -253,18 +253,18 @@ updating an existing toolchain, run `tools/build-toolchain.sh gint` once.
 | User-visible OS | Internal string | CGDoom | MPM |
 |---|---|---|---|
 | 02.00.0202 / 02.00.2202 | `02.00.0000` | Accepted, API 2 | MPM installer and `mpm.bin` 1.1 |
-| 02.20.0202 | `02.20.0000` | Accepted, API 3 | Experimental casio-mpm-220 patch and `mpm.bin`, never installed on a calculator |
-| 02.10 | `02.10.0000` | Refused | None; see below |
-| 02.00.xx1x and others | other strings | Refused | None |
+| 02.20.0202 | `02.20.0000` | Accepted, API 3 | casio-mpm-220 patch and `mpm.bin` (release v1.0) |
+| 02.10 | `02.10.0000` | Refused | casio-mpm-220 updates it to 2.20; see below |
+| 02.00.xx1x and others | other strings | Refused | casio-mpm-220 updates it to 2.20 |
 
 The OS 02.20 addresses come from the stock image with SHA-256
 `1413bb39864b9590c80c3ba761b7a1791d5701b9f4fb3fc25c6d7bd9e89d95e7`. They were checked against it: the
 code at each address matches the OS 02.00 function (64 bytes, PC-relative fields masked), and the BFile
 wrappers that look alike call inner functions that all moved by the same offset. MPM itself (the OS
-patch, both `mpm.bin` builds and the firmware research) lives in
-[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). **OS 02.20 still needs a hardware test:**
-startup on both display controllers, WAD access, a game, settings and save write and reload, world
-switches, exit and relaunch.
+patch, the `mpm.bin` builds and the firmware research) lives in
+[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). **On hardware,** CGDoom plays normally on
+an fx-CG100 with the new display under OS 02.20: startup, WAD access, a game, and exit to the MPM menu.
+Still to check: the old display controller, settings and save write and reload, relaunch, and OS 02.00.
 
 **OS 02.10 is feasible, but not enabled by guessing.** MPM 1.1 already contains a
 2.10 table. Its `BFile_Write` is `0x80396a92`, while Kin1009's gint commit `ee12efd`
@@ -317,7 +317,7 @@ CRCs are reproducible.
 
 ## 4. Tests
 
-There is no hardware, so correctness rests on three things:
+Hardware runs are manual, so automated correctness rests on three things:
 
 - **Golden frames:** the host renders fixed scenarios, and every frame's CRC must match.
 - **Bit-exact simulation:** the SH build in the GDB simulator must reproduce the host CRCs.
@@ -451,6 +451,9 @@ channel.
 
 Not implemented from §E: the SH-4A PMU check and the cache-size stride sweeps (item 7, optional).
 
+**Results so far:** on an fx-CG100 with the new display and OS 02.20, CGDoom starts, loads
+DOOM1.WAD, plays normally and exits to the MPM menu. The probes above have not been recorded yet.
+
 ### 7.2 First hardware run: step by step
 
 Use a fresh build: `fxsdk build-cg`, warning-free. Write down the result of every step, and take photos of
@@ -458,8 +461,8 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 
 **Prepare**
 
-1. Calculator: fx-CG100 / Graph Math+ with MPM from casio-mpm-220: OS 02.00.0202 or 02.00.2202 with
-   **mpm.bin 1.1**, or OS 02.20.0202 with its patch and `mpm.bin`. Note the OS from HOME → System →
+1. Calculator: fx-CG100 / Graph Math+ with MPM: OS 02.20.0202 with casio-mpm-220's patch and `mpm.bin`,
+   or OS 02.00.0202 / 02.00.2202 with **mpm.bin 1.1**. Note the OS from HOME → System →
    Version, and the free storage from the Memory app.
 2. On the PC, run `python3 tools/wadtool.py fetch-wad DOOM1.WAD --save-original doom1.wad`, then
    `python3 tools/wadtool.py verify doom1.wad DOOM1.WAD`.
