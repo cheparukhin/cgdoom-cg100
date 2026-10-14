@@ -19,20 +19,13 @@ diagnostics and troubleshooting.
 
 ### Check your calculator
 
-One `CGDoom.g3a` runs on the fx-CG100 / Graph Math+ with MPM on these OS versions (HOME → System →
-Version):
+CGDoom runs on the fx-CG100 / Graph Math+ with MPM. Install MPM with
+[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220): it updates a calculator on an OS older than 2.20 to OS
+02.20 with MPM, and currently needs a Mac.
 
-- **02.20.0202:** install MPM with [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220).
-  It updates a calculator on an OS older than 2.20, including 02.10 and 02.00.xx1x, to OS 02.20 with
-  MPM. It currently needs a Mac.
-- **02.00.0202 / 02.00.2202:** if MPM is already installed, CGDoom runs with `mpm.bin` 1.1 (see
-  [Which mpm.bin](#which-mpmbin)).
-
-On 02.10 and 02.00.xx1x, CGDoom refuses to run until the calculator is updated to 2.20 with MPM.
-
-Inside CGDoom, the Diagnostics show the OS as `02.00.0000` or `02.20.0000`. That is the OS's internal
-string, so it differs from HOME → System → Version, which is normal. On any other OS string, or on
-another model, CGDoom shows "Unsupported calculator" and quits without touching anything.
+Inside CGDoom, the Diagnostics show the OS as `02.20.0000`. That is the OS's internal string, so it
+differs from HOME → System → Version (02.20.0202), which is normal. On an unsupported OS or another
+model, CGDoom shows "Unsupported calculator" and quits without touching anything.
 
 ### fx-CG50 / Graph 90+E
 
@@ -42,13 +35,11 @@ On the fx-CG50, use [Lephenixnoir's CGDoom](https://git.planet-casio.com/Lepheni
 ## Which mpm.bin
 
 MPM has two parts: an **OS patch**, and **`mpm.bin`**, the add-in menu at the root of the storage memory.
-CGDoom needs `mpm.bin` 1.1 on OS 02.00 (in the release zip's `os-02.00/` folder), or on OS 02.20
-the `mpm.bin` from [casio-mpm-220's release](https://github.com/cheparukhin/casio-mpm-220/releases/latest), which is built from 1.1. Version 1.1 hands add-ins about 5.5 MiB of RAM in one block (a figure from reading the loader's source,
-not a measurement), enough to copy a packed `doom1.wad` to RAM with about 300 KiB to spare by calculation.
+Use the `mpm.bin` from [casio-mpm-220's release](https://github.com/cheparukhin/casio-mpm-220/releases/latest). It is built from MPM 1.1,
+which hands add-ins about 5.5 MiB of RAM in one block (a figure from reading the loader's source, not a
+measurement), enough to copy a packed `doom1.wad` to RAM with about 300 KiB to spare by calculation.
 
-- Older builds (the public Feb-2025 zip, the "dynload" build of gpSP and KhiCAS) announce at most about
-  2 MiB, and CGDoom does not look for the rest. They are not supported: with less than 3 MiB free, CGDoom
-  stops at startup with "Not enough memory" and asks for the `mpm.bin` matching the OS.
+- Other `mpm.bin` builds don't work: casio-mpm-220's OS patch refuses them.
 - The Advanced screen shows how much RAM is free.
 
 ## WAD files
@@ -241,7 +232,8 @@ instructions. In the simulator, in instructions per frame, compared with the def
   gpSP and KhiCAS use it on many units. Try it only if you accept that risk, and turn it off if anything
   odd happens.
 - **Leave Frameskip on Auto.** The game then keeps real-time speed and draws as often as it can.
-- **Use mpm.bin 1.1** so that the WAD can be copied to RAM. Reading from flash is several times slower.
+- **Keep the WAD in RAM.** casio-mpm-220's `mpm.bin` leaves enough memory to copy it; reading from flash
+  is several times slower.
   The Developer info screen shows the mode that was used: *RAM image*, *flash block map* or *BFile reads*.
   (Diagnostics → storage only shows a WAD after a probe, which always maps it as a block map, so it does
   not tell you what a game used.)
@@ -321,11 +313,11 @@ it with the Diagnostics pages.
 |---|---|
 | Black screen or reset when you launch CGDoom | Launch it again while you hold **DEL** (safe start), then report it. Check that your OS and MPM are supported (see [Compatibility](#compatibility)). |
 | "No *.wad file in the storage root." | Copy the WAD over USB to the top folder of the storage memory, not to a subfolder or `@MainMem`. The name must end in `.wad`. |
-| "Unsupported calculator" | CGDoom only runs on the fx-CG100 / Graph Math+ with OS 02.00.0202, 02.00.2202 or 02.20.0202 (see [Compatibility](#compatibility)). |
-| "Not enough memory ... Install the mpm.bin for your OS" | Your `mpm.bin` leaves less than 3 MiB (an older build). Install the `mpm.bin` for your OS (see [Which mpm.bin](#which-mpmbin)). |
+| "Unsupported calculator" | CGDoom only runs on the fx-CG100 / Graph Math+ with MPM from casio-mpm-220 (see [Compatibility](#compatibility)). |
+| "Not enough memory ... Install the mpm.bin for your OS" | Your `mpm.bin` leaves less than 3 MiB (an older build). Install casio-mpm-220's `mpm.bin` (see [Which mpm.bin](#which-mpmbin)). |
 | "Cannot open DOOM1.WAD." with a reason | *Too small*, *truncated* or *could not be opened*: the copy is incomplete, so copy it again. *Not a WAD file*: the file is not a WAD. *Name too long or has characters CGDoom cannot use*: rename it, for example to `doom1.wad`. |
 | "DOOM1.WAD has no map E2M1" | The shareware WAD only has episode 1. Change *Start at episode/map*. |
-| "Z_Malloc ... failure" (out of memory) | Check that you use mpm.bin 1.1. Untick Advanced → *Copy WAD to RAM if it fits* to leave more memory to the game, or use a smaller WAD. |
+| "Z_Malloc ... failure" (out of memory) | Check that you use casio-mpm-220's `mpm.bin`. Untick Advanced → *Copy WAD to RAM if it fits* to leave more memory to the game, or use a smaller WAD. |
 | "Demo is from a different game version" | Delete that `.LMP` file or record it again. |
 | "W_GetNumForName: ... not found!" | The WAD is incomplete or not one CGDoom can play. Copy it again. |
 | "NOT SAVED" when leaving | Storage is full. Delete files to make room. The new version of the listed file is lost. The screen says whether its previous version was kept. |
@@ -336,7 +328,7 @@ it with the Diagnostics pages.
 ## Known limitations
 
 - **Partly tested on hardware.** CGDoom plays normally on an fx-CG100 with the new display and OS 02.20.
-  Saves, the overclock and display-mode settings, OS 02.00 and the old display have not been tried yet.
+  Saves, the overclock and display-mode settings and the old display have not been tried yet.
   The parts that depend most on the hardware are memory protection (UTLB), the flash layout, display
   timing and the overclock.
 - **No sound or music.**
@@ -352,6 +344,6 @@ it with the Diagnostics pages.
   - The title demos are still off by default.
 - **Storage.** About 4.5 MB of storage means only shareware-sized WADs fit on the fx-CG100.
 - **One game per launch.** After a game, CGDoom returns to MPM.
-- **fx-CG100 only, with OS 02.00 or 02.20 and an `mpm.bin` built from 1.1.** Other models, OS versions and
-  `mpm.bin` builds are not supported.
+- **fx-CG100 only, with OS 02.20 and casio-mpm-220's MPM.** Other models, OS versions and `mpm.bin`
+  builds are not supported.
 - **Ptune4 F5** can crash some units.

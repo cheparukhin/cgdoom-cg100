@@ -264,7 +264,7 @@ wrappers that look alike call inner functions that all moved by the same offset.
 patch, the `mpm.bin` builds and the firmware research) lives in
 [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). **On hardware,** CGDoom plays normally on
 an fx-CG100 with the new display under OS 02.20: startup, WAD access, a game, and exit to the MPM menu.
-Still to check: the old display controller, settings and save write and reload, relaunch, and OS 02.00.
+Still to check: the old display controller, settings and save write and reload, and relaunch.
 
 **OS 02.10 is feasible, but not enabled by guessing.** MPM 1.1 already contains a
 2.10 table. Its `BFile_Write` is `0x80396a92`, while Kin1009's gint commit `ee12efd`
@@ -461,9 +461,8 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 
 **Prepare**
 
-1. Calculator: fx-CG100 / Graph Math+ with MPM: OS 02.20.0202 with casio-mpm-220's patch and `mpm.bin`,
-   or OS 02.00.0202 / 02.00.2202 with **mpm.bin 1.1**. Note the OS from HOME → System →
-   Version, and the free storage from the Memory app.
+1. Calculator: fx-CG100 / Graph Math+ with MPM from casio-mpm-220 (OS 02.20.0202). Note the OS from
+   HOME → System → Version, and the free storage from the Memory app.
 2. On the PC, run `python3 tools/wadtool.py fetch-wad DOOM1.WAD --save-original doom1.wad`, then
    `python3 tools/wadtool.py verify doom1.wad DOOM1.WAD`.
 3. Copy `CGDoom.g3a` and `DOOM1.WAD` to the storage root, next to MPM's `mpm.bin`.

@@ -5,8 +5,8 @@ the fx-CG50 DOOM engine, to the [gint](https://git.planet-casio.com/Lephenixnoir
 launcher, fx-CG100 keymaps, overclocking and SH4 assembly renderers.
 
 > **Status: plays normally on an fx-CG100 with the new display and OS 02.20.** Saves, the overclock and
-> display-mode settings, OS 02.00 and the old display have not been tried on hardware yet. If something
-> does not work, see [If something goes wrong](#if-something-goes-wrong).
+> display-mode settings and the old display have not been tried on hardware yet. If something does not
+> work, see [If something goes wrong](#if-something-goes-wrong).
 
 ## Install
 
@@ -14,12 +14,8 @@ You need an fx-CG100 or Graph Math+ with MPM.
 
 **1. Install MPM.** MPM (the Math+ Mod) is the community mod that lets the calculator run add-ins: an OS
 patch, plus `mpm.bin`, the add-in menu at the root of the storage memory. Install it with
-[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). It updates a calculator on an OS older than 2.20
-(such as 02.10 or 02.00) to OS 02.20 with MPM, and currently needs a Mac.
-
-If your calculator already runs MPM on OS 02.00.0202 or 02.00.2202, CGDoom runs there too, with
-`mpm.bin` 1.1: copy it from the release zip's `os-02.00/` folder to the storage root. Older builds leave
-it too little RAM. Never copy it to OS 02.20, which needs casio-mpm-220's own `mpm.bin`.
+[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). It updates a calculator on an OS older than 2.20 to
+OS 02.20 with MPM, and currently needs a Mac.
 
 **2. Copy the files.** Download the zip from [Releases](https://github.com/cheparukhin/cgdoom-cg100/releases)
 and unzip it. Connect the calculator in **USB flash drive** mode, and copy both files in the zip's
@@ -27,7 +23,7 @@ and unzip it. Connect the calculator in **USB flash drive** mode, and copy both 
 
 | File | What it is |
 |---|---|
-| `CGDoom.g3a` | The game, for both OS 02.00 and OS 02.20. |
+| `CGDoom.g3a` | The game. |
 | `DOOM1.WAD` | The shareware DOOM data, packed for the calculator. |
 
 **3. Play.** Eject the calculator. On the HOME screen press **TOOLS**, select **CGDoom** and press **EXE**.
@@ -60,8 +56,8 @@ option, the keymaps, saves and demos.
 ## If something goes wrong
 
 - **Black screen or reset at launch:** launch CGDoom again while holding **DEL** (safe start).
-- **"Unsupported calculator":** CGDoom only runs on the fx-CG100 / Graph Math+, with OS 02.00 or 02.20
-  under MPM.
+- **"Unsupported calculator":** CGDoom only runs on the fx-CG100 / Graph Math+, with MPM from
+  [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220).
 - **The game froze:** hold **SHIFT + 7 + 3 + AC/ON**.
 
 To report a problem, open an [issue](https://github.com/cheparukhin/cgdoom-cg100/issues) with your OS
@@ -80,7 +76,7 @@ from the launcher. More fixes are in the [troubleshooting table](docs/USER-GUIDE
 ```sh
 tools/build-toolchain.sh               # SH toolchain, fxSDK, patched gint, fxlibc -> toolchain/
 export PATH=$PWD/toolchain/bin:$PATH
-fxsdk build-cg                         # -> one CGDoom.g3a for OS 2.00 and 2.20
+fxsdk build-cg                         # -> CGDoom.g3a
 make test-host                         # golden-frame tests (needs Freedoom 0.13.0 in test-wads/)
 ```
 
