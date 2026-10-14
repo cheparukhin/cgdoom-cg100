@@ -881,7 +881,8 @@ static int os_list(void *arg)
 			/* FONTCHARACTER -> ASCII (skip names we cannot represent) */
 			gfs_entry_t *e = &l->out[l->count];
 			int n = 0;
-			bool ok = is_file;
+			/* skip macOS "._" metadata files (AppleDouble) */
+			bool ok = is_file && !(s->found[0] == '.' && s->found[1] == '_');
 			for(; ok && s->found[n]; n++) {
 				uint16_t ch = s->found[n];
 				if(n >= GFS_LIST_NAME - 1 || ch < 0x20 || ch >= 0x7f)
