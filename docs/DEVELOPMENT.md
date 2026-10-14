@@ -113,30 +113,6 @@ Three contracts must hold on every platform (`src/engine/cgdoom.h`, `platform.h`
   An action function emptied because it "only plays a sound" must be checked against vanilla for
   `P_Random` calls.
 
-**Engine changes compared with CGDoom:**
-
-- vanilla-exact `FixedMul`/`FixedDiv`, and exact division helpers;
-- vanilla game logic and random-number use, checked tic by tic against linuxdoom-1.10 (`make test-demosync`);
-- renderer limits raised, with the arrays allocated from the zone so that `.bss` stays small:
-
-  | Array | Vanilla | Grows by | Hard limit |
-  |---|---|---|---|
-  | visplanes | 128 | blocks of 64 | 1024 |
-  | drawsegs | 256 | doubling | 2048 |
-  | vissprites | 128 | doubling | 1024 |
-  | openings | 320×64 shorts | blocks of the same size | 16 blocks |
-
-  Growth never changes a pixel. Visplanes are hashed (64 buckets) without changing the match order. The
-  worst case at the hard limits is about 1.5 MiB; every Freedoom map peaks well below it;
-- low detail with Chocolate Doom's semantics, and view sizes 3–11;
-- auto frameskip: tic *g* is due at a fixed time, `D_Display` is skipped while the next tic is already due
-  (at most N times in a row), and the lag is capped at N tics, so after a stall the game slows down instead
-  of fast-forwarding. Game logic and demos are unaffected;
-- the `PL_WadIsSlow` policy: when WAD pointers are in flash, lumps are copied into the zone (and the level
-  precached) until a reserve of max(25% of the zone, 256 KiB) is left;
-- bounded savegames, checked savegame and demo loads, and the demo-recording "begun" flag;
-- save-name entry fixes.
-
 ### 2.2 SH4 assembly (`src/engine/sh4`)
 
 The assembly has these parts:
@@ -248,6 +224,70 @@ into the fx-CG50 syscall gate and crash. There are four layers (`src/gint/tlb.c`
 Without the executor nothing is pinned or repaired; the miss handler still reloads evicted pages in the
 gint world. **Safe start** (DEL held) uses that path on purpose. It is a held key rather than a setting
 because reading `CGDOOM.CFG` is itself a world switch, and pinning must happen before the first one.
+
+### 2.6 Engine changes compared with CGDoom
+
+The speed-ups are in [§5.1](#51-where-the-speed-comes-from). The other changes are below.
+
+**Vanilla parity.** CGDoom's arithmetic and parts of its game logic differed from linuxdoom-1.10, so
+id's demos desynced. The engine now matches linuxdoom tic by tic on DEMO1-3 of the shareware DOOM v1.9
+`doom1.wad` (`make test-demosync`):
+
+- `FixedMul` was a bit-serial loop that rounded toward zero, and `FixedDiv` never computed the last
+  quotient bit. Both are now vanilla's (rules in §2.1).
+- CGDoom removed three `P_Random` calls along with the sound code: the sound picks in `A_Look`, `A_Chase`
+  and `A_Scream`. It also zeroed the sound fields of `info.c`. Both are back (`sounds.h` holds linuxdoom's
+  sound numbers), but still no sound is played.
+- `P_LookForPlayers` has vanilla's loop over the players again. CGDoom looked at player 0 directly, which
+  changes when monsters wake up.
+- `A_CloseShotgun2` calls `A_ReFire` again, so a held fire button refires the super shotgun.
+- Nightmare and `-fast`: `P_SetFastMonsters` keeps RAM copies of the demon run-state tics and the three
+  missile speeds, and patches them as vanilla's `G_InitNew` does (CGDoom's tables are `const`).
+  `respawnparm` is honoured.
+- The menu does not pause the game during demo playback. A dead player is reborn at level load, and
+  demo-only playback stops at the demo marker.
+
+**Renderer:**
+
+- renderer limits raised, with the arrays allocated from the zone so that `.bss` stays small:
+
+  | Array | Vanilla | Grows by | Hard limit |
+  |---|---|---|---|
+  | visplanes | 128 | blocks of 64 | 1024 |
+  | drawsegs | 256 | doubling | 2048 |
+  | vissprites | 128 | doubling | 1024 |
+  | openings | 320×64 shorts | blocks of the same size | 16 blocks |
+
+  Growth never changes a pixel. Visplanes are hashed (64 buckets) without changing the match order. The
+  worst case at the hard limits is about 1.5 MiB; every Freedoom map peaks well below it;
+- low detail with Chocolate Doom's semantics, using vanilla's `colfunc`/`spanfunc` pointers again;
+- view sizes 3–11 (CGDoom allowed 1–10). The reduced-view border is redrawn after menus, the automap and
+  size changes (CGDoom left garbage there), `R_VideoErase` clears to black, and the full-screen automap
+  redraws the status bar;
+- the midpoints of absent upper and lower wall textures no longer overflow (`R_StoreWallRange`; undefined
+  behaviour in vanilla).
+
+**Pacing and WAD access:**
+
+- auto frameskip: tic *g* is due at a fixed time, `D_Display` is skipped while the next tic is already due
+  (at most N times in a row), and the lag is capped at N tics, so after a stall the game slows down instead
+  of fast-forwarding. Game logic and demos are unaffected;
+- the `PL_WadIsSlow` policy: when WAD pointers are in flash, lumps are copied into the zone (and the level
+  precached) until a reserve of max(25% of the zone, 256 KiB) is left.
+
+**Robustness.** Vanilla trusted its savegames and demos:
+
+- A savegame is written only if every record fits the buffer. Otherwise it is refused, and the slot keeps
+  its previous file.
+- A load checks the header before touching the current game, then every index it reads ("Bad savegame").
+- A demo's length, players and console player are checked before playback. Save commands in a damaged
+  demo are ignored.
+- The special keys no longer write through the missing player on the title screen.
+- Gameplay keys held into save-name entry are released.
+- A recording takes no ticcmd while the menu pauses the level, and a recording that never began is not
+  saved.
+- Fast monsters follow the skill of a loaded save.
+- Save-name entry: digits with ALPHA, and empty slots pre-filled with the map name.
 
 ## 3. Builds
 
@@ -408,7 +448,7 @@ The golden scenarios need `test-wads/fd/freedoom-0.13.0/freedoom1.wad` and `free
 
 [§7](#7-hardware-verification) lists them.
 
-## 5. Performance summary
+## 5. Performance
 
 Details: [`tests/perf-baseline.md`](../tests/perf-baseline.md). These are simulator instructions per frame,
 from frame 42 to the end, with view size 10 and full detail. They exclude the host's CRC work.
@@ -433,14 +473,48 @@ CGDoom; e1m1 and map01 are the closest comparisons.
   (`tests/perf-baseline.md`); column drawing costs
   about 4.0 cycles/pixel, against about 14 for GCC's loop.
 - The DMA transfer of a frame is bus-bound, about 8 ms by estimate, and overlaps the next frame.
-- **Not yet measured on hardware:**
-  - the real frame rate (the game holds its 35 fps cap in the places played so far, but no figures were
-    recorded);
-  - the cache-miss costs;
-  - flash vs SDRAM line-fill costs (the reason the RAM image is the primary path);
-  - the presenter costs at each clock.
 
-  Diagnostics → Benchmarks measures the last two.
+### 5.1 Where the speed comes from
+
+All of these are bit-exact: no golden changed, except for the fixed-point change, which made the engine
+vanilla's. The effects are simulator instructions per frame, measured when each change went in, against
+the engine just before it.
+
+| Change | Where | Effect |
+|---|---|---|
+| **Vanilla-exact fixed point.** `FixedMul` is a header inline (`dmuls.l`, about 4 instructions, against 196 for CGDoom's bit-serial loop). `FixedDiv` is a `div0u`/`div1` sequence (93 instructions and no libgcc call, against about 202 instructions and 16 libgcc divisions). `finecosine` and `SlopeDiv` are inline | `m_fixed.h`, `m_fixed.c`, `tables.h` | −21% e1m1 and map01, −39% demo1 (`FixedMul` was 17–24% of cycles) |
+| **Division helpers.** `IntDivPos` runs a signed division with a positive divisor through the faster unsigned divider (`R_StoreWallRange`). `IntCycleFill` does one division per animation instead of two per animated picture (`P_UpdateSpecials`) | `m_fixed.h` | −0.2% |
+| **Per-column glue** (the next four rows together) | | −3.5% |
+| `R_GetColumn` is a header inline. When the lump is mapped or already cached with the right tag, `W_CacheLumpNumConstFast` returns the pointer without the `W_CacheLumpNumConst` → `Z_ChangeTag2` → `PL_IsWadPointer` chain | `r_data.h`, `w_wad.h` | about 70k instructions per frame in e1m1 |
+| The WAD byte readers are inline, and patch column offsets are read with one aligned 32-bit load when the patch is aligned | `m_swap.h`, `r_things.c`, `v_video.c` | |
+| Short row copies use words instead of fxlibc's byte-by-byte `memcpy` below 64 bytes (status-bar widgets, sprite clips) | `v_video.c`, `r_segs.c` | |
+| The keymap decode is skipped when the key scan has not changed | `cgdoom-kbd.c` | about 10k |
+| **`R_RenderSegLoop` loop state in locals.** GCC no longer reloads and stores the globals around every column call | `r_segs.c` | −1.4% |
+| **Visplane hashing** (64 buckets) | `r_plane.c` | `R_FindPlane` from 17k instructions per frame to almost nothing in demo1; ±0.2% overall; the gain grows with the plane count |
+| **SH4 drawers** (columns, spans, low detail, fuzz, translated, palette expansion) | `src/engine/sh4` | −15% (demo1) to −29% against the C drawers; 2.4–3.2× in modelled hardware cycles |
+| **Empty wall columns skipped.** A single-sided wall no longer calls `R_GetColumn` and the drawer when `yh < yl` (26% of the column calls in e1m1). Lighting and the `dc_iscale` division are computed only before the first tier a column draws | `r_segs.c` | −0.8% (map01) to −5.8% (e1m1); libgcc division −34% in e1m1 |
+| **`R_DrawMaskedColumn` loop state in locals.** Only drawn posts store the `dc_*` globals | `r_things.c` | −21% of the function in demo1 |
+
+Tried and left out:
+
+- a `div1` sequence for the `dc_iscale` and `SlopeDiv` divisions: 2 instructions per quotient bit, no
+  faster than libgcc. An exact reciprocal is still open ([perf-baseline](../tests/perf-baseline.md));
+- an inexact reciprocal: it changes pixels;
+- inlining `R_PointOnSide`: about 1.5k instructions per frame, below the noise;
+- `colfunc` in a local of `R_RenderSegLoop`: the register pressure cost more than one global load per call;
+- an early exit for negative counts in the asm drawers: no call site passes one any more, and it would
+  lengthen every call's set-up;
+- `-O3`: gpSP measured it slower than `-O2` on fx-CG100 hardware (I-cache).
+
+### 5.2 Not yet measured on hardware
+
+- the real frame rate (the game holds its 35 fps cap in the places played so far, but no figures were
+  recorded);
+- the cache-miss costs;
+- flash vs SDRAM line-fill costs (the reason the RAM image is the primary path);
+- the presenter costs at each clock.
+
+Diagnostics → Benchmarks measures the last two.
 
 ## 6. Design decisions
 
