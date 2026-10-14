@@ -526,6 +526,7 @@ Notes:
   5. Hold **×** until "OS ERROR" appears.
   6. Connect and run the updater.
   - If it keeps failing: leave the calculator off ≥ 1 hour first (Parisse), try another PC, or delete stale Casio USB devices in Device Manager (`pnputil /remove-device ...`).
+  - **[V]** Mac hardware test, 14 Oct 2026: Casio's Mac updater restored stock 2.20 over casio-mpm-220's patched 2.20 from OS ERROR, on the first attempt after the calculator had been off overnight. Attempts made minutes after a RESTART failed at the first handshake: the recovery USB link handed back the host's own packets. Details are in casio-mpm-220 `docs/REVIEW.md`, "Recovery on hardware".
 - **Zadig side effect.** If Zadig assigned WinUSB to the calculator, the official OS updater cannot see it. The installer and OS Update share VID:PID 07cf:6102. Uninstall that device and its driver (Device Manager, "Show hidden devices") to restore the official updater.
 - **Black screen + reboot when launching an add-in** = the add-in is not CG100-compatible. No damage (Lephe).
 - **No public Linux installer** (a dev build exists but is private).
