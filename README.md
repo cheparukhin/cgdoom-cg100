@@ -18,8 +18,8 @@ patch, plus `mpm.bin`, the add-in menu at the root of the storage memory. Instal
 (such as 02.10 or 02.00) to OS 02.20 with MPM, and currently needs a Mac.
 
 If your calculator already runs MPM on OS 02.00.0202 or 02.00.2202, CGDoom runs there too, with
-`mpm.bin` 1.1 from the [v1.0-beta5 release](https://github.com/cheparukhin/cgdoom-cg100/releases/tag/v1.0-beta5).
-Older builds leave it too little RAM.
+`mpm.bin` 1.1: copy it from the release zip's `os-02.00/` folder to the storage root. Older builds leave
+it too little RAM. Never copy it to OS 02.20, which needs casio-mpm-220's own `mpm.bin`.
 
 **2. Copy the files.** Download the zip from [Releases](https://github.com/cheparukhin/cgdoom-cg100/releases)
 and unzip it. Connect the calculator in **USB flash drive** mode, and copy both files in the zip's

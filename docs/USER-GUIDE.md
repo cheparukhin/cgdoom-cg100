@@ -42,7 +42,7 @@ On the fx-CG50, use [Lephenixnoir's CGDoom](https://git.planet-casio.com/Lepheni
 ## Which mpm.bin
 
 MPM has two parts: an **OS patch**, and **`mpm.bin`**, the add-in menu at the root of the storage memory.
-CGDoom needs `mpm.bin` 1.1 on OS 02.00 (attached to the [v1.0-beta5 release](https://github.com/cheparukhin/cgdoom-cg100/releases/tag/v1.0-beta5)), or on OS 02.20
+CGDoom needs `mpm.bin` 1.1 on OS 02.00 (in the release zip's `os-02.00/` folder), or on OS 02.20
 the `mpm.bin` from [casio-mpm-220's release](https://github.com/cheparukhin/casio-mpm-220/releases/latest), which is built from 1.1. Version 1.1 hands add-ins about 5.5 MiB of RAM in one block (a figure from reading the loader's source,
 not a measurement), enough to copy a packed `doom1.wad` to RAM with about 300 KiB to spare by calculation.
 
