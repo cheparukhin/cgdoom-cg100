@@ -36,7 +36,7 @@ demo2-1     -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000
 # Step 3 optional renderer modes and frame pacing (default output unchanged;
 # these have their own goldens, see tests/golden/CHANGES.md)
 #   -lowdetail: low detail (160 columns, Chocolate Doom drawers)
-#   -viewsize N: screenblocks; -flatfloors: potato floors
+#   -viewsize N: screenblocks
 #   builtin:options: menu Options > Detail, view size keys 10..7..11..9,
 #     automap and menu over reduced and full-screen views
 #   -autoframeskip N with -rendercost/-ticcost: automatic frameskip against a
@@ -47,8 +47,6 @@ demo1-low    -iwad $WADS/freedoom1.wad -playdemo DEMO1 -tics 2000 -lowdetail
 map07-low    -iwad $WADS/freedoom2.wad -warp 7 -tics 700 -input builtin:noclip -lowdetail
 e1m1-options -iwad $WADS/freedoom1.wad -warp 1 1 -tics 1200 -input builtin:options
 e1m1-view7   -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -viewsize 7
-map01-flat   -iwad $WADS/freedoom2.wad -warp 1 -tics 900 -input builtin:explore -flatfloors
-e2m2-lowflat -iwad $WADS/freedoom1.wad -warp 2 2 -tics 600 -input builtin:noclip -lowdetail -flatfloors -viewsize 9
 e1m1-auto    -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -autoframeskip 3 -rendercost 2.5
 demo2-1-auto -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000 -autoframeskip 2 -rendercost 1.6 -ticcost 0.2
 # auto frameskip across a level exit, the intermission and the next level's

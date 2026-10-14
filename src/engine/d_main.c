@@ -362,6 +362,9 @@ int map = 1;    //HACK
    set by the platform before D_DoomMain() */
 int skill = 3;
 
+/* The demo lump G_DeferedPlayDemo() was given (g_game.c) */
+extern char* defdemoname;
+
 //
 // This cycles through the demo sequences.
 // FIXME - version dependend demo numbers?
@@ -425,8 +428,11 @@ void D_DoAdvanceDemo (void)
         break;
     }
 
-    /* CGDoom: Skip demos on option (often incompatible) */
-    if (gameaction == ga_playdemo && !CGD_Options.EnableDemos) {
+    /* CGDoom: skip a demo when CGD_TitleDemos is clear (host tests), or
+       when the WAD has no such lump (tools/wadtool.py pack --drop-demos):
+       G_DoPlayDemo would stop with "W_GetNumForName: demo1 not found!" */
+    if (gameaction == ga_playdemo
+        && (!CGD_TitleDemos || W_CheckNumForName (defdemoname) < 0)) {
       D_DoAdvanceDemo();
     }
 }

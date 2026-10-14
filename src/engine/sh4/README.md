@@ -398,7 +398,6 @@ All of this is in place in the engine and the gint layer (`notes/engine-changes.
    #else   /* same with the C names (R_DrawColumn, …, R_DrawColumnLow, …) */
    #endif
    ```
-   (The potato-floor span drawers `R_DrawSpanFlat[Low]` stay C in both builds.)
 4. **Call sites** use the vanilla pointers, not CGDoom's direct calls:
    - `r_segs.c`: the 3 wall-tier calls are `colfunc()`;
    - `r_plane.c`: `spanfunc()` in `R_MapPlane`, `colfunc()` for the sky;

@@ -9,6 +9,9 @@
      "ViewSizeX=", "Keymap.Weapon=", "Keymap.Weapon1x=") and values ("F",
      "NONEX", "MMAPX") are ignored, as are unknown, garbled and binary lines,
      lines without '=' and an unterminated last line;
+   - the options and keymap actions of earlier builds (DeveloperInfo,
+     EnableDemos, Autostart, FlatFloors, the gint platform's CG.* lines,
+     the heap statistics, frameskip and profiler keys) are ignored;
    - CRLF line ends;
    - a wrong Version, an empty or a missing file leave the options untouched.
    Exit status 0 = PASS. */
@@ -100,12 +103,8 @@ static void test_roundtrip(void)
 {
     CGDoom_Options o, n;
     CGD_DefaultOptions(&o);
-    o.DeveloperInfo = 1;
-    o.AutoStart = 1;
-    o.EnableDemos = 1;
     o.DelaySaves = 0;
     o.LowDetail = 1;
-    o.FlatFloors = 1;
     o.ViewSize = 7;
     CGD_CopyKeymap(o.Keymap, CGD_Keymap_FullHands);
     o.Keymap[0] = -1;
@@ -165,7 +164,13 @@ static void test_none_and_garbage(void)
     /* Options of older versions (WAD access, unaligned lumps) */
     n += sprintf(text + n, "WADMethod=BFILE\nTrustUnalignedLumps=1\n");
     n += sprintf(text + n, "=5\n=\nnoequals\n\x01\x02=\xff\xfe\n");
-    n += sprintf(text + n, "FlatFloors=1\n");
+    /* Options and actions removed on 2026-10-14 */
+    n += sprintf(text + n, "DeveloperInfo=1\nEnableDemos=1\nAutostart=1\n"
+        "FlatFloors=1\n");
+    n += sprintf(text + n, "CG.Overclock=2\nCG.Display=1\nCG.Frameskip=0\n"
+        "CG.FPS=1\nCG.WadRam=0\nCG.Skill=4\n");
+    n += sprintf(text + n, "Keymap.HeapStatistics=SIN\n"
+        "Keymap.CycleFrameskip=COS\nKeymap.Profiler=MUL\n");
     n += sprintf(text + n, "ViewSize=8");                       /* no '\n' */
     set_file(text);
 
@@ -178,7 +183,6 @@ static void test_none_and_garbage(void)
     want.Keymap[keymap_index(KEY_LEFTARROW)] = -1;
     want.Keymap[keymap_index('1')] = -1;
     want.Keymap[keymap_index(KEY_RSHIFT)] = KEYCODE_SQUARE;
-    want.FlatFloors = 1;
     want.ViewSize = 8;
     CHECK(same_options(&o, &want), "garbled file: options differ");
     for(int i = 0; i < CGDOOM_KEYMAP_SIZE; i++)
@@ -186,6 +190,10 @@ static void test_none_and_garbage(void)
             i, CGD_DoomKey_TechnicalName(CGD_KeymapEntries[i]), o.Keymap[i],
             want.Keymap[i]);
     CHECK(o.LowDetail == 0 && o.ViewSize == 8, "prefix keys");
+    CHECK(CGD_DoomKey_FromTechnicalName("Profiler", -1) < 0
+        && CGD_DoomKey_FromTechnicalName("HeapStatistics", -1) < 0
+        && CGD_DoomKey_FromTechnicalName("CycleFrameskip", -1) < 0,
+        "removed actions have no technical name");
 
     /* Exact technical-name lookups */
     CHECK(CGD_PhysicalKey_FromTechnicalName("F", 1) < 0, "F is not F1");
@@ -203,7 +211,7 @@ static void test_rejected(void)
     CGD_DefaultOptions(&d);
 
     char text[256];
-    sprintf(text, "ViewSize=5\nVersion=%d\nFlatFloors=1\n",
+    sprintf(text, "ViewSize=5\nVersion=%d\nLowDetail=1\n",
         CGDOOM_SETTINGS_FILE_VERSION + 1);
     set_file(text);
     o = d;
@@ -237,25 +245,22 @@ static void test_numeric_values(void)
     CGD_DefaultOptions(&d);
     char text[512];
 
-    sprintf(text, "Version=%d\nLowDetail=\n1\nFlatFloors=\r\n1\r\n"
-        "DelaySaves=\n0\nViewSize= 5\nDeveloperInfo=1x\nEnableDemos=-\n"
-        "Autostart=99999999999\n",
+    sprintf(text, "Version=%d\nLowDetail=\n1\nDelaySaves=\r\n0\r\n"
+        "ViewSize= 5\nLowDetail=1x\nDelaySaves=-\nViewSize=99999999999\n",
         CGDOOM_SETTINGS_FILE_VERSION);
     set_file(text);
     o = d;
     CHECK(CGD_LoadSettings(&o) == 0, "load");
     CHECK(same_options(&o, &d), "empty/malformed numbers changed options "
-        "(LowDetail=%d FlatFloors=%d DelaySaves=%d ViewSize=%d "
-        "DeveloperInfo=%d EnableDemos=%d AutoStart=%d)", o.LowDetail,
-        o.FlatFloors, o.DelaySaves, o.ViewSize, o.DeveloperInfo,
-        o.EnableDemos, o.AutoStart);
+        "(LowDetail=%d DelaySaves=%d ViewSize=%d)", o.LowDetail,
+        o.DelaySaves, o.ViewSize);
 
-    sprintf(text, "Version=%d\r\nViewSize=7\r\nLowDetail=1\nDelaySaves=0\n"
-        "DeveloperInfo=-1", CGDOOM_SETTINGS_FILE_VERSION);
+    sprintf(text, "Version=%d\r\nViewSize=7\r\nLowDetail=1\nDelaySaves=-1",
+        CGDOOM_SETTINGS_FILE_VERSION);
     set_file(text);
     o = d;
     CHECK(CGD_LoadSettings(&o) == 0 && o.ViewSize == 7 && o.LowDetail == 1
-        && o.DelaySaves == 0 && o.DeveloperInfo == -1, "valid numbers");
+        && o.DelaySaves == -1, "valid numbers");
 
     /* An empty Version is not the current version */
     sprintf(text, "Version=\n%d\nViewSize=5\n", CGDOOM_SETTINGS_FILE_VERSION);

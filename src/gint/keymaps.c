@@ -1,7 +1,7 @@
 /* CGDoom gint platform: keymaps and key names.
 
    Keymaps are CGDoom_Keymap arrays of physical matrix codes (row << 4 |
-   (7 - col)) in the order of the engine's CGD_KeymapEntries (27 Doom
+   (7 - col)) in the order of the engine's CGD_KeymapEntries (24 Doom
    actions). The engine keeps all keymap logic; the platform only chooses
    which array is copied into CGD_Options.Keymap (CGD_CopyKeymap), shows key
    names, and lets the user edit bindings. No registration hook is needed
@@ -31,7 +31,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-_Static_assert(CGDOOM_KEYMAP_SIZE == 27, "keymaps below have 27 entries");
+_Static_assert(CGDOOM_KEYMAP_SIZE == 24, "keymaps below have 24 entries");
 
 #define CG100_ON        0x91
 #define CG100_HOME      0x92
@@ -68,8 +68,10 @@ _Static_assert(CGDOOM_KEYMAP_SIZE == 27, "keymaps below have 27 entries");
 /* Default fx-CG100 layout: right thumb on the D-pad cluster (arrows, strafe
    on the tab keys beside UP, map on CATALOG, pause/FPS on the page keys),
    left thumb on SHIFT (fire) / ALPHA (use) / VARIABLE (run), BACK opens the
-   Doom menu, weapons on the digits. Every one of the 27 actions is bound;
-   OK, HOME, ON and SETTINGS are left free. No binding needs the abort
+   Doom menu, weapons on the digits. Every one of the 24 actions is bound;
+   OK, HOME, ON, SETTINGS, TOOLS, sqrt and ) are left free (TOOLS, sqrt and
+   ) were the frameskip, heap statistics and profiler keys until
+   2026-10-14). No binding needs the abort
    chord SHIFT+7+3+AC (time.c). */
 static const CGDoom_Keymap keymap_cg100_thumbs = {
 	CG100_LEFT,       /* Turn left */
@@ -95,10 +97,7 @@ static const CGDoom_Keymap keymap_cg100_thumbs = {
 	CG100_COMMA,      /* Cheat */
 	CG100_XOT,        /* Noclip */
 	CG100_FRAC,       /* Brightness */
-	CG100_SQRT,       /* Heap statistics */
 	CG100_PAGEDOWN,   /* FPS counter */
-	CG100_TOOLS,      /* Frameskip */
-	CG100_RIGHTP,     /* Profiler */
 };
 
 /* Variant: turn with PREVTAB/NEXTTAB, strafe with LEFT/RIGHT */
@@ -126,10 +125,7 @@ static const CGDoom_Keymap keymap_cg100_strafe = {
 	CG100_COMMA,
 	CG100_XOT,
 	CG100_FRAC,
-	CG100_SQRT,
 	CG100_PAGEDOWN,
-	CG100_TOOLS,
-	CG100_RIGHTP,
 };
 
 static const gkm_preset_t presets_cg100[] = {

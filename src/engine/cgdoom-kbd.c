@@ -34,10 +34,7 @@ int16_t CGD_KeymapEntries[CGDOOM_KEYMAP_SIZE] = {
     SKEY_CHEAT,
     SKEY_NOCLIP,
     SKEY_GAMMA,
-    SKEY_FREEMEM,
     SKEY_FPSCOUNTER,
-    SKEY_FRAMESKIP,
-    SKEY_PROFILER,
 };
 
 /* Default keymap: CGDoom 0.03 */
@@ -65,10 +62,7 @@ const CGDoom_Keymap CGD_Keymap_CGDoom_0_03 = {
     KEYCODE_POWER,
     KEYCODE_ARROW,
     KEYCODE_FRAC,
-    KEYCODE_FD,
     KEYCODE_LEFTP,
-    KEYCODE_VARS,
-    KEYCODE_RIGHTP,
 };
 /* Default keymap: thumbs only */
 const CGDoom_Keymap CGD_Keymap_ThumbsOnly = {
@@ -95,10 +89,7 @@ const CGDoom_Keymap CGD_Keymap_ThumbsOnly = {
     KEYCODE_COMMA,
     KEYCODE_ARROW,
     KEYCODE_FRAC,
-    KEYCODE_FD,
     KEYCODE_LEFTP,
-    KEYCODE_VARS,
-    KEYCODE_RIGHTP,
 };
 /* Default keymap: full-hands */
 const CGDoom_Keymap CGD_Keymap_FullHands = {
@@ -125,10 +116,7 @@ const CGDoom_Keymap CGD_Keymap_FullHands = {
     KEYCODE_COMMA,
     KEYCODE_ARROW,
     KEYCODE_FRAC,
-    KEYCODE_FD,
     KEYCODE_LEFTP,
-    KEYCODE_SIN,
-    KEYCODE_RIGHTP,
 };
 
 /* The maps above are the fx-CG50 ones. fx-CG100 / Graph Math+ keymaps live
@@ -440,10 +428,7 @@ static const struct DoomkeyInfo doomkeys[] = {
     { SKEY_CHEAT,        "Cheat",               "Cheat"             },
     { SKEY_NOCLIP,       "ToggleNoclip",        "Noclip"            },
     { SKEY_GAMMA,        "GammaCorrection",     "Brightness"        },
-    { SKEY_FREEMEM,      "HeapStatistics",      "Heap stats"        },
     { SKEY_FPSCOUNTER,   "FPSCounter",          "FPS counter"       },
-    { SKEY_FRAMESKIP,    "CycleFrameskip",      "Frameskip"         },
-    { SKEY_PROFILER,     "Profiler",            "Run profiler"      },
     { -1,                NULL,                  NULL                },
 };
 

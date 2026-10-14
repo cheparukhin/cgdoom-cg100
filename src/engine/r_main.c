@@ -126,8 +126,6 @@ void (*fuzzcolfunc) (void);
 void (*transcolfunc) (void);
 void (*spanfunc) (void);
 
-boolean r_flatfloors;
-
 
 /* finecosine() is static inline in tables.h */
 
@@ -581,12 +579,6 @@ void CGD_SetLowDetail (int on)
   R_SetViewSize (screenblocks, detailLevel);
 }
 
-void CGD_SetFlatFloors (int on)
-{
-  CGD_Options.FlatFloors = on ? 1 : 0;
-  R_SetViewSize (screenblocks, detailLevel);
-}
-
 void CGD_SetViewSize (int blocks)
 {
   if (blocks < 3)
@@ -636,31 +628,27 @@ void R_ExecuteSetViewSize (void)
   centeryfrac = centery<<FRACBITS;
   projection = centerxfrac;
 
-  /* CGDoom step 3: potato floors (solid-colour spans), read here so that
-     the mode only changes between frames */
-  r_flatfloors = CGD_Options.FlatFloors != 0;
-
   /* Drawer selection: the ONE place that picks the column/span drawers.
      Low detail uses Chocolate Doom's drawers (fuzz and translated included,
      where vanilla kept the full-detail ones), see r_draw.c.
      SH4 builds (CGD_SH4, r_draw.h: __sh__ and not CGD_NO_SH4) use the
      bit-exact *_SH4 assembly versions of src/engine/sh4 (README.md §7);
      they need cgd_sh4_set_colormaps() (R_InitColormaps), else they fall
-     back to C. The potato-floor span drawers are C only (a byte fill). */
+     back to C. */
 #ifdef CGD_SH4
   if (!detailshift)
   {
     colfunc = basecolfunc = R_DrawColumn_SH4;
     fuzzcolfunc = R_DrawFuzzColumn_SH4;
     transcolfunc = R_DrawTranslatedColumn_SH4;
-    spanfunc = r_flatfloors ? R_DrawSpanFlat : R_DrawSpan_SH4;
+    spanfunc = R_DrawSpan_SH4;
   }
   else
   {
     colfunc = basecolfunc = R_DrawColumnLow_SH4;
     fuzzcolfunc = R_DrawFuzzColumnLow_SH4;
     transcolfunc = R_DrawTranslatedColumnLow_SH4;
-    spanfunc = r_flatfloors ? R_DrawSpanFlatLow : R_DrawSpanLow_SH4;
+    spanfunc = R_DrawSpanLow_SH4;
   }
 #else
   if (!detailshift)
@@ -668,14 +656,14 @@ void R_ExecuteSetViewSize (void)
     colfunc = basecolfunc = R_DrawColumn;
     fuzzcolfunc = R_DrawFuzzColumn;
     transcolfunc = R_DrawTranslatedColumn;
-    spanfunc = r_flatfloors ? R_DrawSpanFlat : R_DrawSpan;
+    spanfunc = R_DrawSpan;
   }
   else
   {
     colfunc = basecolfunc = R_DrawColumnLow;
     fuzzcolfunc = R_DrawFuzzColumnLow;
     transcolfunc = R_DrawTranslatedColumnLow;
-    spanfunc = r_flatfloors ? R_DrawSpanFlatLow : R_DrawSpanLow;
+    spanfunc = R_DrawSpanLow;
   }
 #endif
 
@@ -829,8 +817,6 @@ void R_SetupFrame (player_t* player)
 //
 void R_RenderPlayerView (player_t* player)
 {
-  prof_enter(CGD_Perf.GraphicsRendering);
-
   R_SetupFrame (player);
   // Clear buffers.
   R_ClearClipSegs ();
@@ -845,6 +831,4 @@ void R_RenderPlayerView (player_t* player)
 
   R_DrawMasked ();
   //I_Error("poof");
-
-  prof_leave(CGD_Perf.GraphicsRendering);
 }

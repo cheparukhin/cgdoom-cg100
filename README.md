@@ -4,9 +4,9 @@ DOOM for the Casio fx-CG100 and Graph Math+, running through the Math+ Mod (MPM)
 the fx-CG50 DOOM engine, to the [gint](https://git.planet-casio.com/Lephenixnoir/gint) kernel, with a
 launcher, fx-CG100 keymaps, overclocking and SH4 assembly renderers.
 
-> **Status: plays normally on an fx-CG100 with the new display and OS 02.20.** Saves, the overclock and
-> display-mode settings and the old display have not been tried on hardware yet. If something does not
-> work, see [If something goes wrong](#if-something-goes-wrong).
+> **Status: plays normally on an fx-CG100 with the new display and OS 02.20.** Saves, the title-screen
+> demos and the old display have not been tried on hardware yet. If something does not work, see
+> [If something goes wrong](#if-something-goes-wrong).
 
 ## Install
 
@@ -48,10 +48,12 @@ Default keys on the fx-CG100 / Graph Math+:
 - Saves are written when you quit, so leave through the Doom menu (*Quit Game*). After a game, CGDoom
   returns to MPM.
 - **Emergency quit: SHIFT + 7 + 3 + AC/ON.** Your saves are kept.
-- If the game is slow, try *Detail: Low* or a smaller *View size* in the launcher's *Options*.
+- Pick the episode and skill in the Doom menu (*New Game*), as on a PC.
+- If the game is slow, set *Graphic Detail* to Low in the Doom menu's *Options*, or make the view smaller
+  with the **-** key.
 
-The launcher's *Controls...* screen rebinds keys. The [user guide](docs/USER-GUIDE.md) covers every
-option, the keymaps, saves and demos.
+The launcher's *Controls...* screen rebinds keys. The [user guide](docs/USER-GUIDE.md) covers the
+launcher, the keymaps and saves.
 
 ## If something goes wrong
 

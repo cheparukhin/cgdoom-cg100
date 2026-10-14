@@ -104,10 +104,6 @@ extern void		(*transcolfunc) (void);
 // No shadow effects on floors.
 extern void		(*spanfunc) (void);
 
-// CGDoom step 3: potato floors are on (set with the view size, from
-// CGD_Options.FlatFloors; spanfunc is then R_DrawSpanFlat[Low]).
-extern boolean		r_flatfloors;
-
 
 //
 // Utility functions.

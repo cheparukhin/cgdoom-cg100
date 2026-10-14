@@ -93,12 +93,6 @@ void 	R_DrawSpan (void);
 // Low resolution mode, 160x200?
 void 	R_DrawSpanLow (void);
 
-// CGDoom step 3, potato floors: solid-colour spans (r_draw.c) in
-// ds_colormap[ds_flatcolor]; full and low detail.
-extern byte		ds_flatcolor;
-void	R_DrawSpanFlat (void);
-void	R_DrawSpanFlatLow (void);
-
 
 void
 R_InitBuffer

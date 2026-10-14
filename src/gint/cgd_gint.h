@@ -13,7 +13,7 @@
      input.c     PL_ScanKeyboard, raw-scan UI keys
      keymaps.c   fx-CG100 keymaps, key names, presets
      time.c      PL_GetTics / PL_GetMicros / PL_WaitTics
-     clock.c     overclock levels
+     clock.c     OS clock / F4 overclock
      ui.c        launcher drawing helpers
      diag.c      diagnostics screen and microbenchmarks
      stack.S     run a function on a private stack
@@ -262,12 +262,10 @@ gfs_scratch_t *gfs_scratch(void);
 /* True if p..p+size is a P1 address the OS can safely use */
 bool gfs_is_p1(void const *p, size_t size);
 
-/* List "*.wad" and "*.lmp" in the storage root in one world switch.
-   gfs_list_more says which list was cut at its maximum (final review). */
-int gfs_list(gfs_entry_t *wads, int wad_max, int *wad_count,
-	gfs_entry_t *demos, int demo_max, int *demo_count);
-enum { GFS_MORE_WADS = 1, GFS_MORE_DEMOS = 2 };
-extern int gfs_list_more;
+/* List "*.wad" in the storage root in one world switch. gfs_list_more is
+   set when the list was cut at its maximum (final review). */
+int gfs_list(gfs_entry_t *wads, int wad_max, int *wad_count);
+extern bool gfs_list_more;
 /* Failure result recorded when PL_FileWrite() cannot keep a copy for later
    and may not write at once (WAD block map live) */
 #define GFS_ERR_NO_MEMORY  (-1000)
@@ -292,20 +290,13 @@ bool gfs_last_failure(char name[GFS_NAME_MAX], int *result);
 /* Count a file the caller could not even hand over (shown at exit) */
 void gfs_note_failure(char const *name, int result);
 
-/* While set, the settings file written by CGD_SaveSettings() gets the
-   platform's own "CG.*" lines appended (see main.c). */
-extern char const *(*gfs_settings_appender)(void);
-extern char const *gfs_settings_name;
-
 //---
-// wadnames.c: WAD names for the engine and the launcher
+// wadnames.c: the WAD name given to the engine
 //---
 
 /* WAD base name (up to the first '.') for CGD_WADFileName: whole, never
    truncated (the engine hashes it into an 8.3 prefix) */
 void gnames_wad_base(char *out, size_t size, char const *wadname);
-/* Index in wads[] of the WAD a demo file belongs to, -1 if unknown */
-int gnames_demo_wad(gfs_entry_t const *wads, int count, char const *demo);
 
 //---
 // wad.c
@@ -344,6 +335,9 @@ typedef struct {
 } gwad_stats_t;
 
 extern gwad_stats_t gwad_stats;
+/* PL_WadOpen() tries the RAM image first (default true); false makes it
+   use the block map (Diagnostics storage probe, tests) */
+extern bool gwad_ram_allowed;
 bool gwad_map_live(void);
 /* PL_WadOpen() failures (final review: one -1 for every cause gave the
    user nothing to act on) and their launcher text */
@@ -355,8 +349,6 @@ enum {
 	GWAD_ERR_TRUNCATED = -5,   /* directory past the end of the file */
 };
 char const *gwad_error_text(int rc);
-/* Whether the open WAD's directory has this lump (case-insensitive) */
-bool gwad_has_lump(char const *lump);
 /* Re-query block addresses after a storage write */
 void gwad_remap(void);
 char const *gwad_mode_name(void);
@@ -368,20 +360,10 @@ void gwad_quit(void);
 // video.c
 //---
 
-enum {
-	GDISP_DMA = 0,    /* expand to RAM frame, async DMA (overlaps) */
-	GDISP_STRIPS,     /* expand into X/Y on-chip strips, ping-pong DMA */
-	GDISP_CPU,        /* CPU writes to the LCD data register */
-	GDISP_COUNT,
-};
-
 /* Allocate the RGB565 frame buffer (call early, before the zones) */
 bool gvid_init(void);
-void gvid_set_mode(int display_path);
-/* Display name of a path; GDISP_DMA reads "DMA n/a: CPU" when the frame
-   buffer could not be allocated (PL_FinishUpdate then uses the CPU path) */
-char const *gvid_mode_name(int mode);
-/* False if gvid_init() failed: GDISP_DMA falls back to CPU writes */
+/* False if gvid_init() failed: PL_FinishUpdate then writes every pixel
+   with the CPU instead of the async DMA */
 bool gvid_dma_available(void);
 /* Wait for the frame DMA and give the full 396x224 window back (always
    before gint drawing + dupdate()). */
@@ -391,13 +373,8 @@ void gvid_release(void);
 void gvid_note_os_activity(void);
 /* Clear the whole LCD to black (CPU writes) */
 void gvid_clear_lcd(void);
-/* Push one frame with a given path (diagnostics benchmark) */
-void gvid_push_test(int mode, uint8_t const *fb);
-
-/* On-chip strip banks (one 8 KiB X bank, one 8 KiB Y bank; the addresses
-   gint's dma_translate() whitelists). Nothing else may use them. */
-#define GVID_XBANK ((void *)0xe5007000)
-#define GVID_YBANK ((void *)0xe5017000)
+/* Push one frame and wait for its DMA (diagnostics benchmark) */
+void gvid_push_test(uint8_t const *fb);
 
 /* Replaceable 8-bit -> RGB565 expansion. The presenter uses the _p32
    entry with a persistent 1 KiB table built by cgd_expand_build_pal32()
@@ -410,11 +387,12 @@ void gvid_push_test(int mode, uint8_t const *fb);
      weak C reads words), big-endian: src[0] is the leftmost pixel and
      dst[0] its RGB565 value;
    - dst is 32-byte aligned and is EITHER cached SDRAM (P1, 0x8xxxxxxx) OR
-     on-chip X/Y memory (0xe5xxxxxx, not cacheable). For P1 dst every
-     32-byte line is allocated with movca.l and purged with ocbp once
-     written (asm and weak C alike), so the data is in RAM on return and
-     the caller only issues synco before a DMA reads it. For on-chip dst,
-     plain stores only (no movca.l / ocb*);
+     on-chip X/Y memory (0xe5xxxxxx, not cacheable; no caller since the
+     X/Y strip presenter was removed, still supported by the routines).
+     For P1 dst every 32-byte line is allocated with movca.l and purged
+     with ocbp once written (asm and weak C alike), so the data is in RAM
+     on return and the caller only issues synco before a DMA reads it. For
+     on-chip dst, plain stores only (no movca.l / ocb*);
    - no DSP repeat loops (ldrs/ldre), no DSP or MAC registers: safe in
      interrupt context (it runs in the foreground today). */
 void cgd_expand_build_pal32(uint32_t *pal32, uint16_t const *pal);
@@ -562,7 +540,7 @@ bool gtime_prof_ok(void);
 // clock.c
 //---
 
-enum { GCLK_OFF = 0, GCLK_F4 = 1, GCLK_PTUNE4_F5 = 2, GCLK_COUNT };
+enum { GCLK_OFF = 0, GCLK_F4 = 1 };
 void gclk_init(void);
 void gclk_apply(int level);
 char const *gclk_name(int level);
@@ -584,21 +562,6 @@ void gdiag_screen(gfs_entry_t const *wads, int count);
 
 /* Call fn() with r15 = stack_top (8-byte aligned top of a P1 buffer) */
 void cgd_call_on_stack(void (*fn)(void), void *stack_top);
-
-//---
-// Platform options (persisted as "CG.*" lines in CGDoom.cfg)
-//---
-
-typedef struct {
-	int overclock;      /* GCLK_* */
-	int display;        /* GDISP_* */
-	int frameskip;      /* -1 = auto, 0..3 */
-	int fps_counter;    /* bool */
-	int wad_in_ram;     /* bool: RAM image when it fits (primary path) */
-	int skill;          /* 0..4 */
-} gopt_t;
-
-extern gopt_t g_opt;
 
 //---
 // ui.c: launcher drawing

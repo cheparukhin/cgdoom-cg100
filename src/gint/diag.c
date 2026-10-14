@@ -4,7 +4,7 @@
    answer (notes/research-critique.md §E): what the loader announced, which
    LCD controller we run on, where the stack is, the clock registers, the heap
    layout, the WAD block map (P1/P2/P0 counts, physical range), UTLB
-   repairs, and flash vs SDRAM / CPU vs DMA timings. Shown on screen only
+   repairs, and flash vs SDRAM / display push timings. Shown on screen only
    (an fxlink text channel would need the USB driver and a connected host).
 
    Pages (LEFT/RIGHT): System, Memory, Storage/WAD (with a read-only
@@ -62,10 +62,10 @@ typedef struct {
 	bool done;
 	int clock;
 	uint32_t flash_us, sdram_us;
-	uint32_t push_us[GDISP_COUNT];
+	uint32_t push_us;
 } bench_t;
 
-/* [0]: OS clock, [1]: the overclock level selected in Options */
+/* [0]: OS clock, [1]: the game's F4 overclock */
 static bench_t g_bench[2];
 static volatile uint32_t g_sink;
 
@@ -105,16 +105,11 @@ static void run_bench_once(bench_t *b, uint8_t const *fb)
 		free(ram);
 	}
 
-	/* 320x200 pushes with each display path. Without the frame buffer
-	   the DMA path is the CPU path: not measured under the DMA label
-	   (gint review round 2; 0 = n/a on the page) */
+	/* One 320x200 push with the game's display path: the async DMA, or
+	   CPU writes without the frame buffer (the page says which) */
 	if(fb) {
 		gvid_clear_lcd();
-		for(int m = 0; m < GDISP_COUNT; m++) {
-			if(m == GDISP_DMA && !gvid_dma_available())
-				continue;
-			b->push_us[m] = prof_exec({ gvid_push_test(m, fb); });
-		}
+		b->push_us = prof_exec({ gvid_push_test(fb); });
 	}
 	b->done = true;
 }
@@ -142,13 +137,9 @@ static void run_bench(void)
 
 	gclk_apply(GCLK_OFF);
 	run_bench_once(&g_bench[0], fb);
-	if(g_opt.overclock != GCLK_OFF) {
-		gclk_apply(g_opt.overclock);
-		run_bench_once(&g_bench[1], fb);
-		gclk_apply(GCLK_OFF);
-	}
-	else
-		g_bench[1].done = false;
+	gclk_apply(GCLK_F4);
+	run_bench_once(&g_bench[1], fb);
+	gclk_apply(GCLK_OFF);
 	free(fbraw);
 }
 
@@ -207,7 +198,8 @@ static void page_system(void)
 		LINE("UTLB executor off: not pinned, URB %d", gtlb_stats.urb_orig);
 	else
 		LINE("UTLB pages not pinned (URB %d)", gtlb_stats.urb_orig);
-	LINE("Clock option: %s", gclk_name(gclk_current()));
+	LINE("Clock now: %s; games: %s", gclk_name(gclk_current()),
+		gtlb_stats.safe ? "OS clock (safe start)" : "F4");
 	/* Final review: whether the 35 Hz TMU tic was obtained (critique §E) */
 	if(gtime_ticking())
 		LINE("Tic timer: TMU %d (35 Hz)%s", gtime_tic_timer(),
@@ -267,8 +259,7 @@ static void probe_wad(void)
 		return;
 	char const *name = g_wads[g_wad_sel].name;
 	static gtlb_view_t before, after;
-	int ram = g_opt.wad_in_ram;
-	g_opt.wad_in_ram = 0;
+	gwad_ram_allowed = false;
 
 	ui_status("Storage probe", name, "Mapping the WAD (read-only)...");
 	gtlb_read_view(&before);
@@ -278,7 +269,7 @@ static void probe_wad(void)
 	g_urb_after = gtlb_mmucr_urb(*(volatile uint32_t *)0xff000010u);
 	PL_WadClose();
 
-	g_opt.wad_in_ram = ram;
+	gwad_ram_allowed = true;
 	strcpy(g_probe_name, name);
 
 	g_utlb_changed = 0;
@@ -345,7 +336,7 @@ static void page_wad(void)
 static void page_bench(void)
 {
 	LINE("EXE/OK: run at the OS clock and at %s",
-		gclk_name(g_opt.overclock));
+		gclk_name(GCLK_F4));
 	for(int k = 0; k < 2; k++) {
 		bench_t const *b = &g_bench[k];
 		if(!b->done)
@@ -353,15 +344,8 @@ static void page_bench(void)
 		LINE("-- %s --", gclk_name(b->clock));
 		LINE("64 KiB read: flash P1 %u us, SDRAM P1 %u us (cold)",
 			(unsigned)b->flash_us, (unsigned)b->sdram_us);
-		if(gvid_dma_available())
-			LINE("Push 320x200: DMA %u, strips %u, CPU %u us",
-				(unsigned)b->push_us[GDISP_DMA],
-				(unsigned)b->push_us[GDISP_STRIPS],
-				(unsigned)b->push_us[GDISP_CPU]);
-		else
-			LINE("Push 320x200: DMA n/a, strips %u, CPU %u us",
-				(unsigned)b->push_us[GDISP_STRIPS],
-				(unsigned)b->push_us[GDISP_CPU]);
+		LINE("Push 320x200 (%s): %u us", gvid_dma_available() ? "DMA"
+			: "CPU, no DMA frame buffer", (unsigned)b->push_us);
 	}
 	if(!gtime_prof_ok())
 		LINE("Profiler timer unavailable: no benchmarks");

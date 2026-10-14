@@ -267,3 +267,29 @@ addresses noted in §9. Existing source tables make it feasible, but save writes
 must not use an inferred address. Verify against an actual 2.10 image, then extend
 the pinned runtime, the startup gate and their tests together. A matching MPM
 installation and hardware validation remain separate requirements.
+
+
+## 11. Launcher options removed (2026-10-14) — overrides the option lists above
+
+After the first hardware run (new display, OS 02.20: the game played normally with the defaults), every
+launcher setting with one right value on the fx-CG100, or with an in-game equivalent, was removed. The
+launcher keeps the WAD rows, *Controls...*, *Diagnostics...* and *Quit*.
+- Fixed: the F4 overclock for every game (the OS clock in safe start); the async DMA presenter (CPU
+  writes only when the frame buffer cannot be allocated); automatic frameskip (`CGD_AUTOFRAMESKIP_DEFAULT`);
+  the WAD copied to RAM whenever it fits (`gwad_ram_allowed` is only cleared by the Diagnostics storage
+  probe); vanilla's title loop with its demos (`CGD_TitleDemos`, which only the host clears).
+- Removed options: *CPU clock* (Off / F4 / Ptune4 F5), *Display* (DMA / X/Y strips / CPU), *Frameskip*,
+  *FPS counter* (the PageDown key stays), *View size* and *Detail* (in the game: the -/+ keys and the
+  Doom menu, still saved in `CGDOOM.CFG`), *Flat floors*, *Developer info*, *Copy WAD to RAM if it fits*,
+  *Skill*, *Start at episode/map*, *Title screen* (Skip / No demos / Full), *Record demo on slot*,
+  *Replay demo...*.
+- Removed with them: the potato-floor renderer (two goldens), the X/Y strip presenter, the Ptune4 F5
+  register set, the platform's `CG.*` settings lines and their appender, the demo listing and
+  demo-to-WAD matching, the start-map check, the stack-peak fill, and the in-game heap statistics,
+  frameskip and profiler keys with the engine's `CGD_Perf` instrumentation (the keymap has 24 actions).
+- Engine change that the new default needs: a key pressed during a title demo opens the Doom menu again,
+  as in vanilla (CGDoom only did so over a title page, since its demos were off).
+- Lost on hardware: the only screens that showed the WAD mode a game used and the stack peak, zone peak
+  and UTLB repairs of a game (Developer info).
+Old `CGDOOM.CFG` lines for the removed options (`DeveloperInfo`, `EnableDemos`, `Autostart`, `FlatFloors`,
+`CG.*`, `Keymap.HeapStatistics`, `Keymap.CycleFrameskip`, `Keymap.Profiler`) are ignored.

@@ -42,7 +42,6 @@ static int t_memcmp(void const *a, void const *b, size_t n) { return memcmp(tr(a
 char g_os_version[11] = "02.00.0000";
 gos_api_t g_os;
 uint32_t g_entry_r15;
-gopt_t g_opt;
 gtlb_stats_t gtlb_stats;
 void gvid_release(void) {}
 void gvid_note_os_activity(void) {}
@@ -126,7 +125,7 @@ static void setup(int fsize, int const *kind, int const *slot)
 
 static void check_all(char const *tag)
 {
-	g_opt.wad_in_ram = 0;
+	gwad_ram_allowed = false;
 	int rc = PL_WadOpen("TEST.WAD");
 	CHECK(rc == g_fsize, "%s open %d", tag, rc);
 	CHECK(gwad_stats.mode == GWAD_MAP, "%s mode %d", tag, gwad_stats.mode);
@@ -212,7 +211,7 @@ int main(void)
 		}
 		int fsize = (nb - 1) * 4096 + 12 + rand() % 4085;
 		setup(fsize, kind, slot);
-		g_opt.wad_in_ram = 0;
+		gwad_ram_allowed = false;
 		CHECK(PL_WadOpen("T.WAD") == fsize, "fuzz open");
 		uint8_t *buf = malloc(fsize);
 		for(int k = 0; k < 300; k++) {
@@ -241,7 +240,7 @@ int main(void)
 	   W_LUMP_PAD past it (w_wad.c: heap copies are zero-filled) */
 	for(int i = 0; i < 2; i++) { kind[i] = K_P2; slot[i] = 20 + i; }
 	setup(2 * 4096 - 50, kind, slot);
-	g_opt.wad_in_ram = 0; PL_WadOpen("T.WAD");
+	gwad_ram_allowed = false; PL_WadOpen("T.WAD");
 	CHECK(gwad_stats.mode == GWAD_MAP, "EOF: map mode");
 	{ uint8_t const *m = PL_WadMap(2 * 4096 - 50 - 60, 60);
 	  CHECK(m == NULL, "EOF lump mapped in place (flash bytes past EOF)");
@@ -254,7 +253,7 @@ int main(void)
 	PL_WadClose();
 	{ uint8_t *h = g_file; int fs = 2 * 4096 - 50; h[4]=1;h[5]=h[6]=h[7]=0; h[8]=16;h[9]=h[10]=h[11]=0;
 	  uint32_t pos = fs - 60; h[16]=pos;h[17]=pos>>8;h[18]=h[19]=0; h[20]=60;h[21]=h[22]=h[23]=0; memcpy(h+24,"LUMP\0\0\0\0",8); }
-	g_opt.wad_in_ram = 1; PL_WadOpen("T.WAD");
+	gwad_ram_allowed = true; PL_WadOpen("T.WAD");
 	CHECK(gwad_stats.mode == GWAD_RAM, "EOF: RAM mode");
 	{ uint8_t const *m = PL_WadMap(2 * 4096 - 50 - 60, 60); int nz = 0;
 	  CHECK(m != NULL, "EOF lump in RAM image");
@@ -267,7 +266,7 @@ int main(void)
 	   and the statistics untouched; PL_WadOpen() never polls */
 	for(int i = 0; i < N; i++) { kind[i] = K_P2; slot[i] = 30 + i; }
 	setup(N * 4096 - 3, kind, slot);
-	g_opt.wad_in_ram = 0;
+	gwad_ram_allowed = false;
 	load_polls = 0;
 	CHECK(PL_WadOpen("T.WAD") == N * 4096 - 3 && gwad_stats.mode == GWAD_MAP, "poll: open");
 	CHECK(load_polls == 0, "PL_WadOpen polled %ld times", load_polls);
@@ -296,7 +295,7 @@ int main(void)
 	for(int i = 0; i < N; i++) { kind[i] = K_P2; slot[i] = 40 + i; }
 	setup(N * 4096 - 3, kind, slot);
 	CHECK(PL_WadIsSlow() == 0, "slow: no WAD");
-	g_opt.wad_in_ram = 0; PL_WadOpen("T.WAD");
+	gwad_ram_allowed = false; PL_WadOpen("T.WAD");
 	CHECK(W.mode == GWAD_MAP && PL_WadIsSlow() == 1, "slow: MAP (mode %d)", W.mode);
 	memset(g_flash + 0x00C80000u + 40 * 4096u, 0x11, 12);   /* header gone */
 	gwad_remap();
@@ -312,10 +311,10 @@ int main(void)
 	/* a directory with one lump, for the RAM image (as in 8.) */
 	{ uint8_t *h = g_file; uint32_t pos = 4096; h[4]=1;h[5]=h[6]=h[7]=0; h[8]=16;h[9]=h[10]=h[11]=0;
 	  h[16]=pos;h[17]=pos>>8;h[18]=h[19]=0; h[20]=60;h[21]=h[22]=h[23]=0; memcpy(h+24,"LUMP\0\0\0\0",8); }
-	g_opt.wad_in_ram = 1; PL_WadOpen("T.WAD");
+	gwad_ram_allowed = true; PL_WadOpen("T.WAD");
 	CHECK(W.mode == GWAD_RAM && PL_WadIsSlow() == 0, "slow: RAM (mode %d)", W.mode);
 	PL_WadClose();
-	g_opt.wad_in_ram = 0;
+	gwad_ram_allowed = false;
 
 	/* 11. Final review: the map is checked against the file at open, as
 	   gwad_remap() did: block 0 must hold the header, and sampled blocks
@@ -328,7 +327,7 @@ int main(void)
 		setup(N * 4096 - 21, kind, slot);
 		/* the flash copy of one block disagrees with the file */
 		g_flash[0x00C80000u + slot[bad[t].block] * 4096u + 2] ^= 0x5a;
-		g_opt.wad_in_ram = 0;
+		gwad_ram_allowed = false;
 		CHECK(PL_WadOpen("T.WAD") == N * 4096 - 21, "verify %s: open", bad[t].tag);
 		CHECK(W.mode == GWAD_BFILE && gwad_stats.map_rejected && !gwad_map_live(),
 			"verify %s: BFile reads (mode %d)", bad[t].tag, W.mode);

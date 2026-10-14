@@ -325,127 +325,6 @@ void R_MapPlane( int y, int	x1,  int x2 )
 
 
 //
-// R_MapPlaneFlat
-// CGDoom step 3, potato floors: R_MapPlane without the texture mapping.
-// Only the row distance is needed, for the light level; the span is filled
-// with ds_colormap[ds_flatcolor] by spanfunc (R_DrawSpanFlat[Low]).
-// cachedheight/cacheddistance are shared with R_MapPlane: the mode only
-// changes between frames and R_ClearPlanes resets the cache every frame,
-// so the unset cachedxstep/cachedystep are never used.
-//
-static void R_MapPlaneFlat (int y, int x1, int x2)
-{
-  fixed_t	distance;
-  unsigned	index;
-
-#ifdef RANGECHECK
-  if (x2 < x1
-    || x1<0
-    || x2>=viewwidth
-    || (unsigned)y>(unsigned)viewheight)
-  {
-    I_Error ("R_MapPlane: %i, %i at %i",x1,x2,y);
-  }
-#endif
-
-  if (planeheight != cachedheight[y])
-  {
-    cachedheight[y] = planeheight;
-    distance = cacheddistance[y] = FixedMul (planeheight, yslope[y]);
-  }
-  else
-    distance = cacheddistance[y];
-
-  if (fixedcolormap)
-    ds_colormap = fixedcolormap;
-  else
-  {
-    index = distance >> LIGHTZSHIFT;
-
-    if (index >= MAXLIGHTZ )
-      index = MAXLIGHTZ-1;
-
-    ds_colormap = planezlight[index];
-  }
-
-  ds_y = y;
-  ds_x1 = x1;
-  ds_x2 = x2;
-
-  spanfunc ();
-}
-
-
-//
-// R_FlatColor
-// CGDoom step 3, potato floors: the palette index closest (squared RGB
-// distance, lowest index on ties) to the average RGB colour of flat `flat`
-// (0..numflats-1) in the first PLAYPAL palette. Computed once per flat
-// lump, the first time it is drawn, and cached (flat_colors, PU_STATIC,
-// allocated on first use: 2 bytes per flat).
-//
-static short*	flat_colors;
-
-static byte R_FlatColor (int flat)
-{
-  const byte*	pal;
-  const byte*	src;
-  int		i, best, bestdist;
-  int		r, g, b;
-  int		lump, n;
-
-  if (!flat_colors)
-  {
-    flat_colors = (short*)Z_Malloc (numflats * sizeof(short), PU_STATIC, 0);
-    for (i = 0; i < numflats; i++)
-      flat_colors[i] = -1;
-  }
-  if (flat_colors[flat] >= 0)
-    return (byte)flat_colors[flat];
-
-  lump = firstflat + flat;
-  n = W_LumpLength (lump);
-  if (n > 64*64)
-    n = 64*64;
-  src = (const byte*)W_CacheLumpNumConst (lump, PU_STATIC);
-  pal = (const byte*)W_CacheLumpNameConst ("PLAYPAL", PU_STATIC);
-
-  r = g = b = 0;
-  for (i = 0; i < n; i++)
-  {
-    r += pal[3*src[i]];
-    g += pal[3*src[i]+1];
-    b += pal[3*src[i]+2];
-  }
-  /* rounded averages (a flat is 64*64 bytes; tolerate shorter lumps) */
-  if (n > 0)
-  {
-    r = (r + n/2) / n;
-    g = (g + n/2) / n;
-    b = (b + n/2) / n;
-  }
-
-  best = 0;
-  bestdist = 0x7fffffff;
-  for (i = 0; i < 256; i++)
-  {
-    int dr = pal[3*i] - r, dg = pal[3*i+1] - g, db = pal[3*i+2] - b;
-    int dist = dr*dr + dg*dg + db*db;
-    if (dist < bestdist)
-    {
-      bestdist = dist;
-      best = i;
-    }
-  }
-
-  Z_ChangeTag (pal, PU_CACHE);
-  Z_ChangeTag (src, PU_CACHE);
-  flat_colors[flat] = (short)best;
-  return (byte)best;
-}
-
-
-//
 // R_ClearPlanes
 // At begining of frame.
 //
@@ -606,39 +485,6 @@ void R_MakeSpans( int	x, int	t1, int	b1, int	t2, int	b2 )
 
 
 //
-// R_MakeSpansFlat
-// CGDoom step 3: R_MakeSpans for potato floors (R_MapPlaneFlat). A copy, so
-// that R_MakeSpans/R_MapPlane test nothing more per span in the default
-// mode; R_DrawPlanes picks one per visplane.
-//
-static void R_MakeSpansFlat( int	x, int	t1, int	b1, int	t2, int	b2 )
-{
-  while (t1 < t2 && t1<=b1)
-  {
-    R_MapPlaneFlat (t1,spanstart[t1],x-1);
-    t1++;
-  }
-  while (b1 > b2 && b1>=t1)
-  {
-    R_MapPlaneFlat (b1,spanstart[b1],x-1);
-    b1--;
-  }
-
-  while (t2 < t1 && t2<=b2)
-  {
-    spanstart[t2] = x;
-    t2++;
-  }
-  while (b2 > b1 && b2>=t2)
-  {
-    spanstart[b2] = x;
-    b2--;
-  }
-}
-
-
-
-//
 // R_DrawPlanes
 // At the end of each frame.
 //
@@ -712,11 +558,7 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
     }
 
     // regular flat
-    /* CGDoom step 3: potato floors only need the flat's average colour */
-    if (r_flatfloors)
-      ds_flatcolor = R_FlatColor (flattranslation[pl->picnum]);
-    else
-      ds_source = (const byte*)W_CacheLumpNumConst(firstflat +flattranslation[pl->picnum],PU_STATIC);
+    ds_source = (const byte*)W_CacheLumpNumConst(firstflat +flattranslation[pl->picnum],PU_STATIC);
 
     planeheight = abs(pl->height-viewz);
     light = (pl->lightlevel >> LIGHTSEGSHIFT)+extralight;
@@ -733,13 +575,6 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
     pl->top[pl->minx-1] = 0xff;
 
     stop = pl->maxx + 1;
-
-    if (r_flatfloors)
-    {
-      for (x=pl->minx ; x<= stop ; x++)
-        R_MakeSpansFlat(x,pl->top[x-1],pl->bottom[x-1],pl->top[x],pl->bottom[x]);
-      continue;
-    }
 
     for (x=pl->minx ; x<= stop ; x++)
     {

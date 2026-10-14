@@ -1,9 +1,7 @@
 /* Host unit test for src/gint/wadnames.c (gint review round 1), linked with
    the engine's cgdoom-names.c:
-   - the WAD base name given to the engine is whole (it used to be cut to 6
-     characters, so freedoom1/freedoom2 and plutonia/plutonia2 shared saves);
-   - demos map to the WAD they were recorded with (DOOM1D03.LMP used to go
-     to doom.wad when both were present; hashed prefixes never matched). */
+   the WAD base name given to the engine is whole (it used to be cut to 6
+   characters, so freedoom1/freedoom2 and plutonia/plutonia2 shared saves). */
 
 #include "cgd_gint.h"
 #include "cgdoom.h"
@@ -25,11 +23,10 @@ static gfs_entry_t wads[] = {
 };
 #define NW (int)(sizeof wads / sizeof *wads)
 
-static char base[NW][GFS_LIST_NAME];
-
 static void test_base(void)
 {
 	char b[GFS_LIST_NAME], small[4];
+	static char base[NW][GFS_LIST_NAME];
 	gnames_wad_base(b, sizeof b, "freedoom1.wad");
 	CHECK(!strcmp(b, "freedoom1"), "base %s", b);
 	gnames_wad_base(b, sizeof b, "noext");
@@ -61,40 +58,9 @@ static void test_base(void)
 	CHECK(strcmp(p1, p2), "truncation would have changed the prefix");
 }
 
-static void test_demos(void)
-{
-	/* Every WAD's own recorded demos map back to it */
-	for(int i = 0; i < NW; i++) {
-		CGD_WADFileName = base[i];
-		for(int slot = 0; slot < 100; slot += 33) {
-			char d[CGD_NAME_MAX];
-			CGD_DemoFileName(d, slot);
-			int w = gnames_demo_wad(wads, NW, d);
-			CHECK(w == i, "%s -> %d (%s), want %s", d, w, w >= 0 ? wads[w].name : "-",
-				wads[i].name);
-			/* Case-insensitive, as listed by the file system */
-			for(char *c = d; *c; c++) if(*c >= 'A' && *c <= 'Z') *c += 32;
-			CHECK(gnames_demo_wad(wads, NW, d) == i, "lower-case %s", d);
-		}
-	}
-	CHECK(gnames_demo_wad(wads, NW, "DOOM1D03.LMP") == 1, "DOOM1D03 -> doom1.wad, not doom.wad");
-	CHECK(gnames_demo_wad(wads, NW, "DOOMD03.LMP") == 0, "DOOMD03 -> doom.wad");
-
-	/* Other names: longest base name followed by a separator */
-	CHECK(gnames_demo_wad(wads, NW, "doom1_demo00.lmp") == 1, "legacy doom1_");
-	CHECK(gnames_demo_wad(wads, NW, "doom_run.lmp") == 0, "legacy doom_");
-	CHECK(gnames_demo_wad(wads, NW, "plutonia2-speed.lmp") == 5, "legacy plutonia2-");
-	CHECK(gnames_demo_wad(wads, NW, "doomed.lmp") == -1, "no separator: unknown");
-	CHECK(gnames_demo_wad(wads, NW, "MYDEMO.LMP") == -1, "unknown");
-	CHECK(gnames_demo_wad(wads, NW, "DOOM1D3.LMP") == -1, "one digit: not an engine name");
-	CHECK(gnames_demo_wad(wads, 0, "DOOM1D03.LMP") == -1, "no WADs");
-	CHECK(gnames_demo_wad(wads, NW, NULL) == -1, "NULL");
-}
-
 int main(void)
 {
 	test_base();
-	test_demos();
 	printf("%s (%d failures)\n", fails ? "FAILED" : "OK", fails);
 	return fails != 0;
 }

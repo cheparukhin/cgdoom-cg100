@@ -1389,7 +1389,8 @@ The oracle runs with `singletics` and draws nothing.
 - **`FixedDiv`'s `MININT` saturation.** See Step 1.
 - **The switch list.** It is built from all episodes. Only textures are affected, and only by switch textures that are
   missing from the WAD.
-- **Input-only differences.** The keyboard `angleturn` table; no menu on a key press during title demos.
+- **Input-only differences.** The keyboard `angleturn` table. (A key pressed during a title demo opens the menu
+  again since 2026-10-14, as in vanilla.)
 - **Cosmetic.** The medikit message (nDoom fix).
 
 ### Risks and cost

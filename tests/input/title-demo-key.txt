@@ -1,0 +1,5 @@
+# Fire pressed during the first title demo (tests/title-keys.sh): the Doom
+# menu opens, as in vanilla, and the demo goes on behind it.
+250
+1 fire
+100

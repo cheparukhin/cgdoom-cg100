@@ -68,8 +68,8 @@ The engine never includes gint or OS headers. Everything platform-specific goes 
 - WAD access (`PL_WadOpen`, `PL_WadRead`, `PL_WadMap` zero-copy, `PL_WadIsSlow`);
 - small files (config, saves, demos).
 
-Platform *policy* lives in the platform: the launcher, options, keymap presets, overclock, delayed-write
-flushing and diagnostics. The engine exports a few hooks that the platform sets. gint references
+Platform *policy* lives in the platform: the launcher, keymap presets, overclock, delayed-write flushing
+and diagnostics. The engine exports a few hooks that the platform sets. gint references
 `CGD_EscapeKeycode` and `CGD_EnterKeycode2` weakly, so it still links against an engine without them:
 
 | Hook | Meaning |
@@ -79,7 +79,8 @@ flushing and diagnostics. The engine exports a few hooks that the platform sets.
 | `CGD_AlphaKeycode` | The save-name digit modifier: 0x72 on the fx-CG100. |
 | `CGD_AutoFrameskip` | Auto frameskip: 0 means fixed, N is the maximum number of consecutive skips (the default is 3). |
 | `CGD_IsPaused()` | A mask that drives the in-game idle policy. |
-| `CGD_WADFileName`, `CGD_RecordDemoSlot`, `CGD_PlayDemoOnly`, `CGD_SingleEpisodeUltimate` | Launch parameters. |
+| `CGD_WADFileName`, `CGD_SingleEpisodeUltimate` | Launch parameters. |
+| `CGD_RecordDemoSlot`, `CGD_PlayDemoOnly`, `CGD_TitleDemos` | Demo recording, demo-only playback and the title demos (on by default). Only the host sets them (`-record`, `-playdemo`, `-demos`). |
 
 Two contracts must hold on every platform (`src/engine/cgdoom.h`):
 
@@ -94,7 +95,7 @@ Engine changes compared with CGDoom are logged in `notes/engine-changes.md`:
 - vanilla-exact `FixedMul`/`FixedDiv`;
 - exact division helpers;
 - renderer limits raised, with the arrays allocated dynamically so that `.bss` stays small;
-- low detail with Chocolate Doom's semantics, view sizes 3–11, and potato ("flat") floors;
+- low detail with Chocolate Doom's semantics, and view sizes 3–11;
 - auto frameskip;
 - the `PL_WadIsSlow` precache policy;
 - the demo-recording "begun" flag;
@@ -125,16 +126,16 @@ Rules:
 | `main.c` | Entry point, launcher, game start, the single exit path, `PL_Fatal`, idle exit, quit-chord polling, destructor |
 | `sys.c` | Model check and a full 10-character OS-string check: the fx-CG100 with `02.00.0000` (gint API 2) or `02.20.0000` (API 3). Builds the BFile call table |
 | `memory.c` | Removes the `_os` arena. `PL_GetZones` (malloc reserve 768 KiB) over gint's arenas: `_uram` and mpm.bin 1.1's `_ld1` |
-| `wad.c` | `PL_Wad*`, three back-ends: **RAM image** (primary), **flash block map** (`Bfile_GetBlockAddress`, checked against the file at open), **BFile** reads (fallback) |
+| `wad.c` | `PL_Wad*`, three back-ends: **RAM image** (primary, whenever it fits), **flash block map** (`Bfile_GetBlockAddress`, checked against the file at open), **BFile** reads (fallback) |
 | `files.c` | World-switched BFile helpers (P1 bounce buffers), `PL_File*`, delayed writes flushed in one world switch at exit (a replacement that does not fit puts the old file back from RAM), failure reporting |
-| `video.c` | Three presenters: async DMA from an SDRAM RGB565 frame (default), DMA strips through the X/Y on-chip banks, CPU writes. The 320x200 frame is centered in the 396x224 panel |
+| `video.c` | Async DMA from an SDRAM RGB565 frame; CPU writes when that frame could not be allocated. The 320x200 frame is centered in the 396x224 panel |
 | `input.c`, `keymaps.c` | Raw KEYSC reads only (never gint `getkey`). Launcher keys by physical position. fx-CG100 presets and key names. Rebind checks |
 | `time.c` | 35 Hz TMU tic. Microseconds from gint's profiler TMU. The quit chord and key activity sampled in the tic interrupt |
-| `clock.c` | Off / F4 (gint `CLOCK_SPEED_F4`) / Ptune4 F5 |
+| `clock.c` | The OS clock (launcher, safe start) and F4 (gint `CLOCK_SPEED_F4`) for every game |
 | `tlb.c`, `tlbh.S`, `tlbplan.c` | UTLB protection of the code pages (§2.5). `tlbplan.c` is pure logic, tested on the host |
 | `diag.c`, `hints.c`, `ui.c` | Diagnostics pages and benchmarks, `PL_Log` ring buffer, fatal-error hints, launcher drawing |
 | `stack.S` | Runs the game on a private 128 KiB stack |
-| `wadnames.c` | Pure logic: the WAD base name given to the engine, and which WAD a demo in storage belongs to |
+| `wadnames.c` | Pure logic: the WAD base name given to the engine |
 | `no_osheap.c` | Replaces gint's OS-heap arena at link time: every request fails (NULL) instead of calling OS code before `main()` |
 | `uram_check.ld` | Link-time guard: `.data` + `.bss` must leave at least 192 KiB of gint's 512 KiB static RAM (`_uram`) free for gint's own start-up allocations |
 
@@ -148,17 +149,15 @@ Rules:
 4. Start the clock state and the timers.
 5. Back up on-chip memory across world switches (`GINT_ONCHIP_BACKUP`).
 6. Allocate the RGB565 frame (`gvid_init`) and the private stack.
-7. Run the memory check (at least 3 MiB, which refuses the older mpm.bin builds). Load the settings, list the WADs and demos (one world
+7. Run the memory check (at least 3 MiB, which refuses the older mpm.bin builds). Load the settings, list the WADs (one world
    switch), then run the launcher.
 
 **Game** (`run_game()`):
 
-1. The demo-overwrite check.
-2. `PL_WadOpen`: RAM image if the image fits in the largest block and 768 KiB + 1 MiB remain; otherwise
+1. `PL_WadOpen`: RAM image if the image fits in the largest block and 768 KiB + 1 MiB remain; otherwise
    the block map; otherwise BFile.
-3. Check that the start map exists (`gwad_has_lump`).
-4. Set the engine parameters, the clock and the display mode, then run `D_DoomMain()` on the private
-   stack. The engine is not re-entrant, so after a game the add-in exits.
+2. Set the engine parameters (the WAD name, automatic frameskip, the key hooks) and the F4 clock, then
+   run `D_DoomMain()` on the private stack. The engine starts the title loop with its demos. The engine is not re-entrant, so after a game the add-in exits.
 
 **Exit.** Every way out but a hang ends in `exit_path()`: a normal quit, `PL_Fatal` (by `longjmp`), the
 quit chord, and the idle exit.
@@ -176,9 +175,9 @@ Finally, gint's `kquit` restores the OS clock, the LCD window and the drivers.
 
 - **Static:** all `.data`/`.bss` sit in gint's 512 KiB `_uram`, shared with gint's VRAM. Do not grow
   static arrays; allocate big renderer arrays at init (design §8).
-  - The current build has `.bss` 72 KiB, `.data` 2.8 KiB, `.text` 188 KiB, `.rodata` 142 KiB and
+  - The current build has `.bss` 70 KiB, `.data` 2.7 KiB, `.text` 178 KiB, `.rodata` 139 KiB and
     `.ilram` 1552 B (of about 4 KiB).
-  - The binary is 343,924 B and the g3a 372,600 B. The binary limit is 2 MiB (gint's linker script).
+  - The binary is 329,832 B and the g3a 358,508 B. The binary limit is 2 MiB (gint's linker script).
 - **Heap:**
   - Only the arenas gint creates: `_uram` and the `_ld1` that mpm.bin 1.1 announces (about 5.5 MiB). No
     RAM address is hard-coded. Older mpm.bin builds announce less or none (critique §B3) and are not
@@ -186,7 +185,9 @@ Finally, gint's `kquit` restores the OS clock, the LCD window and the drivers.
   - RAM is not zeroed between launches.
   - Zones get the largest blocks, after the malloc reserve.
   - With mpm.bin 1.1, a packed doom1.wad (3318 KiB image) should fit in RAM. That is a calculation only;
-    Developer info shows the mode actually used.
+    no screen shows the mode a game used since Developer info was removed (2026-10-14). Diagnostics →
+    Memory shows the largest free block, against which the image size plus 768 KiB + 1 MiB can be
+    compared.
 
 ### 2.5 UTLB protection
 
@@ -302,7 +303,7 @@ make sim                # build-sim/cgdoom-sim.elf (SH4 drawers); a C-only ELF: 
 - `-playdemo LUMP`, `-record N`;
 - `-input builtin:<name>|<file>`;
 - `-crc FILE`, `-shot PREFIX`;
-- `-lowdetail`, `-viewsize N`, `-flatfloors`;
+- `-lowdetail`, `-viewsize N`, `-demos` (title demos, which the calculator always plays);
 - `-autoframeskip N`, `-nodelaysaves`, `-zone KiB,...`, `-fragment N`, `-slowwad`, `-gamelog`, `-stats`;
 - `-demotrace FILE`: one line of game state per tic, in the format of the linuxdoom-1.10 oracle
   (`tools/demosync-oracle/`), to compare demo sync.
@@ -325,10 +326,10 @@ Hardware runs are manual, so automated correctness rests on three things:
 
 | Command | What it checks |
 |---|---|
-| `make test-host` | The 37 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
-| `make test-asan` | The same 37 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys and skill-load tests |
+| `make test-host` | The 35 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
+| `make test-asan` | The same 35 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys and skill-load tests |
 | `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly, also with the Doom menu opened while recording), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load` |
-| `make test-title-keys` | Every special key (frameskip, gamma, memory statistics, cheat, noclip, FPS, view size, profiler) pressed on the title screen before any level: no access through the missing player (ASan/UBSan in `test-asan`) |
+| `make test-title-keys` | Every special key (gamma, cheat, noclip, FPS, view size) pressed on the title screen before any level: no access through the missing player (ASan/UBSan in `test-asan`). Then, with title demos on, a key pressed during a demo opens the Doom menu, as in vanilla |
 | `make test-skill-load` | Fast monsters follow the skill of a loaded save: a fresh session loading a Nightmare save, a Nightmare game loading a normal save, and the reverse (`-gamelog` `skill=` / `sargtics=`) |
 | `make test-map-limit` | `-warp 33` on `freedoom2.wad` starts MAP32: the launcher stops at MAP32 and `G_InitNew` limits a Doom II map to 32, since the engine's HUD titles, par times and intermission names end there. Also part of `test-unit`; `test-asan` runs it under ASan. |
 | `make test-robust` | `tests/save-demo-robustness.sh`: damaged, foreign and oversized savegames and damaged demos fail cleanly, with no access outside a buffer under ASan (`test-asan`). Loads of a savegame patched by `tests/savetool.py` (which reads the record layout from `cgdoom-host -savelayout`): a bad header is refused before the current game is touched; a truncation, an index out of range or another level layout is a "Bad savegame" error. A save in a generated copy of `freedoom2.wad` whose MAP02 has 3000 extra things is refused ("level too large") and keeps the slot's previous save. Demos that are too short, have a bad console player or player set, or lack their end marker (played like the marker), from a file, a lump and the title loop. |
@@ -338,7 +339,7 @@ Hardware runs are manual, so automated correctness rests on three things:
 | `sh tests/gint-host/run.sh` | 11 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: sys (model/OS/API gate, table reset and open wrapper), expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification) |
 | `python3 -m unittest discover -s tests -p 'test_gint_runtime.py' -v` | After rebuilding gint: exercises its actual patched OS selection and old/new LCD world-switch callbacks on the host |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
-| `make test-sim-full` | All 37 scenarios in the simulator vs the goldens (about 4 min) |
+| `make test-sim-full` | All 35 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
 
 Other targets:
@@ -377,9 +378,7 @@ from frame 42 to the end, with view size 10 and full detail. They exclude the ho
 - **Optional modes**, compared with the SH4 default:
   - low detail: −36 to −39%;
   - view size 9: −12 to −16%;
-  - view size 7: −31 to −38%;
-  - flat floors: −6.5 to −16%;
-  - low detail + flat floors: −42 to −46%.
+  - view size 7: −31 to −38%.
 - **The simulator charges 1 cycle per instruction (plus 2 per taken branch)** and models no cache or dual issue. That is why the
   SH4 drawers' gain is a lower bound.
   - Under the SH-4A pipeline model (`src/engine/sh4/README.md` §3), the drawers run 2.3–3.5× faster than
@@ -413,13 +412,14 @@ from frame 42 to the end, with view size 10 and full detail. They exclude the ho
 | UTLB pinning + repair + exit restore; safe start | The OS can evict code pages during world switches; stale entries can reset the next launch | design §7, `tlb.c` |
 | Raw KEYSC only; matrix codes; weak hooks for menu, Enter and ALPHA keys | gint remaps CG100 rows 5–9; CGDoom keymaps are matrix codes | design §7–8, `input.c` |
 | BACK = Doom menu, OK = second Enter | 0x84 (CGDoom's MENU) is OK on the fx-CG100, the launcher's select key | `keymaps.c` |
-| Overclock F4 by default, Ptune4 F5 opt-in | F4 is gint's supported preset; F5's 118 MHz bus fails on some units | `clock.c` |
-| Async DMA presenter by default; X/Y strips and CPU as options | Overlaps the bus-bound transfer with rendering; strips are gpSP's proven path | `video.c` |
-| Hot drawers in ILRAM; X/Y banks reserved for the presenter | On-chip memory is re-initialized by world switches (code is fine, data is not); gint backs it up | design §7 |
-| 128 KiB private game stack | The OS stack's size and location are unknown (critique §B7); Developer info reports the peak | `main.c`, `stack.S` |
+| Overclock F4 for every game, no option | F4 is gint's supported preset and the game plays normally with it; Ptune4 F5's 118 MHz bus fails on some units (an opt-in until 2026-10-14) | `clock.c` |
+| Async DMA presenter only (CPU writes as the fallback) | Overlaps the bus-bound transfer with rendering, and it works on the new display; the X/Y strip presenter and the option to pick one were removed on 2026-10-14 | `video.c` |
+| Hot drawers in ILRAM | On-chip memory is re-initialized by world switches (code is fine, data is not); gint backs it up | design §7 |
+| 128 KiB private game stack | The OS stack's size and location are unknown (critique §B7) | `main.c`, `stack.S` |
 | One exit path; the quit chord is latched by the tic interrupt; `abort()` only for a hang; destructor | Saves survive every exit but a hang; the UTLB is restored even after `abort()` | gint-review rounds 2–3, `time.c` |
 | Idle exit (10 min, or 30 min in a user game) | The add-in owns the interrupts, so the OS auto power-off cannot run | critique §C7 |
-| Auto frameskip (max 3) | Game speed stays at 35 Hz; frames are dropped instead | design §8 |
+| Auto frameskip (max 3), no option | Game speed stays at 35 Hz; frames are dropped instead | design §8 |
+| Launcher: the WADs, Controls and Diagnostics only; vanilla's title loop with its demos | Every other setting has one right value on the fx-CG100, or is chosen in the game (skill, episode, view size, detail) | design §11 |
 | One game per launch | The engine's static state is not re-entrant | design §8 |
 | Strict 8.3 names | The calculator's Memory app shows longer names truncated (`~1`) and cuts extensions to 3 characters | critique §B1, `cgdoom-names.c` |
 
@@ -427,34 +427,37 @@ from frame 42 to the end, with view size 10 and full detail. They exclude the ho
 
 ### 7.1 What only hardware can answer
 
-Every probe in critique §E is on the Diagnostics screen (launcher → *Diagnostics...*) or on the Developer
-info screens (Advanced → *Developer info*). Results are shown on screen only; there is no fxlink text
-channel.
+Every probe in critique §E that remains is on the Diagnostics screen (launcher → *Diagnostics...*).
+Results are shown on screen only; there is no fxlink text channel. The Developer info screens, which also
+showed statistics before and after a game (WAD mode, stack and zone peaks, UTLB repairs during the game),
+were removed on 2026-10-14 with the other launcher options.
 
 | Question | Probe | Where it is shown |
 |---|---|---|
 | Model, OS | Model string, OS string | System, line 1 |
 | Which LCD controller (critique §A3) | `r61524_get_version()` | System: "LCD controller id" |
-| Where the stack is, and how much is used (§B7) | r15 at entry; stack peak of the 128 KiB private stack | System: "r15 at entry"; Developer info (after): "Stack peak" |
+| Where the stack is (§B7) | r15 at entry | System: "r15 at entry" |
 | Which mpm.bin (§A5, §B3) | `gint_load_info`, phys(0x00300000), phys(0x08100000), image size; the `_ld1` arena | System: loadinfo / phys / Image lines; Memory |
 | Stock clock vs F1 (§B8) | FRQCR, FLLFRQ, `clock_get_speed()`, CS0WCR/CS3WCR/CS3BCR, Iφ/Bφ/Pφ | System (read at the current clock; the launcher runs at the OS clock) |
 | Heap layout (§B3) | Arena table: name, start, end, free, largest; OS heap removed; zones and reserve once a game has run | Memory |
-| Flash layout and block-map pointers (§A8, §B2, §C4) | Blocks, mapped, P1/P2/P0/other/error/unaligned counts, contiguous runs, longest run, physical range, "map did not match" | Storage (probe a WAD with OK/EXE); Developer info (before) |
-| Does the OS reload TLB entries during world switches (§C3) | UTLB slots changed by the probe's world switches; URB before and after; repairs and misses | Storage after a probe; System UTLB lines; Developer info (after) |
+| Flash layout and block-map pointers (§A8, §B2, §C4) | Blocks, mapped, P1/P2/P0/other/error/unaligned counts, contiguous runs, longest run, physical range, "map did not match" | Storage (probe a WAD with OK/EXE) |
+| Does the OS reload TLB entries during world switches (§C3) | UTLB slots changed by the probe's world switches; URB before and after; repairs and misses | Storage after a probe; System UTLB lines |
 | UTLB pinning worked | "UTLB pinned N pages: URB x (was 54)", or "executor off", or "SAFE START" | System |
 | Flash vs SDRAM speed (§C1) | 64 KiB cold read, flash P1 vs SDRAM P1 | Benchmarks (OK/EXE) |
-| Presenter cost (§B4) | 320x200 push: DMA, strips, CPU, at the OS clock and at the selected overclock | Benchmarks |
+| Presenter cost (§B4) | 320x200 push with the game's path (DMA, or CPU without the frame buffer), at the OS clock and at F4 | Benchmarks |
 | Tic timer obtained | TMU number, or "polled clock" | System, last line |
 | `BFile_Read` return convention | Both conventions are accepted (`gfs_read_ok`); a failure shows as an open error | Launcher error / Log |
-| X/Y bank aliasing, partial-window DMA (§A2, §B4) | The picture is correct in *DMA strips* and *DMA (async)* | In game |
+| Partial-window DMA (§A2, §B4) | The picture is correct | In game |
 | Exit leaves a clean UTLB | Another add-in launches normally after CGDoom | MPM |
 
 Not implemented from §E: the SH-4A PMU check and the cache-size stride sweeps (item 7, optional).
 
 **Results so far:** on an fx-CG100 with the new display and OS 02.20, CGDoom starts, loads
-DOOM1.WAD, plays normally and exits to the MPM menu. The probes above have not been recorded yet.
+DOOM1.WAD, plays normally and exits to the MPM menu (with the default settings of that build: F4, the
+async DMA presenter, automatic frameskip, the WAD copied to RAM when it fits, which are now the only
+ones). The probes above have not been recorded yet.
 
-### 7.2 First hardware run: step by step
+### 7.2 Hardware test: step by step
 
 Use a fresh build: `fxsdk build-cg`, warning-free. Write down the result of every step, and take photos of
 every Diagnostics page. Stop at the first failure and report it with the step number.
@@ -474,63 +477,56 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
      Math+", with "Play Doom (shareware) DOOM1.WAD (3.3M)".
    - If you get a black screen, a reset or a panic, retry while holding DEL (safe start), and record
      which one happened.
-5. Check navigation: Up/Down, Left/Right, OK and EXE select, BACK returns. Typing digits on the
-   episode/map rows works.
-6. Open Advanced and record the free KiB (about 5.5 MiB expected by calculation with mpm.bin 1.1; under
-   3 MiB CGDoom would have refused to start).
+5. Check navigation: Up/Down, OK and EXE select, BACK returns.
 
 **Diagnostics**
 
-7. System page: record every line. Expected:
+6. System page: record every line. Expected:
    - "fx-CG100/Graph Math+, OS 02.00.0000" or "OS 02.20.0000", matching the installed OS;
    - a loadinfo line;
    - "UTLB pinned N pages: URB x (was 54)";
    - "Tic timer: TMU n (35 Hz)";
    - "speed F…" at the OS clock (this answers §B8).
-8. Memory page: record the arena table. Expected: "OS heap arena: removed".
-9. Storage page: select DOOM1.WAD and press OK/EXE.
+7. Memory page: record the arena table and the total free KiB (about 5.5 MiB expected by calculation
+   with mpm.bin 1.1; under 3 MiB CGDoom would have refused to start). Expected: "OS heap arena: removed".
+8. Storage page: select DOOM1.WAD and press OK/EXE.
    - Record: blocks, mapped, P1/P2/P0 counts, runs and longest run, physical range, map hits, and UTLB
      slots changed with URB before → after.
    - Expected: no "(map did not match)", and URB unchanged after the probe.
    - Probe it twice. The figures should be identical.
-10. Benchmarks page: press OK/EXE and record both blocks: OS clock and F4.
+9. Benchmarks page: press OK/EXE and record both blocks: OS clock and F4.
     - Expected: flash is slower than SDRAM.
     - A picture flickers on the screen during the push tests; that is normal.
-11. Log page: record the lines.
+10. Log page: record the lines.
 
 **First game**
 
-12. Turn on Advanced → *Developer info* and Options → *FPS counter*. Set *Title screen* to *Skip*, then
-    start E1M1 from the WAD row.
-    - **Developer info (before):** record the WAD mode (expected *RAM image* with mpm.bin 1.1), the RAM
-      image size and load time, the heap, the clock (F4) and the display mode.
-13. In the game, check:
+11. Start the game from the WAD row.
+    - **Expected:** the title screen, then the shareware demos (E1M5, E1M3, E1M7) in turn. Let at least one
+      demo play for a minute: it must look like normal play (no desync, such as the player walking into
+      walls).
+    - Press any key during a demo: the Doom menu opens. Start *New Game*, episode 1, *Hurt me plenty*.
+12. In the game, check:
     - the picture is centered and has correct colors, and there is no garbage in the borders;
-    - the FPS counter value, in a few places (record them);
+    - the FPS counter (PageDown), in a few places (record the values);
     - every action of the *Thumbs* preset, from the [user guide](USER-GUIDE.md#presets) table;
     - BACK opens the Doom menu, and EXE and OK select;
-    - the *Detail* menu item, and the view-size keys;
-    - Frameskip (TOOLS), Heap stats (sqrt), Run profiler (`)`); record the profiler line.
-14. Save to slot 0 (the slot is pre-filled with E1M1, so press EXE). Expected: "Save file will be created
+    - *Options* → *Graphic Detail*, and the view-size keys. Leave the view one step smaller (**-**), so
+      that `CGDOOM.CFG` is written at exit (it is only written when a setting changed).
+13. Save to slot 0 (the slot is pre-filled with E1M1, so press EXE). Expected: "Save file will be created
     on exit". Load it back in the same session.
-15. Play for at least 10 minutes over E1M1–E1M3, including a level change.
-16. Quit from the Doom menu (*Quit Game*, then EXE).
-    - **Developer info (after):** record the zone peak, map hits and misses, stack peak, UTLB repairs and
-      misses, and world switches.
+14. Play for at least 10 minutes over E1M1–E1M3, including a level change.
+15. Quit from the Doom menu (*Quit Game*, then EXE).
     - Expected: "Writing N files...", then a return to MPM without an error.
-17. Over USB, check that `DOOM1_0.DSG` and `CGDOOM.CFG` exist. Check that the calculator clock is still
+16. Over USB, check that `DOOM1_0.DSG` and `CGDOOM.CFG` exist. Check that the calculator clock is still
     right.
 
 **Second launch and other paths**
 
-18. Relaunch CGDoom. The settings should have persisted. Load the save from the Doom menu.
-19. Launch another add-in from MPM after CGDoom has exited (UTLB restore). Then relaunch CGDoom.
-20. Record demo slot 0 (*Record demo on slot*), play 1–2 minutes, quit. Then use *Replay demo...*: the
-    replay must match what you played.
-21. In a game, press SHIFT + 7 + 3 + AC/ON. Expected: the normal exit, with its files written.
-22. Repeat a short game with each display mode (DMA strips, CPU direct) and record the FPS. Then repeat
-    with *Copy WAD to RAM* unticked (flash block map) and compare the FPS.
-23. Optional, and risky: Ptune4 F5. Rerun the benchmarks, and play a few minutes.
+17. Relaunch CGDoom. The smaller view of the last game should have persisted. Load the save from the
+    Doom menu.
+18. Launch another add-in from MPM after CGDoom has exited (UTLB restore). Then relaunch CGDoom.
+19. In a game, press SHIFT + 7 + 3 + AC/ON. Expected: the normal exit, with its files written.
 
 **Report:**
 

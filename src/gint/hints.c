@@ -15,17 +15,10 @@ char const *gfatal_hint(char const *msg)
 	/* z_zone.c: "Z_Malloc(%d) failure" (the WAD or the level does not
 	   fit in the zones) */
 	if(strstr(msg, "Z_Malloc"))
-		return "Out of memory for this WAD or level. Untick 'Copy WAD "
-			"to RAM if it fits' (Advanced) to leave more for the game, "
-			"or play a smaller WAD.";
-	/* g_game.c: "Demo is from a different game version (%d)", "Demo is
-	   damaged: ..."; m_misc.c: "M_ReadFile: cannot open %s (%d)" for a
-	   demo lump */
-	if(strstr(msg, "Demo is from") || strstr(msg, "Demo is damaged")
-		|| (strstr(msg, "M_ReadFile") && (strstr(msg, ".LMP")
-		|| strstr(msg, ".lmp"))))
-		return "This demo cannot be played: delete the .LMP file "
-			"(Memory app) or record it again.";
+		return "Out of memory for this WAD or level: play a smaller "
+			"WAD.";
+	/* (No demo hint since 2026-10-14: the title loop skips a demo it
+	   cannot play, and demo files are no longer played.) */
 	/* g_game.c, p_saveg.c: "Bad savegame..." (G_DoLoadGame) */
 	if(strstr(msg, "Bad savegame"))
 		return "This savegame is damaged, or was made with another WAD "

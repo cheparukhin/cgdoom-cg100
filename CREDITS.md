@@ -13,7 +13,7 @@ and of nDoom.
 | nDoom for the Nspire CX | Critor | The Nspire CX port, with support for every commercial game that runs on the original engine. |
 | CGDoom | MPoupe | The first playable port to the Casio fx-CG10/20 (Prizm). |
 | CGDoom for the fx-CG50 | ComputerNerd, then Lephenixnoir, with extensive feedback and guidance from Computer_Freak_2004 | ComputerNerd made the first attempts. Lephenixnoir wrote the fx-CG50 version this port starts from. |
-| CGDoom for the fx-CG100 | this project | Port to gint and MPM. It adds the launcher, the fx-CG100 keymaps, vanilla-exact fixed-point math, the SH4 assembly drawers, the RAM/flash WAD access, low detail, view size, flat floors, auto frameskip, the diagnostics screens, and the host and simulator test harnesses. |
+| CGDoom for the fx-CG100 | this project | Port to gint and MPM. It adds the launcher, the fx-CG100 keymaps, vanilla-exact fixed-point math, the SH4 assembly drawers, the RAM/flash WAD access, low detail, view size, auto frameskip, the diagnostics screens, and the host and simulator test harnesses. |
 
 ## Platform and tools
 
@@ -34,13 +34,10 @@ and of nDoom.
 
 - **gpSP-sh4-jit, fx-CG100 port** (KaraRyougi). These techniques were proven on fx-CG100 hardware, and
   this port follows them:
-  - the 10-row display strips through on-chip X/Y memory with ping-pong DMA, and the partial-window LCD
-    set-up (`src/gint/video.c`);
+  - the partial-window LCD set-up (`src/gint/video.c`);
   - building the flash block map with `Bfile_GetBlockAddress` in one world switch, and the rules for
     accepting P1/P2 pointers and rejecting P0 pointers (`src/gint/wad.c`);
-  - the Ptune4 F5 overclock register set (`src/gint/clock.c`);
   - the bounded key-release wait (`src/gint/input.c`).
-- **Ptune4** (CalcLoverHK): the F5 clock preset, as applied by gpSP.
 - **GBADoom:** the `COLEXTRABITS` trick in the SH4 column drawers (`src/engine/sh4/r_draw_sh4.S`). The
   texture coordinate is pre-shifted, so that a single shift gives the texel row.
 - **Chocolate Doom:** the corrected low-detail semantics, used by the C drawers in `src/engine/r_draw.c`
@@ -53,6 +50,8 @@ These projects were read as references while the port was designed. No code was 
 listed above:
 
 - KhiCAS (Bernard Parisse), and its use of MPM and the faster bus;
+- gpSP-sh4-jit's 10-row display strips through on-chip X/Y memory and its Ptune4 F5 overclock (CalcLoverHK's
+  Ptune4), which earlier builds of this port offered as options;
 - OutRun and Squish It (Slyvtt);
 - NESizm, Prizoop, fxcraft and libsyscall (CalcLoverHK);
 - PythonExtra;

@@ -75,7 +75,8 @@ do not show exactly the same frames).
 | map07 | 1,792,072 | 1,138,143 | −36.5% | 1,982,551 | 1,228,089 | −38.1% | 1,324,961 | 1,944,779 | 5,884,052 |
 | demo2-1 | 2,868,025 | 1,742,870 | −39.2% | 3,174,992 | 1,882,322 | −40.7% | 1,972,587 | 2,611,627 | 3,254,137 |
 
-**Optional modes (step 3), instructions per frame** (same runs plus the mode flags; the game state is identical):
+**Optional modes (step 3), instructions per frame** (same runs plus the mode flags; the game state is identical).
+Potato floors (`-flatfloors`) were removed on 2026-10-14 (`notes/design.md` §11); their columns are kept as a record:
 
 | scenario | default | `-lowdetail` | `-flatfloors` | `-viewsize 9` | `-viewsize 7` | low + flat |
 |---|---|---|---|---|---|---|
@@ -99,8 +100,8 @@ do not show exactly the same frames).
 - Per-step details: `notes/engine-changes.md`.
 
 **Mode runs by hand:** `src/sim/simrun --stats <elf> <scenario args> -lowdetail -simstats -simwin 42 0`. `perf-sim.sh`
-only runs scenarios of `tests/scenarios.txt`; `e1m1-low`, `demo1-low`, `map01-flat` and `e1m1-view7` are scenarios,
-so `-only e1m1-low` etc. work.
+only runs scenarios of `tests/scenarios.txt`; `e1m1-low`, `demo1-low` and `e1m1-view7` are scenarios, so
+`-only e1m1-low` etc. work.
 
 ## After the SH4 drawers (2026-10-10)
 

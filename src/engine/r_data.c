@@ -765,8 +765,7 @@ int		spritememory;
    demo playback; here it is done for demos too (it only moves lumps into
    RAM, the output is the same). Step 3 review: each lump goes through
    W_SlowPrecacheWanted (w_wad.c), so precaching stops at the zone reserve
-   for unmappable lumps too and leaves already cached lumps alone. Flats are skipped with potato floors (only
-   their average colour is used). */
+   for unmappable lumps too and leaves already cached lumps alone. */
 void R_PrecacheLevel (void)
 {
   char*			flatpresent;
@@ -801,7 +800,7 @@ void R_PrecacheLevel (void)
     {
       lump = firstflat + i;
       flatmemory += lumpinfo[lump].size;
-      if (!CGD_Options.FlatFloors && W_SlowPrecacheWanted(lump))
+      if (W_SlowPrecacheWanted(lump))
         W_CacheLumpNumConst(lump, PU_CACHE);
     }
   }

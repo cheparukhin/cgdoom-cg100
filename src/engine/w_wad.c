@@ -383,19 +383,11 @@ void * W_ReadLumpWithZ_Malloc(int lump,int tag,int iEnableFlash)
     CGD_Stats.LumpsLoaded++;
     CGD_Stats.LumpsLoadedTotal += lumpinfo[lump].size;
 
-    prof_enter(CGD_Perf.LumpLoading);
-    if(mapped)
-      prof_enter(CGD_Perf.UnalignedLumpLoading);
-
     byte *dest = Z_Malloc (size + W_LUMP_PAD, tag, &lumpcache[lump]);
     int c = PL_WadRead(dest, position, padded);
     if (c < size)
       I_Error ("W_ReadLump: only read %i of %i on lump %i", c, size, lump);
     memset(dest + c, 0, size + W_LUMP_PAD - c);
-
-    if(mapped)
-      prof_leave(CGD_Perf.UnalignedLumpLoading);
-    prof_leave(CGD_Perf.LumpLoading);
   }
   else
   {

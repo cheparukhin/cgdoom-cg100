@@ -302,34 +302,8 @@ void I_StartTic (void)
             CGD_SwitchClip();
         if(CGD_KeyWasJustPressed(SKEY_GAMMA))
             CGD_CycleGamma();
-        if(CGD_KeyWasJustPressed(SKEY_FREEMEM))
-            CGD_FreeMem();
         if(CGD_KeyWasJustPressed(SKEY_FPSCOUNTER))
             fpscounteractive = !fpscounteractive;
-        if(CGD_KeyWasJustPressed(SKEY_FRAMESKIP))
-            CGD_CycleFrameskip();
-    }
-
-    //---
-    // Profiler
-    //---
-
-    /* Number of ticks left before reporting results */
-    static int profiler_ticks = -1;
-
-    if (!saveStringEnter && CGD_KeyWasJustPressed(SKEY_PROFILER)) {
-        prof_t *counters = (prof_t *)&CGD_Perf;
-        for(int i = 0; i < (int)(sizeof CGD_Perf / sizeof (prof_t)); i++) {
-            counters[i] = prof_make();
-        }
-        profiler_ticks = 40;
-    }
-    else {
-        profiler_ticks--;
-        if(profiler_ticks == 0) {
-            CGD_ProfilerResults();
-            profiler_ticks = -1;
-        }
     }
 
     //---

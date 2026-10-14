@@ -25,7 +25,6 @@
 
 #include "cgdoom-kbd.h"
 #include "os.h"
-#include "cgd-prof.h"
 #include <stdint.h>
 
 //---
@@ -71,13 +70,6 @@ int CGD_FlushDelayedWrites(void);
 #define CGDOOM_SETTINGS_FILE "CGDOOM.CFG"
 
 typedef struct {
-    /* Enable technical detail screens (platform). */
-    int DeveloperInfo;
-    /* Skip title screen and get straight to gameplay. */
-    int AutoStart;
-    /* Enable demos in the title screen (most are for previous versions of
-       the engine and just look bad). */
-    int EnableDemos;
     /* Keep saves/demos in memory until CGD_FlushDelayedWrites() (see above).
        If 0, files are written as soon as they are produced. */
     int DelaySaves;
@@ -89,13 +81,10 @@ typedef struct {
        platform saving the options after the game keeps them:
        - LowDetail: vanilla's low detail (detailshift 1): 160-column view,
          every column/texel drawn as two pixels. 0 = high (default).
-       - FlatFloors: "potato" floors and ceilings, each span one solid colour
-         (the flat's average colour, still light-mapped). 0 = off (default).
        - ViewSize: screenblocks 3..11 (10 = 320x168 + status bar, CGDoom's
          default; 11 = 320x200 without status bar; smaller sizes are
          centered with a black border). Other values mean 10. */
     int LowDetail;
-    int FlatFloors;
     int ViewSize;
 
 } CGDoom_Options;
@@ -115,6 +104,9 @@ int CGD_SaveSettings(const CGDoom_Options *o);
 /* The selected WAD is a split Ultimate Doom WAD with a single episode (this
    exists on the fx-CG 50 and is incorrectly detected by normal logic) */
 extern int CGD_SingleEpisodeUltimate;
+/* Play the WAD's demos in the title loop, as vanilla does (default 1). The
+   host tests clear it unless -demos is given. */
+extern int CGD_TitleDemos;
 /* Skip this amount of frames after every rendered frame (default 1); used
    when CGD_AutoFrameskip is 0 (fixed frameskip, CGDoom's semantics) */
 extern int CGD_Frameskip;
@@ -131,7 +123,6 @@ extern int CGD_AutoFrameskip;
 /* Change the renderer settings at run time: these update CGD_Options and
    take effect at the next rendered frame (r_main.c). */
 void CGD_SetLowDetail(int on);
-void CGD_SetFlatFloors(int on);
 /* blocks is clamped to 3..11 */
 void CGD_SetViewSize(int blocks);
 /* WAD file name (without .wad), used to name save and demo files. Pass the
@@ -191,26 +182,7 @@ void CGD_DemoFileName(char out[CGD_NAME_MAX], int slot);
 
 void CGD_Cheat(void);
 void CGD_SwitchClip(void);
-void CGD_FreeMem(void);
-void CGD_CycleFrameskip(void);
 void CGD_CycleGamma(void);
-void CGD_ProfilerResults(void);
-
-//---
-// Performance metrics
-//---
-
-typedef struct
-{
-   prof_t DynamicAllocation;
-   prof_t GraphicsRendering;
-   prof_t DisplayInterface;
-   prof_t LumpLoading;
-   prof_t UnalignedLumpLoading;
-
-} CGDoom_Perf;
-
-extern CGDoom_Perf CGD_Perf;
 
 //---
 // Game and debugging statistics

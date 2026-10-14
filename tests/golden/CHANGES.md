@@ -154,3 +154,9 @@ Freedoom1 E2M5, `builtin:walk`, 2400 tics: ordinary play in which the ASan/UBSan
 of an unused wall-texture midpoint in `R_StoreWallRange` (external review; shareware E1M8 hits it too). The golden
 was generated with the engine before the fix, and the fixed engine reproduces it: the fix (the row offset added only
 to a midpoint that is set) does not change any frame. The other 36 goldens are unchanged.
+
+## 2026-10-14 — potato floors removed: goldens `map01-flat` and `e2m2-lowflat` deleted
+
+The *Flat floors* option and its engine mode (solid-colour floor and ceiling spans) were removed with the other
+launcher options the fx-CG100 does not need. Their two goldens went with the `-flatfloors` scenarios. The other 35
+goldens are unchanged: the default renderer never took the potato-floor branches.

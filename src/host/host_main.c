@@ -4,7 +4,7 @@
                [-tics N] [-input builtin:<name> | <file>] [-crc <file>]
                [-shot <prefix> [-shotevery N]] [-fragment N] [-zone KiB[,KiB]]
                [-frameskip N] [-exitat T,...] [-demos] [-data <dir>] [-stats]
-               [-rlimits small] [-lowdetail] [-viewsize N] [-flatfloors]
+               [-rlimits small] [-lowdetail] [-viewsize N]
                [-autoframeskip N] [-rendercost T] [-ticcost T] [-realtime]
                [-slowwad] [-noasm]
    cgdoom-host -savelayout
@@ -54,7 +54,8 @@ static void usage(void)
 "  -poison N             fill new zone blocks with byte N (RANGECHECK builds)\n"
 "  -exitat T[,T...]      exit the current level at these tics (intermission,\n"
 "                        finale coverage)\n"
-"  -demos                play WAD demos in the title loop\n"
+"  -demos                play WAD demos in the title loop (CGD_TitleDemos;\n"
+"                        the calculator always does)\n"
 "  -data DIR             directory for config/saves/demos (default .)\n"
 "  -stats                print memory/timing statistics at exit\n"
 "  -demotrace FILE       write one line of game state per tic (gametic,\n"
@@ -69,7 +70,6 @@ static void usage(void)
 "                        their growth; the output must not change)\n"
 "  -lowdetail            low detail (CGD_Options.LowDetail): 160 columns\n"
 "  -viewsize N           screenblocks 3..11 (CGD_Options.ViewSize, def. 10)\n"
-"  -flatfloors           potato floors (CGD_Options.FlatFloors)\n"
 "  -nodelaysaves         write saves and demos at once (DelaySaves=0)\n"
 "  -autoframeskip N      automatic frameskip, at most N frames skipped in a\n"
 "                        row (CGD_AutoFrameskip; 0 = fixed -frameskip)\n"
@@ -326,7 +326,7 @@ int main(int argc, char **argv)
     int skill_arg = 4;
     int frameskip = 0;
     int autoframeskip = 0;
-    int lowdetail = 0, flatfloors = 0, viewsize = 10, nodelaysaves = 0;
+    int lowdetail = 0, viewsize = 10, nodelaysaves = 0;
     int demos = 0;
     int stats = 0;
 
@@ -426,8 +426,6 @@ int main(int argc, char **argv)
         }
         else if(!strcmp(a, "-lowdetail"))
             lowdetail = 1;
-        else if(!strcmp(a, "-flatfloors"))
-            flatfloors = 1;
         else if(!strcmp(a, "-nodelaysaves"))
             nodelaysaves = 1;
         else if(!strcmp(a, "-viewsize") && is_number(next)) {
@@ -490,9 +488,8 @@ int main(int argc, char **argv)
 
     /* Options and keymap must be set before the input script is resolved */
     CGD_DefaultOptions(&CGD_Options);
-    CGD_Options.EnableDemos = demos;
+    CGD_TitleDemos = demos;
     CGD_Options.LowDetail = lowdetail;
-    CGD_Options.FlatFloors = flatfloors;
     if(nodelaysaves)
         CGD_Options.DelaySaves = 0;
     CGD_Options.ViewSize = viewsize;

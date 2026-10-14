@@ -11,7 +11,7 @@
 
    Keys (case-insensitive):
        fwd back left right sl sr run fire use w1..w7 map pause
-       cheat noclip gamma decvp incvp fps frameskip freemem profiler
+       cheat noclip gamma decvp incvp fps
        menu enter del          (fixed CGDoom keys: MENU, EXE, DEL)
        k:<NAME>                raw physical key, CGDoom technical name
                                (e.g. k:EXE, k:F1, k:ALPHA)
@@ -70,9 +70,6 @@ static const struct { const char *name; int doomkey; } keynames[] = {
     { "decvp",     SKEY_DECVP },
     { "incvp",     SKEY_INCVP },
     { "fps",       SKEY_FPSCOUNTER },
-    { "frameskip", SKEY_FRAMESKIP },
-    { "freemem",   SKEY_FREEMEM },
-    { "profiler",  SKEY_PROFILER },
     { NULL, 0 },
 };
 

@@ -74,9 +74,7 @@ void I_SetPalette(const byte* pal)
 
 void I_Flip (void)
 {
-  prof_enter(CGD_Perf.DisplayInterface);
   PL_FinishUpdate(screens[0]);
-  prof_leave(CGD_Perf.DisplayInterface);
 }
 
 void I_InitGraphics(void)

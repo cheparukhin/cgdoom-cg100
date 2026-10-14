@@ -23,7 +23,7 @@
 // Keymaps
 //---
 
-#define CGDOOM_KEYMAP_SIZE 27
+#define CGDOOM_KEYMAP_SIZE 24
 
 /* Array of Doom keys indicating the meaning of keymap indices. */
 extern int16_t CGD_KeymapEntries[CGDOOM_KEYMAP_SIZE];
@@ -45,16 +45,14 @@ void CGD_CopyKeymap(CGDoom_Keymap dest, const CGDoom_Keymap src);
 
 #include "doomdef.h"
 
-/* Key extensions for cheats, debugs, performance, etc. */
+/* Key extensions for cheats, view size, gamma and the FPS counter (0x106,
+   0x108 and 0x109 were heap statistics, frameskip and the profiler) */
 #define SKEY_CHEAT       0x101
 #define SKEY_DECVP       0x102
 #define SKEY_INCVP       0x103
 #define SKEY_NOCLIP      0x104
 #define SKEY_GAMMA       0x105
-#define SKEY_FREEMEM     0x106
 #define SKEY_FPSCOUNTER  0x107
-#define SKEY_FRAMESKIP   0x108
-#define SKEY_PROFILER    0x109
 
 /* Display name for a key (eg. "Strafe left") */
 const char *CGD_DoomKey_DisplayName(int key);

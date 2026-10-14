@@ -56,11 +56,11 @@ __attribute__((weak)) int PL_WadIsSlow(void)
 }
 
 CGDoom_Options CGD_Options;
-CGDoom_Perf CGD_Perf;
 CGDoom_Stats CGD_Stats;
 
 /* Global options */
 int CGD_SingleEpisodeUltimate = 0;
+int CGD_TitleDemos = 1;
 int CGD_Frameskip = 1;
 int CGD_AutoFrameskip = 0;
 const char *CGD_WADFileName = NULL;
@@ -104,12 +104,8 @@ int CGD_FlushDelayedWrites(void)
 void CGD_DefaultOptions(CGDoom_Options *o)
 {
 	memset(o, 0, sizeof *o);
-	o->DeveloperInfo       = 0;
-	o->AutoStart           = 0;
-	o->EnableDemos         = 0;
 	o->DelaySaves          = 1;
 	o->LowDetail           = 0;
-	o->FlatFloors          = 0;
 	o->ViewSize            = 10;
 	CGD_CopyKeymap(o->Keymap, CGD_Keymap_ThumbsOnly);
 }
@@ -128,18 +124,10 @@ int CGD_SaveSettings(const CGDoom_Options *o)
 	out += sprintf(out, "Version=%d\n", CGDOOM_SETTINGS_FILE_VERSION);
 
 	/* Settings */
-	out += sprintf(out, "DeveloperInfo=%d\n",
-		o->DeveloperInfo);
-	out += sprintf(out, "EnableDemos=%d\n",
-		o->EnableDemos);
-	out += sprintf(out, "Autostart=%d\n",
-		o->AutoStart);
 	out += sprintf(out, "DelaySaves=%d\n",
 		o->DelaySaves);
 	out += sprintf(out, "LowDetail=%d\n",
 		o->LowDetail);
-	out += sprintf(out, "FlatFloors=%d\n",
-		o->FlatFloors);
 	out += sprintf(out, "ViewSize=%d\n",
 		o->ViewSize);
 
@@ -204,7 +192,10 @@ int CGD_LoadSettings(CGDoom_Options *o)
 	/* Parse every line on the form "<Key>=<Value>\n" (or "\r\n"). Keys
 	   and values match exactly; unknown keys, unknown values (including
 	   empty or non-numeric values of numeric options) and lines without
-	   '=' are ignored. A NUL byte ends the file. */
+	   '=' are ignored, among them the options of earlier builds
+	   (DeveloperInfo, EnableDemos, Autostart, FlatFloors, the gint
+	   platform's CG.* lines and Keymap lines of removed actions). A NUL
+	   byte ends the file. */
 	const char *line, *nextline=NULL;
 	const char *end = buffer + strlen(buffer);
 
@@ -256,18 +247,10 @@ int CGD_LoadSettings(CGDoom_Options *o)
 			}
 		}
 
-		else if(SettingIs(key, klen, "DeveloperInfo"))
-			SettingInt(value, vlen, &n.DeveloperInfo);
-		else if(SettingIs(key, klen, "EnableDemos"))
-			SettingInt(value, vlen, &n.EnableDemos);
-		else if(SettingIs(key, klen, "Autostart"))
-			SettingInt(value, vlen, &n.AutoStart);
 		else if(SettingIs(key, klen, "DelaySaves"))
 			SettingInt(value, vlen, &n.DelaySaves);
 		else if(SettingIs(key, klen, "LowDetail"))
 			SettingInt(value, vlen, &n.LowDetail);
-		else if(SettingIs(key, klen, "FlatFloors"))
-			SettingInt(value, vlen, &n.FlatFloors);
 		else if(SettingIs(key, klen, "ViewSize"))
 			SettingInt(value, vlen, &n.ViewSize);
 	}

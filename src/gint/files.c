@@ -27,8 +27,6 @@
 #include <string.h>
 
 int gfs_world_switches = 0;
-char const *(*gfs_settings_appender)(void) = NULL;
-char const *gfs_settings_name = NULL;
 
 #define GFS_MAX_PENDING   16
 #define GFS_CACHE_MAX     (16 << 10)
@@ -737,19 +735,10 @@ int PL_FileWrite(const char *name, const void *buf, int size)
 		return -1;
 	}
 
-	char const *extra = NULL;
-	int extra_len = 0;
-	if(gfs_settings_appender && gfs_settings_name
-		&& name_eq(name, gfs_settings_name)) {
-		extra = gfs_settings_appender();
-		extra_len = extra ? (int)strlen(extra) : 0;
-	}
-
-
 	cache_invalidate(name);
 
 	/* Normal case: keep a private copy until gfs_flush() */
-	uint8_t *copy = malloc(size + extra_len + 1);
+	uint8_t *copy = malloc(size + 1);
 	if(copy) {
 		pending_t *p = pending_slot(name);
 		if(!p && !gwad_map_live() && gfs_flush() >= 0)
@@ -757,10 +746,8 @@ int PL_FileWrite(const char *name, const void *buf, int size)
 		if(p) {
 			if(size > 0)
 				memcpy(copy, buf, size);
-			if(extra_len > 0)
-				memcpy(copy + size, extra, extra_len);
 			p->data = copy;
-			p->size = size + extra_len;
+			p->size = size;
 			p->owned = true;
 			p->del = false;
 			return size;
@@ -769,19 +756,7 @@ int PL_FileWrite(const char *name, const void *buf, int size)
 		return -1;
 	}
 
-	/* No memory for a copy. The settings file cannot be written from the
-	   caller's buffer, which lacks the platform's CG.* lines (external
-	   review: they were dropped and success reported): refuse it, and the
-	   file in storage stays as it is. main.c queues the settings before
-	   the end-of-game saves take their copies, so this needs a heap that
-	   was already full. */
-	if(extra_len > 0) {
-		PL_Log("PL_FileWrite: no memory to keep '%s'\n", name);
-		note_failure(name, GFS_ERR_NO_MEMORY);
-		return -1;
-	}
-
-	/* Write right now (with everything pending), unless the WAD map is
+	/* No memory for a copy. Write right now (with everything pending), unless the WAD map is
 	   live */
 	if(gwad_map_live()) {
 		PL_Log("PL_FileWrite: no memory to delay '%s'\n", name);
@@ -834,17 +809,12 @@ int PL_FileDelete(const char *name)
 // Directory listing
 //---
 
-int gfs_list_more = 0;
+bool gfs_list_more = false;
 
 typedef struct {
-	char const *ext;          /* ".wad" or ".lmp" */
 	gfs_entry_t *out;
 	int max, count;
 	bool more;                /* stopped at max with entries left */
-} list_one_t;
-
-typedef struct {
-	list_one_t l[2];
 	gfs_scratch_t *s;
 } list_ctx_t;
 
@@ -863,67 +833,50 @@ static int os_list(void *arg)
 {
 	list_ctx_t *c = arg;
 	gfs_scratch_t *s = c->s;
+	if(!c->out || c->max <= 0)
+		return 0;
 
-	for(int k = 0; k < 2; k++) {
-		list_one_t *l = &c->l[k];
-		if(!l->out || l->max <= 0)
-			continue;
+	pattern(s->path, ".wad");
+	int sh = -1;
+	int rc = g_os.find_first(s->path, &sh, s->found, &s->info);
 
-		pattern(s->path, l->ext);
-		int sh = -1;
-		int rc = g_os.find_first(s->path, &sh, s->found, &s->info);
+	while(rc >= 0 && c->count < c->max) {
+		int t = s->info.type;
+		bool is_file = t != BFile_Type_Directory && t != BFile_Type_Dot
+			&& t != BFile_Type_DotDot && t != BFile_Type_Volume;
 
-		while(rc >= 0 && l->count < l->max) {
-			int t = s->info.type;
-			bool is_file = t != BFile_Type_Directory && t != BFile_Type_Dot
-				&& t != BFile_Type_DotDot && t != BFile_Type_Volume;
-
-			/* FONTCHARACTER -> ASCII (skip names we cannot represent) */
-			gfs_entry_t *e = &l->out[l->count];
-			int n = 0;
-			/* skip macOS "._" metadata files (AppleDouble) */
-			bool ok = is_file && !(s->found[0] == '.' && s->found[1] == '_');
-			for(; ok && s->found[n]; n++) {
-				uint16_t ch = s->found[n];
-				if(n >= GFS_LIST_NAME - 1 || ch < 0x20 || ch >= 0x7f)
-					ok = false;
-				else
-					e->name[n] = (char)ch;
-			}
-			if(ok && n > 0) {
-				e->name[n] = 0;
-				e->size = (int)s->info.file_size;
-				l->count++;
-			}
-			rc = g_os.find_next(sh, s->found, &s->info);
+		/* FONTCHARACTER -> ASCII (skip names we cannot represent) */
+		gfs_entry_t *e = &c->out[c->count];
+		int n = 0;
+		/* skip macOS "._" metadata files (AppleDouble) */
+		bool ok = is_file && !(s->found[0] == '.' && s->found[1] == '_');
+		for(; ok && s->found[n]; n++) {
+			uint16_t ch = s->found[n];
+			if(n >= GFS_LIST_NAME - 1 || ch < 0x20 || ch >= 0x7f)
+				ok = false;
+			else
+				e->name[n] = (char)ch;
 		}
-		/* Final review: the launcher says when a list is cut */
-		l->more = (rc >= 0 && l->count >= l->max);
-		if(sh >= 0)
-			g_os.find_close(sh);
+		if(ok && n > 0) {
+			e->name[n] = 0;
+			e->size = (int)s->info.file_size;
+			c->count++;
+		}
+		rc = g_os.find_next(sh, s->found, &s->info);
 	}
+	/* Final review: the launcher says when the list is cut */
+	c->more = (rc >= 0 && c->count >= c->max);
+	if(sh >= 0)
+		g_os.find_close(sh);
 	return 0;
 }
 
-int gfs_list(gfs_entry_t *wads, int wad_max, int *wad_count,
-	gfs_entry_t *demos, int demo_max, int *demo_count)
+int gfs_list(gfs_entry_t *wads, int wad_max, int *wad_count)
 {
-	*wad_count = 0;
-	*demo_count = 0;
-	gfs_list_more = 0;
-
-	list_ctx_t ctx = {
-		.l = {
-			{ .ext = ".wad", .out = wads, .max = wad_max },
-			{ .ext = ".lmp", .out = demos, .max = demo_max },
-		},
-		.s = gfs_scratch(),
-	};
+	list_ctx_t ctx = { .out = wads, .max = wad_max, .s = gfs_scratch() };
 	gfs_os_call(os_list, &ctx);
 
-	*wad_count = ctx.l[0].count;
-	*demo_count = ctx.l[1].count;
-	gfs_list_more = (ctx.l[0].more ? GFS_MORE_WADS : 0)
-		| (ctx.l[1].more ? GFS_MORE_DEMOS : 0);
+	*wad_count = ctx.count;
+	gfs_list_more = ctx.more;
 	return 0;
 }

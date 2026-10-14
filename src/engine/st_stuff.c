@@ -496,46 +496,6 @@ void CGD_SwitchClip(void)
   }
 }
 
-void CGD_FreeMem(void)
-{
-  static char message[64];
-  sprintf(message, "Free: ");
-
-  /* Up to 4 zones fit in the message */
-  for (int i = 0; i < Z_ZoneCount() && i < 4; i++)
-  {
-    sprintf(message+strlen(message), "%s%d/%dk", (i ? ", " : ""),
-      Z_FreeMemory(i) >> 10, Z_ZoneSize(i) >> 10);
-  }
-
-  ST_SpecialMessage(message);
-}
-
-/* Frameskip key: fixed 0 -> 1 -> 2 -> 3 -> auto -> fixed 0 (step 3; auto
-   uses the last automatic setting, CGD_AUTOFRAMESKIP_DEFAULT at first) */
-void CGD_CycleFrameskip(void)
-{
-  static int auto_max = CGD_AUTOFRAMESKIP_DEFAULT;
-  static char message[48];
-
-  if (CGD_AutoFrameskip > 0)
-  {
-    auto_max = CGD_AutoFrameskip;
-    CGD_AutoFrameskip = 0;
-    CGD_Frameskip = 0;
-  }
-  else if (CGD_Frameskip >= 3)
-    CGD_AutoFrameskip = auto_max;
-  else
-    CGD_Frameskip++;
-
-  if (CGD_AutoFrameskip > 0)
-    sprintf(message, "Frameskip: auto (max %d)", CGD_AutoFrameskip);
-  else
-    sprintf(message, "Frameskip: %d", CGD_Frameskip);
-  ST_SpecialMessage(message);
-}
-
 void CGD_CycleGamma(void)
 {
   extern int usegamma;
@@ -544,18 +504,6 @@ void CGD_CycleGamma(void)
 
   extern char gammamsg[5][26];
   ST_SpecialMessage(gammamsg[usegamma]);
-}
-
-void CGD_ProfilerResults(void)
-{
-  static char message[72];
-  sprintf(message, "DA:%ums GR:%ums DI:%ums LL:%ums ULL:%ums",
-    ((unsigned int)prof_time(CGD_Perf.DynamicAllocation) + 500) / 1000,
-    ((unsigned int)prof_time(CGD_Perf.GraphicsRendering) + 500) / 1000,
-    ((unsigned int)prof_time(CGD_Perf.DisplayInterface) + 500) / 1000,
-    ((unsigned int)prof_time(CGD_Perf.LumpLoading) + 500) / 1000,
-    ((unsigned int)prof_time(CGD_Perf.UnalignedLumpLoading) + 500) / 1000);
-  ST_SpecialMessage(message);
 }
 
 // Respond to keyboard input events,

@@ -174,7 +174,6 @@ void Z_Free (const void* ptr)
     I_Error ("Z_Free: %p is out of zone", ptr);
   }
 
-  prof_enter(CGD_Perf.DynamicAllocation);
   block = (memblock_t *) ( (byte *)ptr - sizeof(memblock_t));
 
   if (block->id != ZONEID)
@@ -231,8 +230,6 @@ void Z_Free (const void* ptr)
       zone->rover = block;
     }
   }
-
-  prof_leave(CGD_Perf.DynamicAllocation);
 }
 
 
@@ -246,7 +243,6 @@ void Z_Free (const void* ptr)
 
 void* Z_Malloc( int size,  int  tag,  void* user )
 {
-  prof_enter(CGD_Perf.DynamicAllocation);
   CGD_Stats.MemoryAllocated += size;
 
   int extra;
@@ -399,7 +395,6 @@ void* Z_Malloc( int size,  int  tag,  void* user )
       base->size - sizeof(memblock_t));
 #endif
 
-  prof_leave(CGD_Perf.DynamicAllocation);
   return (void *) ((byte *)base + sizeof(memblock_t));
 }
 

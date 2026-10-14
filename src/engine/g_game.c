@@ -395,7 +395,11 @@ boolean G_Responder (event_t* ev)
   }*/
 
   // any other key pops up menu if in demos
-  if (gameaction == ga_nothing && !singledemo && (gamestate == GS_DEMOSCREEN) ) 
+  /* CGDoom: vanilla's demoplayback is back in the condition, now that the
+     title loop plays its demos: CGDoom (demos off by default) only opened
+     the menu on a key press over a title page */
+  if (gameaction == ga_nothing && !singledemo &&
+      (demoplayback || gamestate == GS_DEMOSCREEN) ) 
   { 
     if (ev->type == ev_keydown ) 
     { 

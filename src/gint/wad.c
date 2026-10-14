@@ -46,6 +46,7 @@
 #include <string.h>
 
 gwad_stats_t gwad_stats;
+bool gwad_ram_allowed = true;
 
 #define BLOCK_SHIFT 12
 #define BLOCK_SIZE  (1 << BLOCK_SHIFT)
@@ -758,7 +759,7 @@ int PL_WadOpen(const char *name)
 	strcpy(W.name, name);
 	gwad_stats.size = W.size;
 
-	if(g_opt.wad_in_ram && try_ram_image())
+	if(gwad_ram_allowed && try_ram_image())
 		W.mode = GWAD_RAM;
 	else if(g_os.block && build_map()) {
 		W.mode = GWAD_MAP;
@@ -772,7 +773,7 @@ int PL_WadOpen(const char *name)
 	else
 		W.mode = GWAD_BFILE;
 
-	if(W.mode != GWAD_RAM && g_opt.wad_in_ram)
+	if(W.mode != GWAD_RAM && gwad_ram_allowed)
 		gwad_stats.ram_failed = true;
 	gwad_stats.mode = W.mode;
 	return W.size;
@@ -797,33 +798,6 @@ char const *gwad_error_text(int rc)
 	default:
 		return "The file could not be read as a WAD.";
 	}
-}
-
-/* Look a lump up in the open WAD's directory (case-insensitive, 8 chars),
-   reading it in chunks through PL_WadRead() */
-bool gwad_has_lump(char const *lump)
-{
-	if(W.mode == GWAD_NONE || !lump || strlen(lump) > 8)
-		return false;
-	/* Stop at the terminator: lump may be shorter than 8 chars */
-	char up[9] = { 0 };
-	for(int i = 0; i < 8 && lump[i]; i++)
-		up[i] = (lump[i] >= 'a' && lump[i] <= 'z') ? lump[i] - 32 : lump[i];
-	uint32_t numlumps = le32(W.header + 4), dirofs = le32(W.header + 8);
-	enum { CHUNK = 128 };
-	uint8_t *buf = malloc(CHUNK * 16);
-	if(!buf)
-		return false;
-	bool found = false;
-	for(uint32_t i = 0; i < numlumps && !found; i += CHUNK) {
-		uint32_t k = numlumps - i < CHUNK ? numlumps - i : CHUNK;
-		if(PL_WadRead(buf, dirofs + 16 * i, 16 * k) != (int)(16 * k))
-			break;
-		for(uint32_t j = 0; j < k && !found; j++)
-			found = name_is(buf + 16 * j + 8, up);
-	}
-	free(buf);
-	return found;
 }
 
 void PL_WadClose(void)

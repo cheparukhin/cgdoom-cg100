@@ -38,7 +38,6 @@ static void *t_malloc(size_t n)
 char g_os_version[11] = "02.00.0000";
 gos_api_t g_os;
 uint32_t g_entry_r15;
-gopt_t g_opt;
 gtlb_stats_t gtlb_stats;
 void gvid_release(void) {}
 void gvid_note_os_activity(void) {}
@@ -192,7 +191,7 @@ static void test_wad(char const *path)
 	if(old >= 0) { free(fs[old].data); fs[old].used = false; }
 	add_file("TEST.WAD", data, (int)sz);
 
-	g_opt.wad_in_ram = 1;
+	gwad_ram_allowed = true;
 	int rc = PL_WadOpen("test.wad");
 	CHECK(rc == sz, "open %d", rc);
 	CHECK(gwad_stats.mode == GWAD_RAM, "mode %d", gwad_stats.mode);
@@ -244,41 +243,26 @@ static void test_wad(char const *path)
 	free(buf);
 	printf("  mapped %d, unmapped %d, fallback reads %d, os calls %d\n", mapped, unmapped,
 		gwad_stats.fallback_reads, os_calls);
-	/* Final review: gwad_has_lump() (run_game's start-map check) finds
-	   every directory name, case-insensitively, and nothing else */
-	{ char first[9] = {0}, last[9] = {0}, low[9];
-	  memcpy(first, data + dir + 8, 8); memcpy(last, data + dir + 16 * (n - 1) + 8, 8);
-	  for(int k = 0; k < 9; k++) low[k] = (char)tolower((unsigned char)first[k]);
-	  CHECK(gwad_has_lump(first) && gwad_has_lump(last) && gwad_has_lump(low),
-		"has_lump %s %s %s", first, last, low);
-	  CHECK(!gwad_has_lump("ZZZZZZZZ") && !gwad_has_lump("MAP33") && !gwad_has_lump("E5M1"),
-		"has_lump: missing lumps");
-	  CHECK(gwad_has_lump("MAP01") != gwad_has_lump("E1M1"), "MAP01 xor E1M1"); }
 	PL_WadClose();
 
 	/* BFile mode: no RAM image and no block map (g_os.block is NULL) */
-	g_opt.wad_in_ram = 0;
+	gwad_ram_allowed = false;
 	rc = PL_WadOpen("TEST.WAD");
 	CHECK(rc == sz && gwad_stats.mode == GWAD_BFILE, "bfile open");
 	uint8_t hdr[12]; CHECK(PL_WadRead(hdr, 0, 12) == 12 && !memcmp(hdr, data, 12), "bfile hdr");
 	CHECK(PL_WadMap(0, 12) == NULL, "bfile map");
 	PL_WadClose();
-	g_opt.wad_in_ram = 1;
+	gwad_ram_allowed = true;
 	free(data);
 }
-
-static char const *appender(void) { return "CG.Test=1\n"; }
 
 static void test_files(void)
 {
 	char buf[256];
-	gfs_settings_name = "CGDoom.cfg";
-	gfs_settings_appender = appender;
 	CHECK(PL_FileWrite("CGDoom.cfg", "Version=1\n", 10) == 10, "cfg write");
-	gfs_settings_appender = NULL;
-	CHECK(PL_FileSize("cgdoom.cfg") == 20, "cfg size %d", PL_FileSize("cgdoom.cfg"));
+	CHECK(PL_FileSize("cgdoom.cfg") == 10, "cfg size %d", PL_FileSize("cgdoom.cfg"));
 	int n = PL_FileRead("CGDoom.cfg", buf, sizeof buf);
-	CHECK(n == 20 && !memcmp(buf, "Version=1\nCG.Test=1\n", 20), "cfg read");
+	CHECK(n == 10 && !memcmp(buf, "Version=1\n", 10), "cfg read");
 	CHECK(find_file("CGDoom.cfg") < 0, "not written yet");
 
 	char demo[300]; memset(demo, 7, sizeof demo);
@@ -289,7 +273,7 @@ static void test_files(void)
 	int calls = os_calls;
 	CHECK(gfs_flush() == 0, "flush");
 	printf("flush: %d os calls\n", os_calls - calls);
-	CHECK(find_file("CGDoom.cfg") >= 0 && fs[find_file("CGDoom.cfg")].size == 20, "cfg on disk");
+	CHECK(find_file("CGDoom.cfg") >= 0 && fs[find_file("CGDoom.cfg")].size == 10, "cfg on disk");
 	CHECK(find_file("DOOM1D00.LMP") >= 0, "demo on disk");
 	CHECK(PL_FileSize("DOOM1D00.LMP") == 300, "demo size after flush");
 	n = PL_FileRead("DOOM1D00.LMP", buf, 50);
@@ -311,11 +295,14 @@ static void test_files(void)
 	CHECK(PL_FileSize("missing.txt") < 0, "missing");
 	CHECK(PL_FileRead("missing.txt", buf, 10) < 0, "missing read");
 
-	/* listing */
-	gfs_entry_t w[4], d[4]; int nw, nd;
-	gfs_list(w, 4, &nw, d, 4, &nd);
-	CHECK(nd == 1, "demo listed %d", nd);
-	printf("list: %d wad, %d lmp (%s)\n", nw, nd, nd ? d[0].name : "");
+	/* listing: the WADs only (the demo DOOM1D00.LMP is not listed) */
+	add_file("LIST.WAD", "PWAD", 4);
+	gfs_entry_t w[4]; int nw;
+	gfs_list(w, 4, &nw);
+	CHECK(nw == 1 && !strcmp(w[0].name, "LIST.WAD") && w[0].size == 4
+		&& !gfs_list_more, "wad listed (%d)", nw);
+	printf("list: %d wad (%s)\n", nw, nw ? w[0].name : "");
+	int f = find_file("LIST.WAD"); if(f >= 0) { free(fs[f].data); fs[f].used = false; }
 }
 
 static void rm_file(char const *name)
@@ -338,53 +325,39 @@ static void reset_failures(void)
 	g_fail_result = 0;
 }
 
-/* External review: with no memory for its copy, the settings file is
-   refused (counted for the exit screen, the file in storage untouched)
-   instead of being written without the platform's CG.* lines */
+/* With no memory for its copy, the settings file is written at once from
+   the caller's buffer, like any other file (until 2026-10-14 it was
+   refused, because that buffer lacked the platform's CG.* lines, which no
+   longer exist). main.c notes a CGD_SaveSettings() that could not even
+   allocate its buffer; the exit screen then says the previous settings
+   stay in use. */
 static void test_settings_nomem(void)
 {
 	char text[256] = "", name[GFS_NAME_MAX];
-	int rc = 0;
 	/* The session's failures so far, put back afterwards */
 	int f = g_flush_failures, k = g_flush_kept, r = g_fail_result;
 	strcpy(name, g_fail_name);
-	char const *sname = gfs_settings_name;
 	reset_failures();
 
-	add_file("SET.CFG", "Version=1\nCG.Old=1\n", 20);
-	gfs_settings_name = "SET.CFG";
-	gfs_settings_appender = appender;
+	add_file("SET.CFG", "Version=1\nOld=1\n", 16);
 	g_malloc_fail_over = 8;
 	int w = PL_FileWrite("SET.CFG", "Version=1\n", 10);
 	g_malloc_fail_over = -1;
-	gfs_settings_appender = NULL;
-	CHECK(w < 0, "settings without memory refused (%d)", w);
-	CHECK(gfs_pending_count() == 0 && gfs_flush() == 0
-		&& file_is("SET.CFG", "Version=1\nCG.Old=1\n", 20), "old settings untouched");
-	CHECK(gfs_last_failure(text, &rc) && !strcmp(text, "SET.CFG")
-		&& rc == GFS_ERR_NO_MEMORY, "failure named %s %d", text, rc);
-	CHECK(gfs_failure_text(text, sizeof text, 0) && !strcmp(text, "NOT SAVED: "
-		"settings SET.CFG (no memory to keep it). The previous settings stay "
-		"in use."), "exit text: %s", text);
-	printf("settings nomem: %s\n", text);
+	CHECK(w == 10 && gfs_pending_count() == 0
+		&& file_is("SET.CFG", "Version=1\n", 10), "settings without memory "
+		"written at once (%d)", w);
+	CHECK(!gfs_failure_text(text, sizeof text, 0), "no failure: %s", text);
 
-	/* main.c: CGD_SaveSettings() could not even allocate its buffer, so
-	   PL_FileWrite() was not called; the same text */
-	reset_failures();
+	/* main.c: CGD_SaveSettings() could not allocate its buffer, so
+	   PL_FileWrite() was not called */
 	gfs_note_failure("SET.CFG", GFS_ERR_NO_MEMORY);
 	CHECK(gfs_failure_text(text, sizeof text, 0) && strstr(text, "settings SET.CFG")
 		&& strstr(text, "previous settings stay in use") && !strstr(text, "lost"),
 		"noted: %s", text);
+	printf("settings nomem: %s\n", text);
 	reset_failures();
 
-	/* With memory: written whole */
-	gfs_settings_appender = appender;
-	CHECK(PL_FileWrite("SET.CFG", "Version=1\n", 10) == 10, "settings write");
-	gfs_settings_appender = NULL;
-	CHECK(gfs_flush() == 0 && file_is("SET.CFG", "Version=1\nCG.Test=1\n", 20), "settings whole");
-
 	rm_file("SET.CFG");
-	gfs_settings_name = sname;
 	g_flush_failures = f; g_flush_kept = k; g_fail_result = r;
 	strcpy(g_fail_name, name);
 }
@@ -784,7 +757,7 @@ static void test_packed_image(void)
 	if(old >= 0) { free(fs[old].data); fs[old].used = false; }
 	add_file("PACK.WAD", f, fsize);
 
-	g_opt.wad_in_ram = 1;
+	gwad_ram_allowed = true;
 	CHECK(PL_WadOpen("PACK.WAD") == fsize && gwad_stats.mode == GWAD_RAM, "packed: RAM mode");
 	/* Expected size, by the rule: header, lumps, directory are segments */
 	int segsz[NL + 2], ns = 0;
@@ -833,7 +806,7 @@ static void test_wad_errors(void)
 	add_file("MAGIC.WAD", b, sizeof b);
 	memcpy(b, "IWAD", 4); le32w(b + 4, 100); le32w(b + 8, 50);   /* 1600-byte dir */
 	add_file("TRUNC.WAD", b, sizeof b);
-	g_opt.wad_in_ram = 1;
+	gwad_ram_allowed = true;
 	CHECK(PL_WadOpen("SHORT.WAD") == GWAD_ERR_SHORT, "short");
 	CHECK(PL_WadOpen("MAGIC.WAD") == GWAD_ERR_MAGIC, "magic");
 	CHECK(PL_WadOpen("TRUNC.WAD") == GWAD_ERR_TRUNCATED, "truncated");
@@ -853,20 +826,20 @@ static void test_list_more(void)
 {
 	char d[16];
 	for(int i = 0; i < 5; i++) {
-		char nm[16]; snprintf(nm, sizeof nm, "MORE%dD00.LMP", i);
+		char nm[16]; snprintf(nm, sizeof nm, "MORE%d.WAD", i);
 		memset(d, i, sizeof d);
 		add_file(nm, d, sizeof d);
 	}
-	gfs_entry_t w[64], dm[64]; int nw, nd;
-	gfs_list(w, 64, &nw, dm, 64, &nd);
-	CHECK(!(gfs_list_more & GFS_MORE_DEMOS), "all demos listed (%d)", nd);
-	int all = nd;
-	gfs_list(w, 64, &nw, dm, all - 1, &nd);
-	CHECK(nd == all - 1 && (gfs_list_more & GFS_MORE_DEMOS), "demo list cut (%d of %d)", nd, all);
-	gfs_list(w, 64, &nw, dm, all, &nd);
-	CHECK(nd == all && !(gfs_list_more & GFS_MORE_DEMOS), "exactly full is not cut");
+	gfs_entry_t w[64]; int nw;
+	gfs_list(w, 64, &nw);
+	CHECK(!gfs_list_more, "all WADs listed (%d)", nw);
+	int all = nw;
+	gfs_list(w, all - 1, &nw);
+	CHECK(nw == all - 1 && gfs_list_more, "WAD list cut (%d of %d)", nw, all);
+	gfs_list(w, all, &nw);
+	CHECK(nw == all && !gfs_list_more, "exactly full is not cut");
 	for(int i = 0; i < 5; i++) {
-		char nm[16]; snprintf(nm, sizeof nm, "MORE%dD00.LMP", i);
+		char nm[16]; snprintf(nm, sizeof nm, "MORE%d.WAD", i);
 		int f = find_file(nm); if(f >= 0) { free(fs[f].data); fs[f].used = false; }
 	}
 }
@@ -882,7 +855,7 @@ static void test_refusal_counted(void)
 	memcpy(b, "IWAD", 4); b[8] = 12;
 	add_file("MAP.WAD", b, sizeof b);
 	g_os.block = s_block_p0;
-	g_opt.wad_in_ram = 0;
+	gwad_ram_allowed = false;
 	CHECK(PL_WadOpen("MAP.WAD") == (int)sizeof b && gwad_map_live(), "block map live");
 	int before = gfs_flush_failures();
 	static char save[100 << 10];
