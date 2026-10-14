@@ -35,7 +35,7 @@
       BFile_Read. Slow.
 
    The file stays open until PL_WadClose() in every mode (gwad_quit() on
-   the abort() path, gint review round 3.1). */
+   the abort() path). */
 
 #include "cgd_gint.h"
 
@@ -393,8 +393,8 @@ static bool try_ram_image(void)
 	   the end), like the engine's heap copies (w_wad.h, W_LUMP_PAD).
 	   A segment chained to the next one (seg_chained) needs no pad of its
 	   own: the next segment follows it directly, so its pad bytes are the
-	   true file bytes already (final review: a wadtool-packed WAD saved
-	   ~150 KB of duplicated pads this way). */
+	   true file bytes already (a wadtool-packed WAD saves ~150 KB of
+	   duplicated pads this way). */
 	uint32_t total = 0;
 	for(int i = 0; i < n; i++)
 		total = ((total + 3) & ~3u) + segs[i].size
@@ -684,10 +684,10 @@ void gwad_remap(void)
 // PL_Wad* API
 //---
 
-/* Final review: the map is checked against the file before it is used.
-   gwad_remap() compared block 0 with the header; the first open did not,
-   so wrong Bfile_GetBlockAddress semantics on some OS build (offset units,
-   stale pointers, fragment headers) would have fed the engine garbage.
+/* The map is checked against the file before it is used (gwad_remap()
+   checks block 0 against the header): wrong Bfile_GetBlockAddress
+   semantics on some OS build (offset units, stale pointers, fragment
+   headers) would otherwise feed the engine garbage.
    Block 0 must hold the header, and a few sample blocks (middle, last,
    the directory's) must match a BFile_Read of the same bytes (one world
    switch each; no storage write, so the map stays valid). Unmapped blocks
@@ -748,7 +748,7 @@ int PL_WadOpen(const char *name)
 		return GWAD_ERR_MAGIC;
 	}
 	/* The directory must be inside the file (a truncated copy is the
-	   likely cause otherwise; final review) */
+	   likely cause otherwise) */
 	uint32_t numlumps = le32(s->small + 4), dirofs = le32(s->small + 8);
 	if(dirofs > (uint32_t)c.size
 		|| numlumps > ((uint32_t)c.size - dirofs) / 16) {
@@ -825,10 +825,10 @@ void gwad_quit(void)
 	}
 }
 
-/* Both entry points are quit-chord safe points (gint review round 3.2):
-   the startup R_Init scan, level setup with R_PrecacheLevel and game loads
-   read the WAD all along but never call PL_GetTics, so a slow load held the
-   chord into the 2 s abort() fallback and lost the session's saves. The
+/* Both entry points are quit-chord safe points: the startup R_Init scan,
+   level setup with R_PrecacheLevel and game loads read the WAD all along
+   but never call PL_GetTics, so without them a slow load would hold the
+   chord into the 2 s abort() fallback and lose the session's saves. The
    poll comes first and may not return (main.c leave_to_exit_path(), which
    closes the WAD); nothing has been touched yet. PL_WadOpen() reads
    through bfile_read_range() and is not a poll point. */
@@ -911,9 +911,9 @@ const void *PL_WadMap(int offset, int size)
 		   read up to W_LUMP_PAD bytes past it, which in flash are the
 		   rest of the cluster or another file, where the heap copy and
 		   the RAM image have zeros (w_wad.h). Decline: the engine makes a
-		   zero-padded heap copy, only ever for the lump at EOF (gint
-		   review round 2). A range clamped at an engine wad_end below
-		   W.size cannot be recognised here; RAM mode behaves the same. */
+		   zero-padded heap copy, only ever for the lump at EOF. A range
+		   clamped at an engine wad_end below W.size cannot be recognised
+		   here; RAM mode behaves the same. */
 		bool at_eof = (uint32_t)offset + (uint32_t)size
 			>= (uint32_t)W.size;
 		if(!at_eof && W.blk[b0] && W.run_end[b0] >= b1)
@@ -940,8 +940,8 @@ int PL_IsWadPointer(const void *p)
 /* platform.h: 1 when lumps live in NOR flash (block map) or are read from
    the file (BFile), so the engine keeps hot lumps in the zone; 0 for the RAM
    image. Fixed between PL_WadOpen and PL_WadClose: gwad_remap() only ever
-   turns MAP into BFILE, and both are slow (gint review round 3.3; the
-   engine's weak default was 0, so flash lumps were always used in place). */
+   turns MAP into BFILE, and both are slow (the engine's weak default is 0,
+   which would use flash lumps in place). */
 int PL_WadIsSlow(void)
 {
 	return W.mode == GWAD_MAP || W.mode == GWAD_BFILE;

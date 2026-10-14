@@ -1,4 +1,4 @@
-/* Host unit test for src/gint/time.c (gint review round 3.1), #included
+/* Host unit test for src/gint/time.c, #included
    with gint's timer, profiler, clock and interrupt-cancellable sleep
    stubbed; input.c is linked for the raw scan and the chord test.
 
@@ -229,7 +229,7 @@ static void test_idle(void)
 	CHECK(gtime_idle_tics() == 0, "no timer: 0");
 }
 
-/* In-game idle policy (integration follow-up: CGD_IsPaused) */
+/* In-game idle policy (CGD_IsPaused) */
 static void test_idle_policy(void)
 {
 	bool lose = false;

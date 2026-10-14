@@ -9,8 +9,9 @@
 # and compares each per-tic game-state trace with tests/demosync/demoN.ckpt:
 # the SHA-256 and line count of the whole trace, plus every 128th line and the
 # last two lines (to locate a divergence). The expected traces were checked
-# tic by tic against id's linuxdoom-1.10 (notes/engine-changes.md, "Demo
-# sync"); the .ckpt files hold only data derived from our engine, no WAD data.
+# tic by tic against id's linuxdoom-1.10 (the oracle built by
+# tools/demosync-oracle/build.sh); the .ckpt files hold only data derived from
+# our engine, no WAD data.
 #
 # The IWAD is not part of the repository: without $CGD_DOOM1_WAD (or with a
 # different file) the test is skipped with a message and exit status 0.

@@ -4,8 +4,8 @@
 #   demo-unbegun.sh -bin <cgdoom-host> [-out DIR]
 #
 # G_RecordDemo arms a recording (demorecording = true); it only begins in G_BeginRecording, after
-# the first level load. Before the "recording has begun" flag (g_game.c) the engine wrote through
-# the NULL demo_p when a game ended or failed in that window: G_Ticker on the title screen, the
+# the first level load. Without the "recording has begun" flag (g_game.c) the engine would write
+# through the NULL demo_p when a game ends or fails in that window: G_Ticker on the title screen, the
 # final G_CheckDemoStatus of D_DoomLoop, and I_Error during the first level load. Every case below
 # must exit normally (no crash), save no demo and leave the slot's previous file untouched:
 #   1. -record without a start map: the title screen, then -tics ends the game;
@@ -13,10 +13,10 @@
 #      the frames must also equal those of the same run without -record;
 #   3. -warp with a zone too small for the level: I_Error in P_SetupLevel with the recording armed
 #      (a clean fatal exit, status 2).
-# And one recording that HAS begun (wiring review): 4. End Game from a recorded game with title
+# And one recording that HAS begun: 4. End Game from a recorded game with title
 #   demos on (tests/input/demo-endgame.txt). The first played demo ends the recording (G_DoPlayDemo):
-#   the frames must equal those of the same run without -record (before the fix the recording went
-#   on writing ticcmds into the played demo lump, which desynced it), and the demo is saved, short
+#   the frames must equal those of the same run without -record (a recording that went on writing
+#   ticcmds into the played demo lump would desync it), and the demo is saved, short
 #   (game + title tics, not the whole run) and ends with the 0x80 marker.
 # Exit status 0 = PASS.
 

@@ -50,7 +50,7 @@ planefunction_t			ceilingfunc;
 //
 
 // Here comes the obnoxious "visplane".
-/* CGDoom (step 2, design B10): renderer limits.
+/* CGDoom: renderer limits.
 
    Visplanes are allocated from the zone (PU_STATIC) in blocks of
    VISPLANE_BLOCK as a frame needs them, up to MAXVISPLANES (vanilla: a static

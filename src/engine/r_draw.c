@@ -147,7 +147,7 @@ void R_DrawColumn (void)
 }
 
 //
-// Low detail drawers (detailshift = 1, step 3).
+// Low detail drawers (detailshift = 1).
 // The view is viewwidth = scaledviewwidth/2 columns wide and every column
 // covers two screen pixels. These follow Chocolate Doom, which matches the
 // DOS executable (copied from src/engine/sh4/test/ref_draw.c, the reference
@@ -696,8 +696,8 @@ void R_InitBuffer( int	width,  int	height )
 // CGDoom: the background is black (V_Clear clears the view area when the
 // view size changes) instead of vanilla's flat pattern; vanilla copied it
 // from screens[1], which CGDoom uses for the intermission background, so
-// the border is cleared to 0 directly (step 3: the old copy pasted pieces of
-// the last intermission screen into the border).
+// the border is cleared to 0 directly (a copy would paste pieces of the
+// last intermission screen into the border).
 //
 void R_VideoErase ( unsigned ofs, int count ) 
 { 

@@ -6,8 +6,8 @@
    finds afterwards: out[0..6] = r8..r14, out[7] = r15 after the call, out[8] = r15 before it.
    The caller (test_sh4.c, abi_expect()) recomputes the expected values:
      r8 = p, r9 = ~p, r10 = swap.w p, r11 = swap.b p, r12 = -p, r13 = p << 1, r14 = p >> 1.
-   Added in review round 2 with the 1-pixel column paths, which must not touch r8-r14 because
-   they skip the register saves of the main path. */
+   This matters most for the 1-pixel column paths, which must not touch r8-r14 because they
+   skip the register saves of the main path. */
 
 	.text
 	.balign 4

@@ -164,7 +164,7 @@ static void test_none_and_garbage(void)
     /* Options of older versions (WAD access, unaligned lumps) */
     n += sprintf(text + n, "WADMethod=BFILE\nTrustUnalignedLumps=1\n");
     n += sprintf(text + n, "=5\n=\nnoequals\n\x01\x02=\xff\xfe\n");
-    /* Options and actions removed on 2026-10-14 */
+    /* Options and actions of earlier builds */
     n += sprintf(text + n, "DeveloperInfo=1\nEnableDemos=1\nAutostart=1\n"
         "FlatFloors=1\n");
     n += sprintf(text + n, "CG.Overclock=2\nCG.Display=1\nCG.Frameskip=0\n"
@@ -235,10 +235,10 @@ static void test_rejected(void)
     CHECK(CGD_LoadSettings(&o) == 0 && o.ViewSize == 6, "NUL ends the file");
 }
 
-/* Follow-ups review: numeric values are parsed within their own line. An
-   empty value used to be atoi()'d across the line end ("LowDetail=\n1\n"
-   set LowDetail from the next line); empty and non-numeric values are now
-   ignored, like unknown values of the other options. */
+/* Numeric values are parsed within their own line: an empty value must not
+   be atoi()'d across the line end ("LowDetail=\n1\n" would set LowDetail
+   from the next line). Empty and non-numeric values are ignored, like
+   unknown values of the other options. */
 static void test_numeric_values(void)
 {
     CGDoom_Options d, o;

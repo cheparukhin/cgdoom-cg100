@@ -1,4 +1,4 @@
-/* CGDoom: strict 8.3 names for the files the engine creates (design.md §7).
+/* CGDoom: strict 8.3 names for the files the engine creates.
 
    The fx-CG100 storage only takes DOS-style 8.3 names made of
    A-Z a-z 0-9 ! # $ % , ( ) + - ; = @ [ ] ^ _ ` and space, compared without

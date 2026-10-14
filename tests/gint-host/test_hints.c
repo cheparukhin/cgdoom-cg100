@@ -1,4 +1,4 @@
-/* Host unit test for src/gint/hints.c (final review): the fatal-error
+/* Host unit test for src/gint/hints.c: the fatal-error
    screen adds a recovery line for the common engine errors. */
 #include "cgd_gint.h"
 #include <stdio.h>
@@ -12,7 +12,7 @@ int main(void)
 	/* The engine's exact texts (z_zone.c, g_game.c, m_misc.c, w_wad.c) */
 	char const *zm = gfatal_hint("Z_Malloc(42776) failure");
 	CHECK(zm && strstr(zm, "smaller WAD"), "memory hint: %s", zm ? zm : "-");
-	/* No demo hint since the demo replay was removed */
+	/* No demo hint: demo files are not played */
 	CHECK(gfatal_hint("Demo is from a different game version (110)") == NULL, "no demo version hint");
 	CHECK(gfatal_hint("M_ReadFile: cannot open FRE0D03.LMP (-1)") == NULL, "no demo read hint");
 	char const *s = gfatal_hint("Bad savegame: state 5000");

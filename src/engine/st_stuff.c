@@ -442,7 +442,7 @@ void ST_refreshBackground(void)
 /* CGDoom special keys (i_system.c). plyr is set by ST_Start(), when the
    first level starts: on the title screen before that there is no player.
    The setting keys still apply there, without a message; cheat and noclip
-   do nothing (external review: a NULL write, a crash on the calculator). */
+   do nothing (otherwise a NULL write, a crash on the calculator). */
 static void ST_SpecialMessage(char *message)
 {
   if (plyr)

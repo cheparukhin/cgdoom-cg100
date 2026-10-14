@@ -1,12 +1,11 @@
-/* Host unit test for src/gint/keymaps.c (gint review round 1):
+/* Host unit test for src/gint/keymaps.c:
    - gkm_rebind_check(): BACK/HOME cancel a capture, AC/ON and the Doom menu
      key are refused, anything else binds;
    - gkm_apply_engine_hooks(): the Doom menu key (CGD_EscapeKeycode) and the
      save-name ALPHA modifier (CGD_AlphaKeycode).
    Linked with the engine's cgdoom-kbd.c, which defines both hooks.
    "Keymap.<action>=NONE" (actions unbound with DEL) is the engine's
-   CGD_LoadSettings() job since the engine follow-ups (tests/settings_test.c,
-   make test-settings); gint's re-apply workaround and its test are gone. */
+   CGD_LoadSettings() job (tests/settings_test.c, make test-settings). */
 
 #include "cgd_gint.h"
 #include "cgdoom.h"
@@ -50,7 +49,7 @@ static void test_hooks(void)
 	CHECK(CGD_AlphaKeycode == 0x72, "alpha -> CG100 ALPHA (%02x)", CGD_AlphaKeycode);
 }
 
-/* Final review: OK is a second Enter key of the Doom menu (unless an
+/* OK is a second Enter key of the Doom menu (unless an
    action is bound to it); EXE still is one */
 #define KEY_ENTER_ 13   /* doomdef.h KEY_ENTER */
 static int enter_after(int code)
@@ -84,7 +83,7 @@ static void test_enter(void)
 	CGD_CopyKeymap(CGD_Options.Keymap, gkm_presets(&n)[0].map);
 }
 
-/* Final review: one action per key. gkm_find_binding() finds the older
+/* One action per key. gkm_find_binding() finds the older
    binding (main.c clears it); no preset binds a key twice; the reserved
    text names the actual menu key */
 static void test_bindings(void)

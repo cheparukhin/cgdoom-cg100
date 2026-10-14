@@ -8,7 +8,7 @@
      buffer and the private stack. Too little heap -> message, exit.
    Launcher (port of CGDoom's cgdoom-ui.c UI_Main to gint on 396x224): the
      WAD list, the controls editor and diagnostics. Everything else is fixed
-     (2026-10-14, notes/design.md §11): the F4 overclock, the async DMA
+     (docs/DEVELOPMENT.md §6): the F4 overclock, the async DMA
      display path, automatic frameskip, the WAD copied to RAM when it fits,
      and vanilla's title screen with its demos; skill, episode, view size and
      detail are chosen in the game.
@@ -21,7 +21,7 @@
      closes the WAD file if it is still open (gwad_quit) and restores MPM's
      UTLB layout (gtlb_quit), before gint's kquit restores the OS clock, LCD
      window and drivers; MPM redraws.
-   Safe start (final review): DEL held when the add-in starts skips the
+   Safe start: DEL held when the add-in starts skips the
      UTLB executor and pinning, the overclock and the private stack for
      that session (a way out of a startup problem on new hardware without
      a rebuild).
@@ -55,7 +55,7 @@ static jmp_buf g_exit_jmp;
 static volatile bool g_exit_ready = false;
 static volatile bool g_in_fatal = false;
 static volatile bool g_game_running = false;
-/* exit_path() has started (gint review round 3.1: gquit_poll stays out) */
+/* exit_path() has started (gquit_poll stays out) */
 static volatile bool g_in_exit = false;
 
 /* DEL held at startup: no UTLB pinning, no overclock, no private stack */
@@ -72,8 +72,7 @@ static size_t g_stack_words = 0;
 static CGDoom_Options g_saved_engine_opts;
 /* Set by load_settings(): before that, g_saved_engine_opts is not a
    baseline and saving would write default settings over the user's file
-   (the idle hook runs from the startup error screens since gint review
-   round 2) */
+   (the idle hook also runs from the startup error screens) */
 static bool g_settings_loaded = false;
 
 static void load_settings(void)
@@ -98,8 +97,8 @@ static void save_settings_if_changed(void)
 
 	int failures = gfs_flush_failures();
 	int rc = CGD_SaveSettings(&CGD_Options);
-	/* Not queued (external review: CGD_SaveSettings() without memory for
-	   its buffer, or PL_FileWrite() refusing): shown at exit, unless the
+	/* Not queued (CGD_SaveSettings() without memory for its buffer, or
+	   PL_FileWrite() refusing): shown at exit, unless the
 	   file layer counted it already, and the baseline stays, so that a
 	   later call tries again */
 	if(rc < 0) {
@@ -177,12 +176,12 @@ static void screen_controls(void)
 				int code = ginp_wait_raw_key(GINP_IDLE_MS);
 				ginp_wait_release();
 				/* BACK/HOME cancel; AC/ON and the Doom menu key are
-				   refused (gint review rounds 1, 2) */
+				   refused */
 				char const *why = NULL;
 				int verdict = gkm_rebind_check(code, &why);
 				if(verdict == GKM_BIND_OK) {
-					/* One action per key (final review: the older
-					   binding stayed, and both fired) */
+					/* One action per key: the key's older binding is
+					   cleared, or both would fire */
 					int other = gkm_find_binding(CGD_Options.Keymap,
 						code, e);
 					CGD_Options.Keymap[e] = code;
@@ -203,8 +202,8 @@ static void screen_controls(void)
 	}
 }
 
-/* "512 B", "12 KiB", "3.4M" (final review: demos under 1 KiB showed
-   "0 KiB" and WADs under 100 KB "0.0M") */
+/* "512 B", "12 KiB", "3.4M" (a small file never shows as "0 KiB" or
+   "0.0M") */
 static char const *size_text(char *buf, size_t n, int bytes)
 {
 	if(bytes < 1024)
@@ -292,20 +291,19 @@ static int launcher(gfs_entry_t const *wads, int wad_count)
 // Game
 //---
 
-/* Every way out of a game but a crash (gint review round 3.2): the normal
+/* Every way out of a game but a crash: the normal
    return, PL_Fatal(), the quit chord and the in-game idle exit.
    - The WAD block map goes first: PL_FileWrite() refuses its no-memory
      fallback while it is live, and its arrays give memory back for the
-     copies (gint review round 1). exit_path()'s PL_WadClose() is then a
+     copies. exit_path()'s PL_WadClose() is then a
      no-op.
    - The settings are queued: the engine changes view size and low detail
      in game (r_main.c CGD_Set*) and never saves them itself. Before the
-     saves (external review): their copies may take most of the heap, and
-     the settings copy then failed.
+     saves: their copies may take most of the heap, and the settings copy
+     would then fail.
    - The delayed saves (savegames) go to the file layer (a save that cannot
      be copied is written at once, with everything pending).
-   No demo is ever recorded here: CGD_RecordDemoSlot stays -1 (the
-   launcher's recording was removed on 2026-10-14). */
+   No demo is ever recorded here: CGD_RecordDemoSlot stays -1. */
 static void end_game_session(void)
 {
 	g_game_running = false;
@@ -331,7 +329,7 @@ static bool run_game(gfs_entry_t const *wads, int wad)
 	ui_status("Loading", wadname, NULL);
 	int wrc = PL_WadOpen(wadname);
 	if(wrc < 0) {
-		/* Final review: one message per cause (gwad_error_text) */
+		/* One message per cause (gwad_error_text) */
 		char t[220];
 		snprintf(t, sizeof t, "Cannot open %s. %s", wadname,
 			gwad_error_text(wrc));
@@ -341,8 +339,8 @@ static bool run_game(gfs_entry_t const *wads, int wad)
 
 	/* Engine parameters (only once the game is sure to start).
 	   CGD_WADFileName: the whole base name, from which the engine derives
-	   an 8.3-safe save prefix (CGD_FilePrefix). Truncating it made WADs
-	   with a common start share their saves (gint review round 1). A copy,
+	   an 8.3-safe save prefix (CGD_FilePrefix). Truncating it would make
+	   WADs with a common start share their saves. A copy,
 	   since wads[] may be rescanned. The engine's own defaults start the
 	   title screen with its demos (no autostart); the Doom menu asks for
 	   the episode and skill. */
@@ -358,9 +356,9 @@ static bool run_game(gfs_entry_t const *wads, int wad)
 	}
 
 	/* Automatic frameskip: at most CGD_AUTOFRAMESKIP_DEFAULT skipped
-	   frames in a row, which is also the catch-up limit (cgdoom.h). It was
-	   1, which slowed the game down as soon as a frame took more than 2
-	   tics (gint review round 3.3). */
+	   frames in a row, which is also the catch-up limit (cgdoom.h): a
+	   lower limit slows the game down as soon as a frame takes more than
+	   that many tics plus one. */
 	CGD_AutoFrameskip = CGD_AUTOFRAMESKIP_DEFAULT;
 	gkm_apply_engine_hooks();
 
@@ -393,8 +391,8 @@ static bool run_game(gfs_entry_t const *wads, int wad)
 static void exit_path(void)
 {
 	g_in_exit = true;
-	/* No abort() from the quit chord while the files are written (gint
-	   review round 3.1); every wait below is bounded */
+	/* No abort() from the quit chord while the files are written; every
+	   wait below is bounded */
 	gtime_disarm_abort();
 	g_game_running = false;
 	ginp_idle_hook = NULL;
@@ -412,13 +410,12 @@ static void exit_path(void)
 		failures = gfs_flush();
 	}
 	/* The log is a RAM ring buffer, gone once we exit: say what failed
-	   right here (gint review round 1). Every failure of the session
-	   counts, including the immediate writes of PL_FileWrite()'s
-	   no-memory path, which leave nothing pending (gint review round 2;
-	   nothing reports failures before this point). */
+	   right here. Every failure of the session counts, including the
+	   immediate writes of PL_FileWrite()'s no-memory path, which leave
+	   nothing pending (nothing reports failures before this point). */
 	char text[256];
 	if(gfs_failure_text(text, sizeof text, failures)) {
-		/* Bounded: the idle hook is off here (gint review round 2) */
+		/* Bounded: the idle hook is off here */
 		ui_message_timeout("Saving", text, GINP_IDLE_MS);
 	}
 
@@ -453,7 +450,7 @@ void PL_Fatal(const char *msg)
 	ui_text(DWIDTH / 2, DHEIGHT - 12, UI_BG, DTEXT_CENTER,
 		"Press any key to exit");
 	ui_end();
-	/* Bounded (gint review round 2): the idle hook is off here and the
+	/* Bounded: the idle hook is off here and the
 	   add-in owns the interrupts (no OS auto power-off). After
 	   GINP_IDLE_MS we leave as if a key had been pressed. */
 	ginp_wait_release();
@@ -476,7 +473,7 @@ void PL_Fatal(const char *msg)
 
 /* Called by ginp_getkey() after GINP_IDLE_MS without a key in a launcher
    screen. The add-in owns the interrupts, so the OS's auto power-off cannot
-   run (critique §C7); no PowerOff syscall exists for the fx-CG100 OS in
+   run; no PowerOff syscall exists for the fx-CG100 OS in
    gint, and the backlight registers of r61525_brightness_set() are not
    known to be valid on the fx-CG100's new LCD controller, so instead of
    dimming we return to MPM, where the OS's own auto power-off works. */
@@ -486,7 +483,7 @@ static void idle_quit(void)
 		return;
 	ui_status("Idle", "No key pressed for 10 minutes.",
 		"Quitting to MPM in 60 s. Press any key to stay.");
-	/* Edge-triggered: a pinned key is not "stay" (gint review round 3.1) */
+	/* Edge-triggered: a pinned key is not "stay" */
 	if(ginp_wait_any_key(60 * 1000)) {
 		ginp_wait_release();
 		return;
@@ -496,7 +493,7 @@ static void idle_quit(void)
 }
 
 //---
-// Quit chord and in-game idle exit (gint review round 3.1)
+// Quit chord and in-game idle exit
 //---
 
 /* Leave like PL_Fatal does after its message: in a game, end_game_session()
@@ -519,8 +516,8 @@ static void leave_to_exit_path(int code)
    engine keeps calling PL_GetTics while it is paused, in the menu, in the
    save-name entry, on the automap, in intermissions and in title demos, so
    all of these are covered.
-   The limit depends on what a quit would lose (integration follow-up: the
-   engine's CGD_IsPaused() mask and usergame, gtime_game_idle_limit_ms()):
+   The limit depends on what a quit would lose (the engine's CGD_IsPaused()
+   mask and usergame, gtime_game_idle_limit_ms()):
    - demos (title loop, replays), title pages, no level outside a user game:
      nothing to lose, GINP_IDLE_MS;
    - the player's own game, also paused or behind the menu: unsaved
@@ -528,7 +525,10 @@ static void leave_to_exit_path(int code)
    Quitting goes through leave_to_exit_path(): the explicit saves and the
    settings (including in-game view size / detail changes) are queued and
    exit_path() writes them, as with a normal quit. A game cannot be saved behind the player's back (no slot is
-   ours), so a long-paused game offers to quit rather than saving. */
+   ours), so a long-paused game offers to quit rather than saving.
+   The 60 s warning blocks inside PL_GetTics. That is harmless: the engine
+   runs one tic per frame (singletics) and I_AutoPace caps the lag, so the
+   game does not fast-forward afterwards. */
 _Static_assert(GIDLE_PAUSED == CGD_IDLE_PAUSED && GIDLE_MENU == CGD_IDLE_MENU
 	&& GIDLE_NOLEVEL == CGD_IDLE_NOLEVEL && GIDLE_DEMO == CGD_IDLE_DEMO,
 	"time.c's idle policy bits are the engine's CGD_IDLE_* mask");
@@ -579,9 +579,9 @@ void gquit_poll(void)
 	g_poll_busy = false;
 }
 
-/* From wad.c, on entry of every engine WAD read or map (gint review round
-   3.2). Only in a game: PL_WadOpen() (before the game) does not come here,
-   and the launcher has its own poll points. No idle exit (no drawing in
+/* From wad.c, on entry of every engine WAD read or map. Only in a game:
+   PL_WadOpen() (before the game) does not come here, and the launcher has
+   its own poll points. No idle exit (no drawing in
    the middle of a frame or a load); PL_GetTics runs it soon enough. */
 void gquit_poll_load(void)
 {
@@ -596,13 +596,15 @@ void gquit_poll_load(void)
 }
 
 //---
-// Destructor: every exit path, including abort() (gint review round 3.1)
+// Destructor: every exit path, including abort()
 //---
 
 /* gint's start2 runs .dtors before kquit after exit() and after abort()
    (the quit chord's hang fallback, EXIT on gint's panic screen), which
    skip exit_path(). Order matters: closing the WAD is a world switch,
-   which needs the UTLB protection that gtlb_quit() then removes. */
+   which needs the UTLB protection that gtlb_quit() then removes. Hence one
+   destructor with an explicit order: gint's linker script does not sort
+   .dtors by priority. */
 __attribute__((destructor))
 static void platform_quit(void)
 {
@@ -642,8 +644,10 @@ int main(void)
 	gsys_init();
 	if(!gsys_supported())
 		return unsupported();
-	/* Safe start (final review): DEL held at launch. A raw KEYSC read,
-	   before the UTLB is touched. */
+	/* Safe start: DEL held at launch. A raw KEYSC read, before the UTLB
+	   is touched. A held key and not a CGDOOM.CFG setting: reading the
+	   file is itself a world switch, and pinning must happen before the
+	   first one. */
 	g_safe_start = ginp_safe_start();
 	gmem_init();
 	gtlb_init(g_safe_start);
@@ -656,8 +660,7 @@ int main(void)
 	if(onchip)
 		gint_set_onchip_save_mode(GINT_ONCHIP_BACKUP, onchip);
 	/* Without the RGB565 frame, the DMA display path falls back to CPU
-	   writes; gvid_mode_name() and the benchmark page say so (gint review
-	   round 2) */
+	   writes; the Benchmarks page says so */
 	if(!gvid_init())
 		PL_Log("DMA frame buffer unavailable: DMA display uses CPU\n");
 	if(CGD_PRIVATE_STACK_SIZE > 0 && !g_safe_start) {
@@ -669,7 +672,7 @@ int main(void)
 	if(setjmp(g_exit_jmp) == 0) {
 		g_exit_ready = true;
 		/* Idle timeout on every screen from here on, including the
-		   startup error screens (gint review round 2). idle_quit() saves
+		   startup error screens. idle_quit() saves
 		   nothing before load_settings(), and exit_path() then has
 		   nothing to write. */
 		ginp_idle_hook = idle_quit;

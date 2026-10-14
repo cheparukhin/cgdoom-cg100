@@ -52,7 +52,7 @@
 #endif
 /* Refuse to start with less heap than this in total: mpm.bin 1.1 leaves
    about 5.5 MiB (by calculation), the older builds at most about 2 MiB, so
-   they are refused rather than run untested (their UTLB handling is gone) */
+   they are refused rather than run untested */
 #ifndef CGD_MIN_TOTAL_HEAP
 #define CGD_MIN_TOTAL_HEAP        (3 << 20)
 #endif
@@ -98,7 +98,7 @@ char const *gsys_model_name(void);
 // tlb.c: protect our code pages against UTLB replacement by the OS
 //---
 
-/* safe: safe start (DEL held at launch, final review): the miss handler
+/* safe: safe start (DEL held at launch): the miss handler
    only, no P2 executor (no pinning, no ldtlb), as when the executor cannot
    be set up */
 void gtlb_init(bool safe);
@@ -179,7 +179,7 @@ int gtlb_plan_pin(gtlb_view_t *v, gtlb_entry_t const *table, int8_t *slot,
 int gtlb_plan_repair(gtlb_view_t *v, gtlb_entry_t const *table,
 	int8_t const *slot, int pin_lo, gtlb_op_t *ops, int max_ops);
 /* Restrict slot[] to the image pages 0..n-1 (n <= 0: keep all): only
-   they are repaired after world switches (gint review round 2) */
+   they are repaired after world switches */
 void gtlb_track_image(int8_t *slot, int n);
 /* Plan the exit normalisation: every snapshot page p (slot_orig[p] >= 0)
    back in slot_orig[p] and in no other slot (the executor drops the other
@@ -223,12 +223,11 @@ bool gmem_arena_info(int i, char const **name, uintptr_t *start,
 #define GFS_NAME_MAX  13          /* strict 8.3 name, including NUL */
 #define GFS_LIST_NAME 40          /* names found on storage (read/list) */
 #define GFS_PATH_MAX  (7 + GFS_LIST_NAME)
-/* PL_FileWrite() refuses larger sizes before touching the file (gint review
-   round 3.3): every legitimate write (settings, saves, a demo of at most
-   128 KiB) comes from RAM, and no RAM of these models is that large. A
-   bogus size such as the engine's "demo_p - demobuffer" with demo_p still
-   NULL (about 1.9e9) used to reach os_flush(), which removed the existing
-   file before create() failed. */
+/* PL_FileWrite() refuses larger sizes before touching the file (defence in
+   depth): every legitimate write (settings, saves) comes from RAM, and no
+   RAM of this model is that large. A bogus size (such as a pointer
+   difference with a NULL pointer, about 1.9e9) must never reach
+   os_flush(), which removes the existing file before create() fails. */
 #define GFS_WRITE_MAX (16 << 20)
 
 typedef struct {
@@ -263,7 +262,7 @@ gfs_scratch_t *gfs_scratch(void);
 bool gfs_is_p1(void const *p, size_t size);
 
 /* List "*.wad" in the storage root in one world switch. gfs_list_more is
-   set when the list was cut at its maximum (final review). */
+   set when the list was cut at its maximum. */
 int gfs_list(gfs_entry_t *wads, int wad_max, int *wad_count);
 extern bool gfs_list_more;
 /* Failure result recorded when PL_FileWrite() cannot keep a copy for later
@@ -339,8 +338,8 @@ extern gwad_stats_t gwad_stats;
    use the block map (Diagnostics storage probe, tests) */
 extern bool gwad_ram_allowed;
 bool gwad_map_live(void);
-/* PL_WadOpen() failures (final review: one -1 for every cause gave the
-   user nothing to act on) and their launcher text */
+/* PL_WadOpen() failures, one per cause so the user can act on it, and
+   their launcher text */
 enum {
 	GWAD_ERR_NAME = -1,        /* name too long / unusable characters */
 	GWAD_ERR_OPEN = -2,        /* BFile open failed */
@@ -353,7 +352,7 @@ char const *gwad_error_text(int rc);
 void gwad_remap(void);
 char const *gwad_mode_name(void);
 /* Close the WAD file if it is still open (main.c's destructor: the abort()
-   path skips PL_WadClose; gint review round 3.1). Nothing else is freed. */
+   path skips PL_WadClose). Nothing else is freed. */
 void gwad_quit(void);
 
 //---
@@ -387,8 +386,8 @@ void gvid_push_test(uint8_t const *fb);
      weak C reads words), big-endian: src[0] is the leftmost pixel and
      dst[0] its RGB565 value;
    - dst is 32-byte aligned and is EITHER cached SDRAM (P1, 0x8xxxxxxx) OR
-     on-chip X/Y memory (0xe5xxxxxx, not cacheable; no caller since the
-     X/Y strip presenter was removed, still supported by the routines).
+     on-chip X/Y memory (0xe5xxxxxx, not cacheable; supported by the
+     routines, but no caller uses it).
      For P1 dst every 32-byte line is allocated with movca.l and purged
      with ocbp once written (asm and weak C alike), so the data is in RAM
      on return and the caller only issues synco before a DMA reads it. For
@@ -410,7 +409,7 @@ bool ginp_any_key(void);
    (checked by time.c's tic interrupt; gint's own chord cannot fire, see
    input.c) */
 bool ginp_abort_chord(uint8_t const st[12]);
-/* Safe start (final review): DEL held when the add-in starts. Read from a
+/* Safe start: DEL held when the add-in starts. Read from a
    raw scan before any OS call or UTLB change. */
 #define GINP_SAFE_START_KEY 0x44
 bool ginp_safe_start(void);
@@ -420,8 +419,8 @@ bool ginp_safe_start(void);
 #define GINP_RELEASE_MAX_POLLS   2000
 void ginp_wait_release(void);
 /* True on a new key press: a key that was not down at entry, or one
-   released and pressed again (gint review round 3.1: a key held or stuck
-   at entry does not count); false after timeout_ms */
+   released and pressed again (a key held or stuck at entry does not
+   count); false after timeout_ms */
 bool ginp_wait_any_key(int timeout_ms);
 /* Wait for a new key press and return its matrix code (AC/ON is 0x07);
    -1 after timeout_ms */
@@ -437,8 +436,8 @@ enum {
 	GK_DIGIT0,   /* GK_DIGIT0 + n for digit n */
 };
 /* Wait for a UI key. If ginp_idle_hook is set, once the keyboard has
-   not changed for GINP_IDLE_MS (time.c's tic scan, round 3.2: an
-   auto-repeating held arrow is no activity) the hook is called and GK_NONE
+   not changed for GINP_IDLE_MS (time.c's tic scan: an auto-repeating held
+   arrow is no activity) the hook is called and GK_NONE
    is returned (callers redraw and wait again). Without a tic timer, each
    call times out after GINP_IDLE_MS without a UI key instead. */
 int ginp_getkey(void);
@@ -468,8 +467,8 @@ void gkm_apply_engine_hooks(void);
 enum { GKM_BIND_OK = 0, GKM_BIND_CANCEL, GKM_BIND_RESERVED };
 int gkm_rebind_check(int code, char const **why);
 /* Index of the keymap entry (CGDOOM_KEYMAP_SIZE entries) other than
-   `except` that is bound to `code`, or -1 (final review: a rebind clears
-   the older binding of the key and says so) */
+   `except` that is bound to `code`, or -1 (a rebind clears the older
+   binding of the key and says so) */
 int gkm_find_binding(int16_t const *map, int code, int except);
 /* Second Enter key of the Doom menu (CGD_EnterKeycode2): OK when BACK is
    the menu key, else -1 */
@@ -482,7 +481,7 @@ int gkm_enter_key2(void);
 void gtime_init(void);
 void gtime_quit(void);
 void gtime_resync(void);
-/* Quit chord (gint review round 3.1): the tic interrupt latches a request;
+/* Quit chord: the tic interrupt latches a request;
    gtime_take_quit() returns it once and disarms the interrupt-context
    abort() fallback, which only fires when the chord stays held this long
    without the request being taken (hang). */
@@ -508,7 +507,7 @@ int gtime_tic_timer(void);
    runs the idle exit. Does nothing on the exit and fatal paths. */
 void gquit_poll(void);
 /* Safe point of long engine phases that never call PL_GetTics (startup
-   R_Init, level setup and precache, game loads; round 3.2): wad.c calls it
+   R_Init, level setup and precache, game loads): wad.c calls it
    on entry of PL_WadRead()/PL_WadMap(). In a game, takes a pending quit
    chord request like gquit_poll(); never draws (no idle exit). */
 void gquit_poll_load(void);

@@ -1,5 +1,5 @@
-/* Host unit test for src/gint/tlbplan.c (gint review round 1: pinning the
-   image pages above MMUCR.URB, and the repair after world switches).
+/* Host unit test for src/gint/tlbplan.c (pinning the image pages above
+   MMUCR.URB, and the repair after world switches).
 
    A simulated UTLB starts in MPM's layout: slots 0..54 map the 64 KiB pages
    of 0x00300000.. (page i in slot i), 55..62 the user RAM at 0x08100000,
@@ -10,8 +10,9 @@
    foreign 4 KiB pages, explicit overwrites) and miss-handler reloads are
    then mixed with repairs.
 
-   gint review round 2: the three mpm.bin layouts (v1.1 and dynload map 55
-   ROM pages, Feb-2025 only 48 and leaves slots 48..54 alone), image-only
+   Also: the three mpm.bin layouts (v1.1 and dynload map 55 ROM pages,
+   Feb-2025 only 48 and leaves slots 48..54 alone; only v1.1 is accepted at
+   startup, the others test the exit normalisation's defence), image-only
    repair tracking, and the exit normalisation (gtlb_plan_unpin) followed
    by a replay of MPM's next launch, which must find no duplicate VPN. */
 
@@ -252,7 +253,7 @@ static void test_repair_cases(void)
 	CHECK(do_repair(lo) >= 1, "repair moves page 2 back");
 	CHECK(where(2) == 51, "page 2 back in its pinned slot (%d)", where(2));
 
-	/* Round 2: the OS reusing the slot of a page beyond the image is not
+	/* The OS reusing the slot of a page beyond the image is not
 	   a repair: its entry is left alone (page 30 reloads on demand) */
 	hw_load(30, 0x00114000u, 0x0c114000u | PTEL_4K);
 	CHECK(do_repair(lo) == 0, "OS entry over non-image page 30: no repair");
@@ -350,11 +351,11 @@ static void check_normalised(char const *what)
 	}
 }
 
-/* Round 2: CGDoom pins, exits, and MPM launches the next add-in */
+/* CGDoom pins, exits, and MPM launches the next add-in */
 static void test_relaunch(void)
 {
 	for(int kind = 0; kind < MPM_KINDS; kind++) {
-		/* What round 1 did (URB restore only) breaks Feb-2025 */
+		/* A URB-only restore at exit breaks Feb-2025 */
 		mpm_layout_kind(kind); snapshot_img(5);
 		CHECK(do_pin(5) == 5 && urb == 49, "%s: pinned", mpm_name[kind]);
 		exec_ops(ops, 0, 54);
@@ -363,7 +364,7 @@ static void test_relaunch(void)
 		CHECK(dup == (kind == MPM_FEB2025), "%s: URB-only exit %s",
 			mpm_name[kind], dup ? "duplicates (reset)" : "clean");
 
-		/* Round 2: unpin at exit, then the next launch is clean */
+		/* Unpin at exit, then the next launch is clean */
 		mpm_layout_kind(kind); snapshot_img(5);
 		do_pin(5);
 		/* plus an OS entry over an untracked page and a 4 KiB foreign
@@ -454,7 +455,7 @@ static void test_fuzz(void)
 				CHECK(urc < lo, "URC %d below URB %d", urc, lo);
 			}
 		}
-		/* Exit and the next launch (round 2) */
+		/* Exit and the next launch */
 		do_unpin(54);
 		CHECK(no_duplicates(&hw), "fuzz: duplicates after unpin");
 		check_normalised("fuzz");

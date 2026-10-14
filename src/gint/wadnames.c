@@ -2,11 +2,9 @@
 
    gnames_wad_base(): the WAD base name handed to the engine as
    CGD_WADFileName. The engine derives its 8.3 save prefix from the WHOLE
-   base name (CGD_FilePrefix, src/engine/cgdoom-names.c); the launcher used
-   to cut it to 6 characters, so freedoom1/freedoom2 and plutonia/plutonia2
-   shared their saves (gint review round 1). (gnames_demo_wad(), which
-   matched demo files to WADs for the launcher's demo replay, went with
-   that replay on 2026-10-14.)
+   base name (CGD_FilePrefix, src/engine/cgdoom-names.c); cutting it (say,
+   to 6 characters) would make freedoom1/freedoom2 and plutonia/plutonia2
+   share their saves.
 
    Pure logic (host-tested in tests/gint-host with the engine's
    cgdoom-names.c). */

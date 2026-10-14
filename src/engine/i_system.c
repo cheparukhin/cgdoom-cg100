@@ -162,7 +162,7 @@ static void R_SetViewSizeChange(int iDiff)
 }
 
 //
-// Frame pacing (CGDoom step 3: automatic frameskip, cgdoom.h)
+// Frame pacing (CGDoom: automatic frameskip, cgdoom.h)
 //
 // Fixed frameskip (CGD_AutoFrameskip == 0, CGDoom's semantics): a frame is
 // rendered every CGD_Frameskip+1 tics, and the tic that starts such a group
@@ -333,8 +333,8 @@ void I_StartTic (void)
 
     /* Emit events for all changes. The keys are passed as they are: digits
        and space are negative in input_keys (-'0'..-'9', -' ': typed with or
-       without ALPHA, see cgdoom-kbd.c), and the (uint8_t) casts CGDoom had
-       here turned them into unknown keys (gint review §12). Every base key
+       without ALPHA, see cgdoom-kbd.c); a (uint8_t) cast, as CGDoom had
+       here, would turn them into unknown keys. Every base key
        is positive and below 256, so its events are unchanged. The event
        carries the Doom key itself ('0'..'9', ' '). */
     const int entering = saveStringEnter;
@@ -347,12 +347,12 @@ void I_StartTic (void)
             e.type = ev_keyup;
         else continue;
 
-        /* Follow-ups review: events are handled as they are posted, so a
-           key press that switches save-name entry on or off (EXE on a save
-           slot; EXE or MENU while typing) applies to the presses after it
-           in this scan, which belong to the other set. With Interact on EXE
-           (CG50 preset "CGDoom 0.3"), picking an empty slot typed a space
-           after the pre-filled "E1M1" (a Weapon key on EXE typed a digit).
+        /* Events are handled as they are posted, so a key press that
+           switches save-name entry on or off (EXE on a save slot; EXE or
+           MENU while typing) applies to the presses after it in this scan,
+           which belong to the other set. With Interact on EXE, picking an
+           empty slot would type a space after the pre-filled "E1M1" (a
+           Weapon key on EXE would type a digit).
            Drop those presses; releases still reach G_Responder. */
         if(e.type == ev_keydown && saveStringEnter != entering)
             continue;
@@ -361,10 +361,10 @@ void I_StartTic (void)
         D_PostEvent(&e);
     }
 
-    /* External review: the gameplay keys released during save-name entry
-       still reach G_Responder as key-ups (vanilla's events always did; the
-       menu ignores key-ups). Otherwise an action held when the entry began
-       (fire, a move) stayed down in gamekeydown afterwards. ESCAPE and
+    /* The gameplay keys released during save-name entry still reach
+       G_Responder as key-ups (as vanilla's events do; the menu ignores
+       key-ups). Otherwise an action held when the entry began (fire, a
+       move) would stay down in gamekeydown afterwards. ESCAPE and
        ENTER are in both sets and were handled above. */
     if(entering)
     {

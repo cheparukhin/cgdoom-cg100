@@ -67,19 +67,19 @@ typedef struct
 extern	void**		lumpcache;
 extern	lumpinfo_t*	lumpinfo;
 
-/* CGDoom (step 2): W_LumpMapped[lump] != 0 when lumpcache[lump] is a
+/* CGDoom: W_LumpMapped[lump] != 0 when lumpcache[lump] is a
    PL_WadMap pointer. Such pointers are not zone blocks: they are never
    purged, Z_ChangeTag ignores them, and they stay valid until PL_WadClose. */
 extern	byte*		W_LumpMapped;
 
-/* CGDoom step 3: PL_WadIsSlow() at W_InitMultipleFiles: mapped lumps are
+/* CGDoom: PL_WadIsSlow() at W_InitMultipleFiles: mapped lumps are
    copied into the zone while it has room (w_wad.c), and P_SetupLevel
    precaches the level's graphics (R_PrecacheLevel). */
 extern	boolean		W_WadSlow;
 /* Before loading a level (slow mapping only, else nothing): purge the
    purgeable lumps and forget the lumps referenced in place (w_wad.c) */
 void	W_SlowLevelStart (void);
-/* Step 3 review: R_PrecacheLevel's test for one lump: true if the lump is not
+/* CGDoom: R_PrecacheLevel's test for one lump: true if the lump is not
    cached yet and a copy of it keeps the zone above the slow-mode reserve
    (w_wad.c, W_CopySlowLump) */
 boolean	W_SlowPrecacheWanted (int lump);
@@ -109,7 +109,7 @@ const void* W_CacheLumpNumConst (int lump, int tag);
 
 const patch_t *W_CacheLumpNumPatch(int lump, int tag);
 
-/* CGDoom (step 2): W_CacheLumpNumConst for hot paths (R_GetColumn). When the
+/* CGDoom: W_CacheLumpNumConst for hot paths (R_GetColumn). When the
    lump is already cached and W_CacheLumpNumConst's Z_ChangeTag would change
    nothing (a mapped lump, or a zone block that already has this tag), the
    pointer is returned without any call; otherwise this is

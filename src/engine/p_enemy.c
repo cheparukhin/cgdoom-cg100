@@ -517,8 +517,8 @@ boolean P_LookForPlayers ( mobj_t* actor, boolean allaround )
     // CGDoom: in single player the loop comes back to player 0 and looks
     // a second time; that look gives the same answer (P_CheckSight and the
     // angle test change no game state), so skip its sight check. c and
-    // lastlook advance exactly as in vanilla. (Demo sync review: the
-    // repeats were ~45% of all P_CheckSight calls in DEMO1-3.)
+    // lastlook advance exactly as in vanilla. (The repeats are ~45% of all
+    // P_CheckSight calls in DEMO1-3.)
     if (looked & (1 << actor->lastlook))
       continue;
     looked |= 1 << actor->lastlook;

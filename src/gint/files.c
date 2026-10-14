@@ -33,10 +33,10 @@ int gfs_world_switches = 0;
 #define GFS_WRITE_CHUNK   (32 << 10)
 /* Largest previous version that os_flush() keeps in RAM while it replaces
    a file with one of another size. Every file CGDoom writes is smaller: a
-   savegame is at most 176 KiB (the engine's SAVEGAMESIZE, 0x2c000), a demo
-   at most 128 KiB (DEMO_MAXSIZE), and CGDOOM.CFG is about 2 KiB. A larger
-   file under one of these names was not written by CGDoom. It is replaced
-   without a backup, as before, and is not read into RAM. */
+   savegame is at most 176 KiB (the engine's SAVEGAMESIZE, 0x2c000), and
+   CGDOOM.CFG is about 2 KiB. A larger file under one of these names was not
+   written by CGDoom. It is replaced without a backup and is not read into
+   RAM. */
 #define GFS_BACKUP_MAX    (256 << 10)
 
 //---
@@ -276,9 +276,9 @@ bool gfs_last_failure(char name[GFS_NAME_MAX], int *result)
 	return true;
 }
 
-/* A failure that leaves nothing pending (final review: PL_FileWrite()'s
-   refusal while the WAD map is live was not counted, so the exit screen
-   stayed silent about the lost file) */
+/* A failure that leaves nothing pending (e.g. PL_FileWrite()'s refusal
+   while the WAD map is live): counted, so the exit screen names the lost
+   file */
 static void note_failure(char const *name, int result)
 {
 	if(strlen(name) < sizeof g_fail_name)
@@ -324,13 +324,13 @@ static char const *file_kind(char const *name)
 
 bool gfs_failure_text(char *text, size_t size, int flush_result)
 {
-	/* Every failure of the session counts, not only the exit flush's
-	   (gint review round 2): PL_FileWrite()'s no-memory path writes at
+	/* Every failure of the session counts, not only the exit flush's:
+	   PL_FileWrite()'s no-memory path writes at
 	   once and leaves nothing pending, and its callers
 	   (CGD_FlushDelayedWrites) drop the result. A negative or uncounted
 	   flush result (map live, unsupported OS) gets the generic text.
-	   Final review: the text says that the file is lost (the game is
-	   over when it is shown) and what to do. A failed replacement puts
+	   The text says that the file is lost (the game is over when it is
+	   shown) and what to do. A failed replacement puts
 	   the previous version back (os_flush()); the text then says that
 	   it was kept instead of calling the file lost. */
 	if(flush_result == 0 && g_flush_failures == 0)
@@ -574,7 +574,7 @@ static int os_flush(void *arg)
 		/* Remove, create with the final size, write. The old file has to
 		   go first: storage is nearly full with the full WAD installed,
 		   and a temporary copy (create + rename) would need room for both
-		   files exactly when space is short (gint review round 1). If
+		   files exactly when space is short. If
 		   create() or a write fails, the old file is created again at its
 		   old size, in the space the remove has just freed, from the
 		   backup. The failure is still reported by name at exit, with
@@ -864,7 +864,7 @@ static int os_list(void *arg)
 		}
 		rc = g_os.find_next(sh, s->found, &s->info);
 	}
-	/* Final review: the launcher says when the list is cut */
+	/* The launcher says when the list is cut */
 	c->more = (rc >= 0 && c->count >= c->max);
 	if(sh >= 0)
 		g_os.find_close(sh);

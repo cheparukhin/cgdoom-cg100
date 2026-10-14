@@ -19,8 +19,6 @@
    Fallback, without the frame buffer (gvid_init() failed) or for an
    unaligned frame: CPU writes of palette lookups to the LCD data register
    (CGDoom's approach), ~8 ms of CPU per frame.
-   (A third path through the on-chip X/Y banks, and the launcher option to
-   choose between them, were removed on 2026-10-14: notes/design.md §11.)
    Both read the palette from one persistent 1 KiB pal32 table
    (cgd_expand_build_pal32 layout), rebuilt by PL_SetPalette(). The
    expansion runs in the foreground; the _p32 routine (asm and weak C) has
@@ -205,8 +203,8 @@ static void present_dma(uint8_t const *fb)
 
 	/* g_fb16 is P1 (gvid_init): the expansion allocates every line with
 	   movca.l and purges it with ocbp, so the frame is already in SDRAM
-	   (the per-line ocbwb loop that followed was redundant: integration
-	   step "gint video"). Only drain the stores before the DMA starts. */
+	   (no per-line ocbwb is needed). Only drain the stores before the DMA
+	   starts. */
 	cgd_expand_p8_rgb565_p32(g_fb16, fb, g_pal32, FB_PIXELS);
 	synco();
 
@@ -279,7 +277,7 @@ void gvid_push_test(uint8_t const *fb)
 
 void PL_SetPalette(const uint16_t pal565[256])
 {
-	/* Persistent table (integration step "gint video"): built here once
+	/* Persistent table: built here once
 	   per palette change (~256 iterations) instead of on the expansion's
 	   stack at every call of the plain entry (1 KiB of stack, ~870
 	   cycles). Never in a DMA's way: the DMA reads g_fb16, not the
@@ -300,8 +298,8 @@ void PL_FinishUpdate(const uint8_t *fb)
 }
 
 /* Called by the engine after errors and file I/O (I_ReinitAfterError:
-   every save/load). Blanking the whole LCD here showed a black frame on
-   each save/load (gint review round 1); what the world switch may have
+   every save/load). Blanking the whole LCD here would show a black frame
+   on each save/load; what the world switch may have
    damaged is already handled: the borders are cleared by the next frame
    (dirty flag, also set by gfs_os_call()) and every present re-sets the
    window. The next PL_FinishUpdate repaints the game area. */

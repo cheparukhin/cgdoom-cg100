@@ -57,7 +57,7 @@
    n = count+1 pixels are covered by N = (n+1)/2 pairs: prologue (stage 0 of pair 0), N-1 loop
    iterations, epilogue (stage 1 of pair N-1, whose pixel b is only stored if n is even; when
    n is odd it is computed but not written - its texel read stays inside dc_source[0..127]).
-   n = 1 takes a separate straight-line path (.Lc_one, review round 2): no register saves, no
+   n = 1 takes a separate straight-line path (.Lc_one): no register saves, no
    colormap check, no loop set-up. n = 2 branches once, straight to the epilogue.
   ============================================================================================*/
 
@@ -258,7 +258,7 @@ ENDFUNC(R_DrawColumn_SH4)
    2*step9) remove the ordering constraint between them.
    Registers: r0 texel, r1 frac9 a, r11 frac9 b, r2 2*step9, r3 -25, r4 dest+2, r5 dc_source,
    r6 rotated colormap, r7 322, r8/r9 texel address a/b, r10 colour.
-   1 texel (dc_yl == dc_yh) takes a separate straight-line path (.Ll_one, review round 2): no
+   1 texel (dc_yl == dc_yh) takes a separate straight-line path (.Ll_one): no
    register saves, no colormap or contiguity check, no loop set-up. 2 texels branch once, to
    the epilogue.
   ============================================================================================*/
@@ -850,8 +850,8 @@ ENDFUNC(R_DrawSpanLow_SH4)
    Low: x = dc_x << 1, pixels at columnofs[x] and columnofs[x+1] (two pointers, no precondition).
    Shared body: every texel is stored through r4 and through r8, both stepped by 320.
    Low: r8 = second destination. Normal: r8 = r4, so the second store rewrites the same byte
-   with the same value (no other memory is touched; review round 1 fixed a version where r8
-   pointed at a 4-byte scratch object and walked 320 bytes per pixel through .bss). */
+   with the same value, and no other memory is touched (test_sh4.c's stray-write check covers
+   all static memory, not just the framebuffer guards). */
 
 	CGD_SH4_COLD
 	.balign 4

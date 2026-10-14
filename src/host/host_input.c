@@ -419,7 +419,7 @@ static const Builtin builtins[] = {
       "no cheats: bot wandering, the player may die (use respawns)",
       "bot 3000 3\n" },
 
-    /* Step 3: renderer settings changed in the game. The menu remembers
+    /* Renderer settings changed in the game. The menu remembers
        the last item of each menu (lastOn): the second visit goes straight
        to Options > Detail. */
     { "options",

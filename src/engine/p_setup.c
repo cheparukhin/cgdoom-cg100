@@ -649,7 +649,7 @@ void P_SetupLevel ( int episode, int map, int playermask)
   //S_Start ();
 
   Z_FreeTags (PU_LEVEL, PU_PURGELEVEL-1);
-  /* CGDoom step 3: slow WAD mapping, make room for this level's lumps */
+  /* CGDoom: slow WAD mapping, make room for this level's lumps */
   W_SlowLevelStart ();
 
 
@@ -712,7 +712,7 @@ void P_SetupLevel ( int episode, int map, int playermask)
 
   // preload graphics
   //if (precache) R_PrecacheLevel ();
-  /* CGDoom: precaching only when the WAD mapping is slow (step 3): it copies
+  /* CGDoom: precaching only when the WAD mapping is slow: it copies
      the level's graphics into the zone (w_wad.c, W_CopySlowLump) */
   if (W_WadSlow)
     R_PrecacheLevel ();

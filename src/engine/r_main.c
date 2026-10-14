@@ -570,7 +570,7 @@ void R_SetViewSize( int		blocks, int detail )
 extern int	detailLevel;
 extern int	screenblocks;
 
-/* CGDoom step 3: run-time renderer settings (cgdoom.h). They update
+/* CGDoom: run-time renderer settings (cgdoom.h). They update
    CGD_Options and request a view size change, so that the new drawers and
    tables are set up between two frames. */
 void CGD_SetLowDetail (int on)
@@ -618,7 +618,7 @@ void R_ExecuteSetViewSize (void)
     viewheight = (setblocks*168/10)&~7;
   }
 
-  /* CGDoom step 3: low detail is back (vanilla's detailshift path) */
+  /* CGDoom: low detail through vanilla's detailshift path */
   detailshift = setdetail ? 1 : 0;
   viewwidth = scaledviewwidth>>detailshift;
 
@@ -725,7 +725,7 @@ void R_Init (void)
 {
   printf ("R_InitData\n");
   R_InitData ();
-  /* CGDoom step 3: view size and detail from the options (vanilla read
+  /* CGDoom: view size and detail from the options (vanilla read
      them from the config file defaults). screenblocks is 3..11 as in
      vanilla (11 = full screen, no status bar; CGDoom's default is 10). */
   screenblocks = CGD_Options.ViewSize;

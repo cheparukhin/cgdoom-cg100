@@ -204,8 +204,8 @@ void R_RenderSegLoop (void)
   int			top;
   int			bottom;
 
-  /* CGDoom (step 2): the loop state is kept in locals. As globals, the
-     compiler had to reload and store all of them around every R_DrawColumn
+  /* CGDoom: the loop state is kept in locals. As globals, the compiler
+     would have to reload and store all of them around every R_DrawColumn
      call (about a third of this loop's instructions). Nothing called from the
      loop (the column drawers, R_GetColumn and the zone/WAD code below it)
      reads or writes these globals, so this is the same computation; the
@@ -314,7 +314,7 @@ void R_RenderSegLoop (void)
 
       texturecolumn = 0;
     }
-    /* CGDoom (polish): the lighting and dc_x/dc_iscale are set up only
+    /* CGDoom: the lighting and dc_x/dc_iscale are set up only
        before the first tier this column actually draws (SEG_COLUMN_SETUP).
        Every other reader of dc_colormap, dc_x and dc_iscale (masked segs,
        sprites, sky) sets them itself first, and the values at each colfunc
@@ -326,7 +326,7 @@ void R_RenderSegLoop (void)
     if (midtex)
     {
       // single sided line
-      /* CGDoom (polish): vanilla calls R_GetColumn and colfunc even when
+      /* CGDoom: vanilla calls R_GetColumn and colfunc even when
          yh < yl (26% of the column calls in e1m1); every column drawer
          returns at once for dc_yh < dc_yl (count < 0), so skipping both
          draws the same frame (only the texture cache traffic differs).
@@ -433,7 +433,7 @@ void R_RenderSegLoop (void)
 
 
 
-/* CGDoom (step 2): copy n clip shorts (vanilla used memcpy). The copies are
+/* CGDoom: copy n clip shorts (vanilla used memcpy). The copies are
    short (often a few columns); fxlibc's memcpy does sizes below 64 bytes
    byte by byte, and lastopening is only 2-byte aligned. */
 static inline void R_CopyClip (short *dest, const short *src, int n)
@@ -688,10 +688,10 @@ void R_StoreWallRange ( int start, int stop )
         rw_bottomtexturemid = worldlow;
       rw_bottomtexturemid += sidedef->rowoffset;
     }
-    /* CGDoom: the row offset is added inside each block (external review).
-       Vanilla added it to both midpoints of every two-sided wall, so the
-       global of an absent upper or lower part kept growing until it
-       overflowed (signed overflow, UB). Such a midpoint is never used
+    /* CGDoom: the row offset is added inside each block. Vanilla adds it
+       to both midpoints of every two-sided wall, so the global of an absent
+       upper or lower part keeps growing until it overflows (signed
+       overflow, UB). Such a midpoint is never used
        (toptexture/bottomtexture are only set in these blocks): no output
        change (tests/scenarios.txt e2m5-walk). */
 

@@ -7,7 +7,7 @@
 # player dies and respawns) with -record into DIR, checks that the file got
 # its 8.3 name (FRE0PD05.LMP for freedoom1, src/engine/cgdoom-names.c), plays
 # it back with -playdemofile and requires the playback to render exactly the
-# recorded frames. Then (external review, 2026-10-11) a recording that opens
+# recorded frames. Then a recording that opens
 # the Doom menu for a while: the menu pauses the level but not playback, so
 # the paused tics must not be in the demo. The per-tic game states
 # (-demotrace, without gametic; the paused tics collapse into one) of the

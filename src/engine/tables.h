@@ -54,8 +54,7 @@ extern const fixed_t		finetables[FINEANGLES/2 + 5*FINEANGLES/4];
 #define finesine		(finetables + FINEANGLES/2)
 
 // Re-use data, is just PI/2 phase shift.
-// CGDoom: a function instead of vanilla's pointer alias (static inline since
-// step 1 of the port; it used to be out of line in r_main.c).
+// CGDoom: a static inline function instead of vanilla's pointer alias.
 static inline fixed_t finecosine(int fine)
 {
   return finesine[fine + FINEANGLES/4];
@@ -85,7 +84,7 @@ extern const angle_t		tantoangle[SLOPERANGE+1];
 
 // Utility function,
 //  called by R_PointToAngle.
-// (static inline since step 1 of the port; was in tables.c)
+// (CGDoom: static inline; vanilla's is in tables.c)
 static inline int
 SlopeDiv
 ( unsigned	num,

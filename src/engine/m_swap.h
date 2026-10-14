@@ -35,8 +35,8 @@
 unsigned short	SwapSHORT(const unsigned short);
 unsigned long	SwapLONG(const unsigned long);
 
-/* CGDoom port (step 2, notes/engine-changes.md): the little-endian readers
-   are static inline (they were out-of-line calls on every patch column).
+/* CGDoom port: the little-endian readers are static inline, not
+   out-of-line calls: they run on every patch column.
 
    SHORTFromBytes / INTFromBytes read a little-endian value byte by byte and
    accept any alignment: WAD data can be misaligned (fields inside

@@ -395,8 +395,8 @@ fixed_t		sprtopscreen;
 
 void R_DrawMaskedColumn (const column_t* column)
 {
-  /* CGDoom (polish): the loop state is kept in locals, as step 2 did for
-     R_RenderSegLoop. As globals, the compiler had to reload sprtopscreen,
+  /* CGDoom: the loop state is kept in locals, as in R_RenderSegLoop. As
+     globals, the compiler would have to reload sprtopscreen,
      spryscale, dc_x, mfloorclip[dc_x], mceilingclip[dc_x] and colfunc after
      every store to dc_* and around every colfunc call. Nothing called from
      here (the column drawers) writes them: the drawers write the frame

@@ -286,7 +286,7 @@ void ui_message_timeout(char const *title, char const *text, int timeout_ms)
 {
 	/* For the screens shown with the idle hook off (exit path): the add-in
 	   owns the interrupts, so an unbounded wait here would keep the
-	   calculator on until the battery is flat (gint review round 2) */
+	   calculator on until the battery is flat */
 	message_draw(title, text, true);
 	uint32_t start = PL_GetMicros();
 	uint32_t limit = (uint32_t)timeout_ms * 1000u;

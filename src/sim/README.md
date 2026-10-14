@@ -18,18 +18,12 @@ and the scripts use absolute tool paths.
 
 ## 1. Using it from the root Makefile
 
-```make
--include src/sim/sim.mk              # after the root's own default goal (the fragment preserves it)
-
-SIM_OBJS := $(patsubst src/%.c,$(SIM_BUILD)/%.o,$(ENGINE_SRCS) $(HOST_SRCS))   # your own list
-
-$(SIM_BUILD)/%.o: src/%.c
-	$(call sim-cc,$<,$@)                                  # $(SIM_CC) $(SIM_CFLAGS) -MMD -MP -c
-$(SIM_BUILD)/cgdoom-sim.elf: $(SIM_OBJS) $(SIM_RUNTIME_OBJS) $(SIM_DIR)/sim.ld
-	$(call sim-link,$@,$(SIM_OBJS))                       # adds runtime objs, libs, writes <elf>.map
-sim: $(SIM_BUILD)/cgdoom-sim.elf
-	$(SIM_RUNNER) --stats $< -iwad test-wads/fd/freedoom-0.13.0/freedoom1.wad -warp 1 1 -tics 100
-```
+The root Makefile includes `sim.mk` after its own default goal (the fragment preserves it), then
+`cgdoom.mk`, the client that builds CGDoom (§9). `cgdoom.mk` is the reference for writing another one:
+it compiles its objects into `$(SIM_BUILD)` (with its own flags, or with `$(call sim-cc,<src>,<obj>)`
+for plain `$(SIM_CFLAGS)`), links them with `$(call sim-link,<elf>,<objs>)`, which adds the runtime
+objects and libraries and writes `<elf>.map`, and runs the ELF through `$(SIM_RUNNER)`. The rules for
+`make test-fixed-sim` / `make test-div-sim` in the root Makefile are smaller examples of the same pattern.
 
 Variables defined by `sim.mk` (set `SIM_BUILD` etc. *before* the include; append with `+=` after it):
 
@@ -276,6 +270,9 @@ override). Differences from the stock simulator:
 | `libc-glue.c` | allocator, `memalign`, `bsearch`, `strupr`, `getenv`, fxlibc HAL pieces |
 | `sim.h` | harness API (heap info, counters, marks, syscall numbers, memory-map symbols) |
 | `sim.mk`, `Makefile` | make fragment for the root Makefile; standalone entry (`make -C src/sim`) |
+| `cgdoom.mk` | the CGDoom client of `sim.mk`, included by the root Makefile: `make sim`, `test-sim`, `test-sim-full`, `test-demosync-sim`, `perf-sim` (§9) |
+| `cgdoom-hooks.c` | sim-only measurement hooks linked into `cgdoom-sim.elf` through `-Wl,--wrap=` (`-simwin`, `-simstats`, `-simmarks`) |
+| `test-sim.sh`, `perf-sim.sh` | the scripts behind `make test-sim` and `make perf-sim` |
 | `simrun`, `simbench`, `simprof` | run wrapper (digit args, stats), differential benchmark driver, profile viewer (python3) |
 | `gdbsim/sim64.patch`, `gdbsim/build.sh` | simulator patch and its build script |
 | `test/selftest.c`, `test/insns.s` | the self test (stdio on the WAD, file write/append/update, 64-bit math, allocator stress with `sim_heap_check`, libc/libm, SH4A/DSP opcodes, sim64 counters) |
@@ -305,4 +302,13 @@ directory changes, `.cgsim-variant`):
 | `make sim` | build the ELF |
 | `make test-sim` | `test-sim.sh`: first `SIM_TEST_TICS` (60) tics of e1m1, map01, demo1 must equal the first lines of the host goldens (~6 s) |
 | `make test-sim-full` | every scenario of `tests/scenarios.txt` through `tests/run-scenarios.sh -runner simrun` (35, ~245 s) |
+| `make test-demosync-sim` | `tests/demo-sync.sh` with the sim ELF: DEMO1-3 of the shareware `doom1.wad` given by `CGD_DOOM1_WAD` must give the same per-tic game-state traces as the host (`tests/demosync/*.ckpt`); skipped when `CGD_DOOM1_WAD` is not set |
 | `make perf-sim` | `perf-sim.sh`: per-frame insts/cycles table + PC profiles (needs sim64), results in `build-sim/perf/` |
+
+The root Makefile also has two exactness tests for the simulator, outside `cgdoom.mk`. They are the gate
+for any SH-specific change to `FixedMul`/`FixedDiv` or the division helpers of `m_fixed.h`:
+
+| target | what |
+|---|---|
+| `make test-fixed-sim` | `tests/fixed_exact.c` built for SH: `FixedMul`/`FixedDiv` (the SH `FixedDiv` is inline asm in `m_fixed.c`) against the vanilla definitions, edge values plus `FIXED_SIM_PAIRS` (3M) random pairs |
+| `make test-div-sim` | `tests/div_exact.c` built for SH: the `m_fixed.h` division helpers (`IntDivPos`, `IntCycleFill`) against the C operators (libgcc on SH) |

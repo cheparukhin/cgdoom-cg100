@@ -8,7 +8,7 @@
 #                    (and the save-entry, demo-unbegun, map-limit and robust tests)
 #   make test-fixed  FixedMul/FixedDiv vs vanilla exactness test (PASS/FAIL)
 #   make test-fixed-sim  the same test built for SH and run in the simulator
-#   make test-div    step-2 exact division helpers vs the C operators (host)
+#   make test-div    exact division helpers vs the C operators (host)
 #   make test-div-sim    the same test in the SH simulator
 #   make test-names  8.3 file-name mapping test (src/engine/cgdoom-names.c)
 #   make test-roundtrip  record a demo (8.3 name) and play it back identically
@@ -130,7 +130,7 @@ $(HOST_BUILD)/fixed-exact: $(ROOT)/tests/fixed_exact.c $(ROOT)/src/engine/m_fixe
 	@mkdir -p $(dir $@)
 	$(HOST_CC) -std=gnu11 -O2 $(HOST_WARN) $(HOST_INC) $(filter %.c,$^) -o $@
 
-# Step-2 division helpers (m_fixed.h IntDivPos/IntCycleFill) vs C operators
+# Exact division helpers (m_fixed.h IntDivPos/IntCycleFill) vs C operators
 test-div: $(HOST_BUILD)/div-exact
 	$(HOST_BUILD)/div-exact
 
@@ -237,7 +237,7 @@ clean:
 	rm -rf $(HOST_BUILD) $(ASAN_BUILD)
 
 #---
-# Simulator builds (src/sim/sim.mk, written separately; optional)
+# Simulator builds (src/sim/sim.mk and src/sim/cgdoom.mk; optional)
 #---
 
 -include $(ROOT)/src/sim/sim.mk
@@ -267,7 +267,7 @@ $(FIXED_SIM_ELF): $(FIXED_SIM_OBJ) $(SIM_RUNTIME_OBJS) $(SIM_DIR)/sim.ld
 test-fixed-sim: $(FIXED_SIM_ELF)
 	$(SIM_RUNNER) $(FIXED_SIM_ELF) $(FIXED_SIM_PAIRS) $(FIXED_SIM_DOUBLE_EVERY)
 
-# The step-2 division helpers in the SH simulator (tests/div_exact.c; the
+# The exact division helpers in the SH simulator (tests/div_exact.c; the
 # references are libgcc's __sdivsi3_i4i and __divdi3)
 DIV_SIM_PAIRS ?= 2000000
 DIV_SIM_ELF   := $(ROOT)/build-sim/tests/div-exact.elf

@@ -5,8 +5,9 @@
                  evicted). Define CGD_SH4_NO_ILRAM to keep them in .text (A/B tests, or when
                  IL memory is needed for something else). The SH simulator harness (src/sim/sim.ld)
                  maps ".ilram" into its plain RAM, so sim builds work either way.
-   CGD_SH4_COLD  rare drawers (fuzz, translated) and the presenter routines: always .text.
-                 Define CGD_SH4_EXPAND_ILRAM to put the palette expansion into .ilram as well. */
+   CGD_SH4_COLD  rare drawers (fuzz, translated): always .text.
+   CGD_SH4_EXPAND  palette expansion and cgd_fill32 (expand_sh4.S): .text, or ".ilram" when
+                 CGD_SH4_EXPAND_ILRAM is defined (and CGD_SH4_NO_ILRAM is not). */
 #ifndef CGD_SH4_ASM_H
 #define CGD_SH4_ASM_H
 

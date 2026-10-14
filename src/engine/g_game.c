@@ -511,10 +511,10 @@ void G_Ticker (void)
 
   // get commands
   // check for special buttons
-  // CGDoom (external review): while the menu pauses the level (P_Ticker),
-  // a recording takes no ticcmd at all. Playback, where the menu never
-  // pauses, must run exactly the tics the recording ran; vanilla recorded
-  // these and the demo desynced. A pause or save request made meanwhile
+  // CGDoom: while the menu pauses the level (P_Ticker), a recording takes
+  // no ticcmd at all. Playback, where the menu never pauses, must run
+  // exactly the tics the recording ran; recording these, as vanilla does,
+  // desyncs the demo. A pause or save request made meanwhile
   // waits in sendpause/sendsave for the first tic after the menu.
   if (playeringame[0]
     && !(demorecording && gamestate == GS_LEVEL && P_MenuPaused ()))
@@ -1098,10 +1098,10 @@ void G_DoLoadGame (void)
     }
 
     /* CGDoom: gameskill keeps the current skill until G_InitNew, which
-       switches the fast monsters by comparing the two (external review:
-       vanilla set it first, so a Nightmare save loaded from the title of a
-       fresh session had normal-speed monsters, and a normal save loaded
-       during a Nightmare game kept fast ones). Demos never load saves. */
+       switches the fast monsters by comparing the two (vanilla sets it
+       first, so a Nightmare save loaded from the title of a fresh session
+       has normal-speed monsters, and a normal save loaded during a
+       Nightmare game keeps fast ones). Demos never load saves. */
     gameepisode = episode;
     gamemap = map;
     for (i=0 ; i<MAXPLAYERS ; i++)
@@ -1216,7 +1216,7 @@ void G_DoSaveGame (void)
       strcpy(dfw->filename, name);
     }
     else {
-      /* CGDoom (final review): the platform may refuse the write (gint:
+      /* CGDoom: the platform may refuse the write (gint:
          no memory to delay it while the WAD block map is live); say so
          instead of "game saved." */
       save_failed = PL_FileWrite(name, savebuffer, length) < 0;
@@ -1432,7 +1432,7 @@ void G_WriteDemoTiccmd (ticcmd_t* cmd)
   /* CGDoom: unreachable in practice, M_Responder eats every KEY_ESCAPE
      press (it opens/closes the menu), so gamekeydown[KEY_ESCAPE] is never
      set; recordings end at a played demo (G_DoPlayDemo), a full buffer or
-     the quit (wiring review) */
+     the quit */
   if (gamekeydown[KEY_ESCAPE])           // press MENU to end demo recording
   {
     G_CheckDemoStatus (); 

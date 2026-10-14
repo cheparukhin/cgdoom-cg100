@@ -1,4 +1,4 @@
-/* cgd_sh4.h - SH4 (SH4AL-DSP, fx-CG100/CG50) assembly renderer routines for CGDoom.
+/* cgd_sh4.h - SH4 (SH4AL-DSP, fx-CG100) assembly renderer routines for CGDoom.
 
    See README.md in this directory for the full contract, register usage, timings and the exact
    integration steps. Summary:
@@ -66,7 +66,7 @@ extern struct cgd_sh4_cmaps cgd_sh4_cmaps;
 /* ---- Palette expansion for the presenter (expand_sh4.S) ------------------------------------------
    dst[i] = pal[src[i]] for 0 <= i < npixels. Contract (src/gint/cgd_gint.h): src 4-byte aligned,
    npixels % 16 == 0, dst 32-byte aligned and either cached P1 SDRAM (0x80000000-0x9fffffff) or
-   on-chip X/Y memory (anything else). For P1 dst each 32-byte line is allocated with movca.l
+   any other address, e.g. on-chip X/Y memory (supported; the presenter does not use it). For P1 dst each 32-byte line is allocated with movca.l
    (no line fill) and purged with ocbp after being written (data is in RAM when the function
    returns: the caller needs only a synco before starting a DMA, as src/gint/video.c
    present_dma() does). Other dst: plain stores only.
@@ -75,10 +75,10 @@ extern struct cgd_sh4_cmaps cgd_sh4_cmaps;
    peak, ~870 modelled cycles per call); smaller counts use a byte loop (8-10 cycles/pixel). */
 void cgd_expand_p8_rgb565(uint16_t *dst, uint8_t const *src, uint16_t const *pal, int npixels);
 
-/* Same loop without the per-call table build (modelled 2.81 cycles/pixel against ~3.09 for the
-   plain entry at 3200 pixels, the presenter's strip size, 20 calls per frame; ~2.83 at 64000, one
-   call per frame in DMA mode), using a 1 KiB table built from the palette by
-   cgd_expand_build_pal32() (rebuild it whenever pal changes, e.g. in PL_SetPalette).
+/* Same loop without the per-call table build (modelled 2.81 cycles/pixel against ~2.83 for the
+   plain entry at 64000 pixels, the presenter's one call per frame, and ~3.09 at 3200), using a
+   1 KiB table built from the palette by cgd_expand_build_pal32() (rebuild it whenever pal
+   changes, e.g. in PL_SetPalette).
    pal32 must be 4-byte aligned; layout: pal32[k] = pal[k^0x80] * 0x00010001. */
 void cgd_expand_build_pal32(uint32_t *pal32, uint16_t const *pal);
 void cgd_expand_p8_rgb565_p32(uint16_t *dst, uint8_t const *src, uint32_t const *pal32, int npixels);

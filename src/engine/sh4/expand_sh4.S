@@ -464,7 +464,7 @@ FUNC(cgd_expand_p8_rgb565)
 	mov.l	r10, @-r15
 	/* table[j] = dup(pal[j + 128]), table[j + 128] = dup(pal[j]), j < 128, two j per iteration:
 	   8 LS + 11 EX + bf: 12 issue cycles, 13 per iteration with the taken branch (14 with GCC's
-	   3-cycle loads), ~830 for the table (the one-j loop before review round 1: 10 per j, ~1300).
+	   3-cycle loads), ~830 for the table.
 	   dup(v): swap.w v,t; xtrct v,t = (v << 16) | v.
 	   Hand-ordered in aligned LS|EX pairs (nop = padding that keeps the pairs aligned). */
 	ALIGN4

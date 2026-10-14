@@ -2,7 +2,8 @@
 
    mpm.bin 1.1 announces its free RAM to gint through the loadinfo block
    ('MPM0'): gint turns it into the "_ld1" arena, which ends where our code
-   was loaded (about 5.5 MiB with the bundled build). Older mpm.bin builds
+   was loaded (about 5.5 MiB; players get mpm.bin 1.1 from casio-mpm-220).
+   Older mpm.bin builds
    (the public Feb-2025 zip, the "dynload" build shipped by gpSP and KhiCAS)
    announce at most about 2 MiB, and CGDoom does not look for the rest: main()
    refuses them (CGD_MIN_TOTAL_HEAP) and asks for an OS-matching MPM 1.1-based menu.

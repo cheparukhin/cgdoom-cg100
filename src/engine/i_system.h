@@ -63,7 +63,7 @@ void I_Restore (void);
 // Can call D_PostEvent.
 void I_StartTic (void);
 
-// CGDoom step 3: called by D_DoomLoop after each tic (gametic already
+// CGDoom: called by D_DoomLoop after each tic (gametic already
 // incremented): whether to render a frame now (fixed or automatic
 // frameskip, cgdoom.h CGD_AutoFrameskip), and after each rendered frame
 // (FPS counter).

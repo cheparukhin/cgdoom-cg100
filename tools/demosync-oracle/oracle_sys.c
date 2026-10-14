@@ -5,7 +5,8 @@
  * a per-tic game-state trace at the end of every G_Ticker (ORACLE_TraceTic,
  * called from the patched g_game.c) in exactly the format of cgdoom-host's
  * -demotrace, to the file named by $ORACLE_TRACE (default stdout).
- * See build.sh and notes/engine-changes.md, "Demo sync". */
+ * The format is defined twice, here and in cgdoom-host's demotrace_tic
+ * (src/host/host_main.c): the two must stay identical. See build.sh. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>

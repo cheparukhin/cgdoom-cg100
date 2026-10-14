@@ -21,7 +21,7 @@ typedef struct {
     FILE *crc_file;         /* per-frame CRC output (NULL = none) */
     const char *shot_prefix;/* PPM screenshots (NULL = none) */
     int shot_every;         /* every N frames (0 = last frame only) */
-    /* Virtual clock (step 3): each presented frame advances it by
+    /* Virtual clock: each presented frame advances it by
        frame_mtics, each game tic (PL_ScanKeyboard) by tic_mtics, in 1/1000
        tic (defaults 1000 and 0: one tic per frame, singletics). Lets tests
        model a slow renderer deterministically (-rendercost/-ticcost). */

@@ -147,7 +147,7 @@ void HUlib_eraseTextLine(hu_textline_t* l)
       else
       {
         R_VideoErase(yoffset, viewwindowx); // erase left border
-        /* CGDoom step 3: scaledviewwidth (vanilla used viewwidth, which
+        /* CGDoom: scaledviewwidth (vanilla used viewwidth, which
            is half of it in low detail) */
         R_VideoErase(yoffset + viewwindowx + scaledviewwidth, viewwindowx);
         // erase right border

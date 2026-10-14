@@ -1,5 +1,6 @@
 #!/bin/sh
-# Build the linuxdoom-1.10 demo-sync oracle (notes/engine-changes.md, "Demo sync").
+# Build the linuxdoom-1.10 demo-sync oracle: the reference that
+# tests/demosync/*.ckpt are checked against before tests/demo-sync.sh -update.
 #
 #   tools/demosync-oracle/build.sh [linuxdoom-1.10.src.tgz] [OUTDIR]
 #

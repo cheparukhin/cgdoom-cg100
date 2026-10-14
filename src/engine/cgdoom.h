@@ -66,7 +66,7 @@ int CGD_FlushDelayedWrites(void);
 /* The settings file is text-based and probably doesn't ever need to change
    even if settings are added or removed. This is just in case. */
 #define CGDOOM_SETTINGS_FILE_VERSION 1
-/* Strict 8.3 name (notes/design.md §7; the file system ignores case) */
+/* Strict 8.3 name (the file system ignores case) */
 #define CGDOOM_SETTINGS_FILE "CGDOOM.CFG"
 
 typedef struct {
@@ -76,7 +76,7 @@ typedef struct {
     /* Custom controls. */
     CGDoom_Keymap Keymap;
 
-    /* Renderer settings (step 3), applied by R_Init and kept up to date when
+    /* Renderer settings, applied by R_Init and kept up to date when
        they change in the game (menu detail item, view size keys), so that a
        platform saving the options after the game keeps them:
        - LowDetail: vanilla's low detail (detailshift 1): 160-column view,
@@ -110,7 +110,7 @@ extern int CGD_TitleDemos;
 /* Skip this amount of frames after every rendered frame (default 1); used
    when CGD_AutoFrameskip is 0 (fixed frameskip, CGDoom's semantics) */
 extern int CGD_Frameskip;
-/* Automatic frameskip (step 3, design §8). 0 = fixed CGD_Frameskip. N > 0 =
+/* Automatic frameskip. 0 = fixed CGD_Frameskip. N > 0 =
    auto: game tics stay at 35 Hz real time (PL_GetTics) and a rendered frame
    (D_Display) is skipped while the game is behind real time, with at most
    N consecutive skipped frames (at least one frame every N+1 tics). When
@@ -212,7 +212,7 @@ typedef struct
    uint64_t LumpsReferencedTotal;
    uint64_t UnalignedLumpsLoadedTotal;
 
-   /* Slow WAD mapping (step 3, PL_WadIsSlow): mappable lumps copied into the
+   /* Slow WAD mapping (PL_WadIsSlow): mappable lumps copied into the
       zone (count, bytes; also counted in LumpsLoaded), and mappable lumps
       referenced in place because the zone was too full (also counted in
       LumpsReferenced) */
@@ -220,7 +220,7 @@ typedef struct
    uint64_t SlowLumpsCopiedTotal;
    int SlowLumpsInPlace;
 
-   /* Renderer limits (step 2): per-frame peaks of visplanes, drawsegs,
+   /* Renderer limits: per-frame peaks of visplanes, drawsegs,
       vissprites and openings (shorts) in use, the number of frames that went
       over vanilla's static limits (128, 256, 128, 320*64; those frames
       would have dropped walls/sprites or crashed before), and the walls and
@@ -232,8 +232,8 @@ typedef struct
    int FramesOverVanillaLimits;
    int DrawsegsDropped;
    int VisspritesDropped;
-   /* Zone bytes held by these renderer arrays (they were static before
-      step 2), current and peak */
+   /* Zone bytes held by these renderer arrays (vanilla's are static),
+      current and peak */
    int RenderArrayBytes;
    int RenderArrayBytesPeak;
 

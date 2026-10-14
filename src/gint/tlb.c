@@ -11,9 +11,8 @@
       gint_world_switch_in(), after gint_call(), the on-chip memory
       restore, the canary check and the funbind loop. Our os_* callbacks
       (wad.c, files.c) and that part of gint all run from P0 in this window,
-      so a miss there goes to the OS's handler. (An earlier version of this
-      comment claimed layer 1 covered it; gint review round 1.)
-   2. Pinning (gint review round 1): move the entries of the image pages
+      so a miss there goes to the OS's handler.
+   2. Pinning: move the entries of the image pages
       into the slots just below MMUCR.URB and lower URB under them. LDTLB
       with MMUCR.URC (the OS's replacement, and our handler's) only selects
       slots below URB, so the OS can no longer evict them, in either world.
@@ -25,17 +24,15 @@
       pages and rewrite the ones that are missing (and the URB, if the OS
       changed it), using the same executor. Unpinned pages already
       re-loaded elsewhere by the handler are left alone; pinned ones are
-      moved back. Pages MPM maps beyond the image are not repaired (round
-      2): nothing runs there, the handler reloads them on demand.
-   At exit (gtlb_quit, run from main.c's destructor; gint review rounds 2
-   and 3.1), every snapshot page is put back in the slot MPM gave it, every
-   other copy is dropped and the original URB is restored. Required: only mpm.bin v1.1 flushes
-   the TLB (invalidateTLB) before the next launch and only dynload rewrites
-   all of slots 0..54. The Feb-2025 public mpm.bin (and a1a2cc3, 0fb6cec)
-   maps ROM pages into slots 0..47 only, never sets MMUCR.TI, and leaves
-   48..54 alone, so a copy of one of our pages left in 49..53 would make
-   the next add-in launch hit two UTLB entries (reset). It runs from a
-   destructor, not an atexit handler: gint's start2 runs .dtors after
+      moved back. Pages MPM maps beyond the image are not repaired:
+      nothing runs there, the handler reloads them on demand.
+   At exit (gtlb_quit, run from main.c's destructor), every snapshot page is
+   put back in the slot MPM gave it, every other copy is dropped and the
+   original URB is restored. This is defence in depth: mpm.bin 1.1 rewrites
+   all 64 UTLB entries and resets URC before the next launch anyway, but a
+   copy of one of our pages left in a pinned slot would make a loader that
+   rewrites fewer entries hit two UTLB entries on the next launch (reset). It
+   runs from a destructor, not an atexit handler: gint's start2 runs .dtors after
    exit() AND after abort() (raise -> _Exit longjmp), which skips atexit
    handlers; that covers the chord's hang fallback (time.c) and EXIT on
    gint's panic screen.
@@ -162,11 +159,11 @@ static bool setup_executor(void)
 
 /* Run ops, then set MMUCR = mmucr. Interrupts must be masked.
 
-   Only through the executor (gint review round 2). The former direct
-   fallback (MMUCR.URC + ldtlb from P0) did not drop the other entries of
-   the page, which the planners assume (a foreign entry overlapping the
-   page would have become a multiple hit), and ran from P0, where an ITLB
-   refill between the URC write and ldtlb can move URC. Invalidating
+   Only through the executor. A direct path (MMUCR.URC + ldtlb from P0)
+   would not drop the other entries of the page, which the planners assume
+   (a foreign entry overlapping the page would become a multiple hit), and
+   would run from P0, where an ITLB refill between the URC write and ldtlb
+   can move URC. Invalidating
    through the address array needs P1/P2 code, i.e. the executor; without
    it, nothing is written (callers check g_apply). */
 static void apply(gtlb_op_t const *ops, int n, uint32_t mmucr)
@@ -273,7 +270,7 @@ void gtlb_init(bool safe)
 		install_handler();
 	if(!gtlb_stats.handler)
 		return;
-	/* Safe start (final review): no executor, so no pinning and no
+	/* Safe start: no executor, so no pinning and no
 	   ldtlb from our code, a session-only escape from a pinning problem
 	   on hardware without a rebuild (CGD_TLB_PIN=0). The handler stays:
 	   gint's would jump to the fx-CG50 syscall gate. */
@@ -309,10 +306,10 @@ void gtlb_repair(void)
 			fix_urb ? g_pin_lo : urb));
 	cpu_atomic_end();
 
-	/* Diagnostics (gint review round 1): repairs > 0 in the logs means the
-	   OS does evict our image pages during world switches (since round 2
-	   only image pages are tracked, so OS reuse of the slots of the pages
-	   beyond the image no longer counts) */
+	/* Diagnostics: repairs > 0 in the logs means the OS does evict our
+	   image pages during world switches (only image pages are tracked,
+	   gtlb_track_image, so OS reuse of the slots of the pages beyond the
+	   image does not count) */
 	gtlb_stats.last_repairs = count;
 	gtlb_stats.repairs += count;
 	if(fix_urb)

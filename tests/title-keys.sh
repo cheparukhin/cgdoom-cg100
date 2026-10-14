@@ -4,11 +4,10 @@
 #
 #   title-keys.sh -bin <cgdoom-host> [-out DIR]
 #
-# External review: before the first level starts there is no player (the
-# status bar's plyr is NULL), and the special keys that showed a message
-# (gamma, cheat, noclip; also frameskip, memory statistics and the profiler
-# report, since removed) wrote through it: a crash on the calculator from
-# the title screen. tests/input/title-keys.txt presses each special key
+# Before the first level starts there is no player (the status bar's plyr
+# is NULL), and a special key that shows a message (gamma, cheat, noclip)
+# must not write through it: that would crash the calculator from the
+# title screen. tests/input/title-keys.txt presses each special key
 # once on the title screen, then the title loop goes on.
 # Second run: with title demos on (-demos, as on the calculator), a key
 # pressed during a demo opens the Doom menu, as in vanilla

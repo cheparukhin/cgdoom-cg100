@@ -1,9 +1,9 @@
 /* Host unit test for src/gint/files.c and src/gint/wad.c (RAM image, BFile
    modes, delayed writes, 8.3 mapping) against a simulated Fugue/BFile.
    Usage: test_files [file.wad...] (WAD tests are skipped without files).
-   gint review round 1: failed writes leave no partial file behind, and the
-   first failure is reported by name (gfs_last_failure).
-   gint review round 2: files.c is #included with malloc interposed, to
+   Failed writes leave no partial file behind, and the first failure is
+   reported by name (gfs_last_failure).
+   files.c is #included with malloc interposed, to
    drive PL_FileWrite()'s no-memory path; every failure of the session is
    reported at exit (gfs_failure_text), not only the exit flush's.
    A replacement with a file of another size that fails (storage full, write
@@ -46,7 +46,7 @@ void ui_status(char const *a, char const *b, char const *c) { (void)a; (void)b; 
 size_t gmem_total_free(void) { return 64u << 20; }
 size_t gmem_largest_free(void) { return 64u << 20; }
 void PL_Log(const char *fmt, ...) { va_list a; va_start(a, fmt); printf("  [log] "); vprintf(fmt, a); va_end(a); }
-/* main.c's load-phase quit poll (round 3.2), called by wad.c */
+/* main.c's load-phase quit poll, called by wad.c */
 void gquit_poll_load(void) {}
 
 /* ---- simulated file system ---- */
@@ -326,11 +326,9 @@ static void reset_failures(void)
 }
 
 /* With no memory for its copy, the settings file is written at once from
-   the caller's buffer, like any other file (until 2026-10-14 it was
-   refused, because that buffer lacked the platform's CG.* lines, which no
-   longer exist). main.c notes a CGD_SaveSettings() that could not even
-   allocate its buffer; the exit screen then says the previous settings
-   stay in use. */
+   the caller's buffer, like any other file. main.c notes a
+   CGD_SaveSettings() that could not even allocate its buffer; the exit
+   screen then says the previous settings stay in use. */
 static void test_settings_nomem(void)
 {
 	char text[256] = "", name[GFS_NAME_MAX];
@@ -362,7 +360,7 @@ static void test_settings_nomem(void)
 	strcpy(g_fail_name, name);
 }
 
-/* gint review round 1: os_flush() failure paths. A replacement that does
+/* os_flush() failure paths. A replacement that does
    not fit puts the previous version back (test_replace_rollback); these are
    the failures where that cannot work either, and nothing may be left
    behind. */
@@ -656,7 +654,7 @@ static void test_flush_mixed(void)
 	rm_file("MIXD.DSG");
 }
 
-/* Round 2: what exit_path() shows */
+/* What exit_path() shows */
 static void test_failure_text_clean(void)
 {
 	char text[256];   /* as exit_path() */
@@ -668,7 +666,7 @@ static void test_failure_text_clean(void)
 		"refused flush: generic text: %s", text);
 }
 
-/* Round 2: PL_FileWrite()'s no-memory path writes at once; a failure there
+/* PL_FileWrite()'s no-memory path writes at once; a failure there
    leaves nothing pending but must still be reported at exit */
 static void test_nomem(void)
 {
@@ -703,12 +701,10 @@ static void test_nomem(void)
 		&& gfs_flush_failures() == before + 1, "immediate write ok");
 }
 
-/* Round 3.3: the bogus size an unbegun recording used to produce in the
-   engine's G_CheckDemoStatus() ("demo_p - demobuffer" with demo_p NULL + 1)
-   is refused before the slot's existing demo is touched, on both
-   PL_FileWrite() paths. (end_game_session()'s own gdemo_begun() check was
-   removed: the engine's "begun" flag now drops an armed recording, tested by
-   tests/demo-unbegun.sh; this stays as defence in depth.) */
+/* Defence in depth (GFS_WRITE_MAX): a bogus size such as "demo_p -
+   demobuffer" with demo_p NULL + 1 is refused before the slot's existing
+   demo is touched, on both PL_FileWrite() paths. (The engine drops a
+   recording that never began, tested by tests/demo-unbegun.sh.) */
 static void test_demo_exit(void)
 {
 	static uint8_t demobuf[0x20000];
@@ -734,7 +730,7 @@ static void test_demo_exit(void)
 		"a full 128 KiB demo is written");
 }
 
-/* Final review: a segment chained to the next (file-adjacent, size a
+/* A segment chained to the next (file-adjacent, size a
    multiple of 4) gets no pad of its own; reads and maps across every
    boundary still return the file's bytes, zeros past EOF, 4-aligned */
 static void le32w(uint8_t *p, uint32_t v) { p[0] = v; p[1] = v >> 8; p[2] = v >> 16; p[3] = v >> 24; }
@@ -796,7 +792,7 @@ static void test_packed_image(void)
 	free(f);
 }
 
-/* Final review: PL_WadOpen() says why a file is not usable */
+/* PL_WadOpen() says why a file is not usable */
 static void test_wad_errors(void)
 {
 	uint8_t b[200];
@@ -821,7 +817,7 @@ static void test_wad_errors(void)
 	CHECK(gwad_map_live() == false, "nothing open after the errors");
 }
 
-/* Final review: a list cut at its maximum is reported (gfs_list_more) */
+/* A list cut at its maximum is reported (gfs_list_more) */
 static void test_list_more(void)
 {
 	char d[16];
@@ -844,7 +840,7 @@ static void test_list_more(void)
 	}
 }
 
-/* Final review: PL_FileWrite()'s refusal while the WAD block map is live
+/* PL_FileWrite()'s refusal while the WAD block map is live
    (no memory for a copy) is counted, so the exit screen names the lost
    file; G_DoSaveGame() shows "save failed" from the -1 */
 static int s_block_p0(int fd, int offset, void **ptr) { (void)fd; *ptr = (void *)(uintptr_t)(0x00112900u + offset); return 0; }

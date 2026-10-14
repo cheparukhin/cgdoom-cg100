@@ -174,7 +174,7 @@ void D_Display (void)
       redrawsbar = true;
     if (inhelpscreensstate && !inhelpscreens)
       redrawsbar = true;              // just put away the help screen
-    /* CGDoom step 3: with the full-screen view (screenblocks 11) the status
+    /* CGDoom: with the full-screen view (screenblocks 11) the status
        bar is only drawn with the automap, so it is redrawn in full when the
        automap opens (vanilla did this through ST_Responder's AM_MSGENTERED,
        which CGDoom's automap does not send) */
@@ -197,7 +197,7 @@ void D_Display (void)
     break;
   }
 
-  /* CGDoom step 3: border of a reduced view (screenblocks < 10: the view
+  /* CGDoom: border of a reduced view (screenblocks < 10: the view
      is narrower than the screen). The border is black (CGDoom's
      background, R_VideoErase); it is cleared again whenever something may
      have drawn over it: the menu (active now or in the previous frame), the

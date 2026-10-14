@@ -3,7 +3,7 @@
 
    - gmem_init() removes the OS heap arena;
    - the OS heap arena returns NULL from the very first allocation and
-     never calls the OS (gint review round 1);
+     never calls the OS;
    - PL_GetZones() keeps the malloc reserve and hands out the rest. */
 
 #include "cgd_gint.h"

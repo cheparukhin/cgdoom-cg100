@@ -12,9 +12,9 @@ stores and for each other, and keep their position relative to the instructions 
 Scheduling: greedy cycle-by-cycle list scheduling, priority = longest latency path to the end of
 the block; at most one LS, one EX, one BR per cycle, 2 instructions per cycle; CO alone.
 The output is emitted in issue order; pairs are emitted adjacently. With --pairing aligned (the
-default since review round 2, matching pipesim's default rule) a pair may only start at an even
-instruction position, so the emitted order keeps its pairs when the block starts 4-byte aligned
-(or use --odd-start). The set-up blocks written before round 2 used --pairing any.
+default, matching pipesim's default rule) a pair may only start at an even instruction position,
+so the emitted order keeps its pairs when the block starts 4-byte aligned (or use --odd-start).
+The span set-up blocks of r_draw_sh4.S were ordered with --pairing any.
 """
 import re, sys, argparse
 sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(__file__)))

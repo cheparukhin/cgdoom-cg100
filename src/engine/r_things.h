@@ -28,7 +28,7 @@
 #pragma interface
 #endif
 
-/* CGDoom (step 2, design B10): vissprites grow on demand from vanilla's 128
+/* CGDoom: vissprites grow on demand from vanilla's 128
    up to MAXVISSPRITES; past it sprites are dropped as vanilla did at 128 */
 #define MAXVISSPRITES_INITIAL	128
 #define MAXVISSPRITES  	1024

@@ -1,4 +1,4 @@
-/* CGDoom: link-time guard on gint's _uram arena (gint review round 1).
+/* CGDoom: link-time guard on gint's _uram arena.
 
    Passed to the linker as an implicit linker script (CMakeLists.txt); it
    only adds this assertion to gint's fxcg50.ld.

@@ -201,9 +201,9 @@ In an SH-4 simulator, which counts instructions, they save this much work per fr
 
 | Setting | Work saved per frame |
 |---|---|
-| Detail: Low | 36–39% |
-| View size 9 | 12–16% |
-| View size 7 | 31–38% |
+| Detail: Low | 34–39% |
+| View size 9 | 13–16% |
+| View size 7 | 32–38% |
 
 CGDoom keeps both settings for the next launch.
 
@@ -290,6 +290,7 @@ it with the Diagnostics pages.
   timing and the overclock.
 - **No sound or music.**
 - **Single player only.** Network and co-op play are not supported.
+- **One WAD at a time.** Add-on WADs (PWADs) cannot be loaded on top of an IWAD.
 - **Some WAD demos cannot play.** The engine follows vanilla's game logic and random numbers, and the
   demos DEMO1-3 of the shareware DOOM v1.9 `doom1.wad` play on the title screen exactly like id's
   linuxdoom-1.10, tic by tic, and end on the same tic. Single-player Freedoom demos also play in sync.

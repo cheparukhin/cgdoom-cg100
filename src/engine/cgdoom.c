@@ -47,9 +47,9 @@ int strnicmp(const char *s1,const char *s2,int count)
 	return 0;
 }
 
-/* Step 3: default for platforms that do not define PL_WadIsSlow() yet (the
-   gint platform is expected to: 1 in flash-map/BFile modes, 0 with the WAD
-   in RAM). Weak, so a platform definition replaces it. */
+/* Default for platforms that do not define PL_WadIsSlow() (gint and the
+   host do: gint returns 1 in flash-map/BFile modes, 0 with the WAD in RAM).
+   Weak, so a platform definition replaces it. */
 __attribute__((weak)) int PL_WadIsSlow(void)
 {
 	return 0;
@@ -114,7 +114,7 @@ int CGD_SaveSettings(const CGDoom_Options *o)
 {
 	/* ~30 bytes per keymap entry plus a few lines of options. Not
 	   CGD_malloc: without memory the settings are not saved, which is no
-	   reason for a fatal error at the end of a game (external review) */
+	   reason for a fatal error at the end of a game */
 	char *out_start = malloc(2048);
 	if(!out_start)
 		return -1;
@@ -144,17 +144,17 @@ int CGD_SaveSettings(const CGDoom_Options *o)
 }
 
 /* Whether the key of a settings line (keylen characters) is exactly `name`
-   (step-3 review: the old strncmp(line, name, keylen) accepted any prefix,
-   so "View=" set the first key starting with "View") */
+   (a plain strncmp(line, name, keylen) would accept any prefix, so "View="
+   would set the first key starting with "View") */
 static int SettingIs(const char *key, int keylen, const char *name)
 {
 	return (int)strlen(name) == keylen && !strncmp(key, name, keylen);
 }
 
 /* Integer value of a settings line: an optional '-' and 1..9 digits, nothing
-   else (follow-ups review: atoi() skips leading whitespace, newlines
-   included, so an empty value such as "LowDetail=" read the digits of the
-   next line). Returns 0 and leaves *out alone for anything else. */
+   else (atoi() skips leading whitespace, newlines included, so an empty
+   value such as "LowDetail=" would read the digits of the next line).
+   Returns 0 and leaves *out alone for anything else. */
 static int SettingInt(const char *value, int vlen, int *out)
 {
 	int i = 0, neg = 0, v = 0;
@@ -227,10 +227,10 @@ int CGD_LoadSettings(CGDoom_Options *o)
 			}
 		}
 
-		/* "Keymap.<action>=<key>"; <key> = NONE unbinds the action (gint
-		   review §13: CGD_SaveSettings writes NONE for an action unbound
-		   in the launcher, and it used to be ignored here, so the preset
-		   key came back at the next start) */
+		/* "Keymap.<action>=<key>"; <key> = NONE unbinds the action
+		   (CGD_SaveSettings writes NONE for an action unbound in the
+		   launcher; ignoring it here would bring the preset key back at
+		   the next start) */
 		else if(klen > 7 && !strncmp(key, "Keymap.", 7)) {
 			int k1 = CGD_DoomKey_FromTechnicalName(key+7, klen-7);
 			int k2 = SettingIs(value, vlen, "NONE") ? -1 :

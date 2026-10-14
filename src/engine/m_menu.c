@@ -929,7 +929,7 @@ void M_ChangeSensitivity(int choice)
 
 
 
-/* CGDoom step 3: low detail works again (Chocolate Doom's M_ChangeDetail);
+/* CGDoom: low detail (Chocolate Doom's M_ChangeDetail);
    CGD_SetLowDetail also records it in CGD_Options.LowDetail */
 void M_ChangeDetail(int choice)
 {

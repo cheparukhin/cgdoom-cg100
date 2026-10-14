@@ -1,8 +1,8 @@
 /* CGDoom gint platform: recovery hints for the fatal-error screen.
 
-   PL_Fatal() shows the engine's I_Error() text, then exits to MPM. Final
-   review: the common errors gave the player no next step, so the screen
-   adds one line for them. Pure logic (host-tested, tests/gint-host). */
+   PL_Fatal() shows the engine's I_Error() text, then exits to MPM. For the
+   common errors, which give the player no next step, the screen adds one
+   line. Pure logic (host-tested, tests/gint-host). */
 
 #include "cgd_gint.h"
 
@@ -17,8 +17,8 @@ char const *gfatal_hint(char const *msg)
 	if(strstr(msg, "Z_Malloc"))
 		return "Out of memory for this WAD or level: play a smaller "
 			"WAD.";
-	/* (No demo hint since 2026-10-14: the title loop skips a demo it
-	   cannot play, and demo files are no longer played.) */
+	/* (No demo hint: the title loop skips a demo it cannot play, and
+	   demo files are not played.) */
 	/* g_game.c, p_saveg.c: "Bad savegame..." (G_DoLoadGame) */
 	if(strstr(msg, "Bad savegame"))
 		return "This savegame is damaged, or was made with another WAD "

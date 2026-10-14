@@ -58,7 +58,7 @@ pass() { passes=$((passes + 1)); }
 # A sanitizer report in a log (I_Error exits with status 2, a crash with another one)
 crashed() { grep -q -E 'AddressSanitizer|runtime error|LeakSanitizer' "$1"; }
 
-# The binary with a watchdog: a run that hangs (monsters used to look for a player forever
+# The binary with a watchdog: a run that hangs (e.g. monsters looking for a player forever
 # in a demo without one) ends with SIGALRM, exit status 142
 WATCHDOG=120
 [ -n "$RUNNER" ] && WATCHDOG=1800

@@ -19,7 +19,8 @@
 //	Sound effect numbers (sfxenum_t) of linuxdoom-1.10 sounds.h.
 //	CGDoom plays no sound; only the numbers are kept, because the
 //	mobjinfo sound fields decide game-state P_Random calls (A_Look,
-//	A_Chase, A_Scream). See notes/engine-changes.md, "Demo sync".
+//	A_Chase, A_Scream): info.c's sound fields are game state, and demos
+//	must stay in sync with linuxdoom-1.10.
 //
 //-----------------------------------------------------------------------------
 

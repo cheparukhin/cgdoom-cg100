@@ -121,7 +121,7 @@ const CGDoom_Keymap CGD_Keymap_FullHands = {
 
 /* The maps above are the fx-CG50 ones. fx-CG100 / Graph Math+ keymaps live
    in the platform (src/gint/keymaps.c), which copies a preset into
-   CGD_Options.Keymap (design.md §8). */
+   CGD_Options.Keymap. */
 
 void CGD_CopyKeymap(CGDoom_Keymap dest, const CGDoom_Keymap src)
 {
@@ -141,26 +141,26 @@ static int DecodeKeymap(const CGDoom_Keymap map, int key)
 // Physical keyboard state (scanned by the platform)
 //---
 
-/* Physical key for KEY_ESCAPE when the keymap does not map it (design.md §8:
-   gint sets it to BACK on the fx-CG100, where 0x84 is the D-pad's OK key) */
+/* Physical key for KEY_ESCAPE when the keymap does not map it (gint sets
+   it to BACK on the fx-CG100, where 0x84 is the D-pad's OK key) */
 int CGD_EscapeKeycode = KEYCODE_MENU;
 
 /* Second physical key for KEY_ENTER, besides EXE, when the keymap does not
    use it for an action (-1: none). gint sets it to OK (0x84) on the
-   fx-CG100, whose launcher selects with OK or EXE (final review). */
+   fx-CG100, whose launcher selects with OK or EXE. */
 int CGD_EnterKeycode2 = -1;
 
-/* ALPHA modifier of save-name entry (gint review §12: the platform sets it
-   to 0x72 on the fx-CG100, where 0x71 is SHIFT). Plain int, written by the
+/* ALPHA modifier of save-name entry (the platform sets it to 0x72 on the
+   fx-CG100, where 0x71 is SHIFT). Plain int, written by the
    platform through a weak reference before D_DoomMain. */
 int CGD_AlphaKeycode = KEYCODE_ALPHA;
 
 static CGDoom_KeyboardState st_prev = { 0 };
 static CGDoom_KeyboardState st_now = { 0 };
-/* CGDoom (step 2): st_prev != st_now. When the two scans are equal, KeyDown()
+/* CGDoom: st_prev != st_now. When the two scans are equal, KeyDown()
    gives the same answer for both and no key was just pressed or released, so
-   I_StartTic's ~40 key queries per tic return at once (each one used to
-   decode the keymap twice: ~10k instructions per frame). */
+   I_StartTic's ~40 key queries per tic return at once (otherwise each one
+   decodes the keymap twice: ~10k instructions per frame). */
 static int st_changed = 0;
 
 int KeycodeDown(const uint8_t *state, int code)
@@ -211,7 +211,8 @@ static int DoomKeyToKeycode(int key)
        then the six keys of row 5 (0x51..0x56) in reading order, as on the
        fx-CG50. Rows 5 and 6 carry different keys on the two models, but
        the same letters at the same matrix positions, so no per-model table
-       is needed (notes/engine-changes.md, "Follow-ups"). */
+       is needed. D, E and G..L follow from that layout but are not
+       confirmed by the manual or on hardware. */
     case 'A':               return KEYCODE_XOT;
     case 'B':               return KEYCODE_LOG;
     case 'C':               return KEYCODE_LN;

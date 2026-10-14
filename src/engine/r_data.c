@@ -383,8 +383,7 @@ void R_GenerateLookup (int texnum)
 
 //
 // R_GetColumn
-// CGDoom (step 2): static inline in r_data.h; this is its composite path.
-// (CGDoom's disabled "composite size limit" hack was dropped with it.)
+// CGDoom: static inline in r_data.h; this is its composite path.
 //
 const byte* R_GetColumnComposite ( int tex )
 {
@@ -758,12 +757,12 @@ int		flatmemory;
 int		texturememory;
 int		spritememory;
 
-/* CGDoom step 3: enabled again for slow WAD mappings (W_WadSlow, called by
+/* CGDoom: only for slow WAD mappings (W_WadSlow, called by
    P_SetupLevel): every lump the level's flats, wall textures and things'
    sprites use is cached (PU_CACHE) up front, which copies it into the zone
    while the zone has room (W_CopySlowLump). Vanilla skipped this during
    demo playback; here it is done for demos too (it only moves lumps into
-   RAM, the output is the same). Step 3 review: each lump goes through
+   RAM, the output is the same). Each lump goes through
    W_SlowPrecacheWanted (w_wad.c), so precaching stops at the zone reserve
    for unmappable lumps too and leaves already cached lumps alone. */
 void R_PrecacheLevel (void)

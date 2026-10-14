@@ -94,7 +94,7 @@ seq=$(sed -n 's/^GAMELOG idle .* idle=\([0-9]*\)$/\1/p' "$dir/load.log" |
 [ "$seq" = "4 6 0 1 0 " ] ||
     fail "CGD_IsPaused sequence '$seq', expected '4 6 0 1 0 ' (see $dir/load.log)"
 
-# Final review: with DelaySaves=0 (-nodelaysaves) a write the platform
+# With DelaySaves=0 (-nodelaysaves) a write the platform
 # refuses must not be reported as "game saved." (G_DoSaveGame checks the
 # PL_FileWrite result and logs the lost file). A read-only data directory
 # makes the host's writes fail; a writable one must still save at once.
@@ -116,7 +116,7 @@ ls "$nd/ro"/*.DSG > /dev/null 2>&1 && fail "read-only dir got a save"
 grep -q "not written" "$nd/rw.log" && fail "a good save reported as failed (see $nd/rw.log)"
 ls "$nd/rw"/*_0.DSG > /dev/null 2>&1 || fail "no immediate save in $nd/rw"
 
-# External review (2026-10-11): fire held while the save menu opens and
+# Fire held while the save menu opens and
 # released during the name entry must not stay pressed in the game after
 # the save. The run is recorded (-record 0): the menu tics are not in the
 # demo, so its last ticcmds are the ones after the menu closed, and none

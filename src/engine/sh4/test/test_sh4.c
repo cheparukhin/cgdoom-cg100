@@ -14,13 +14,13 @@
    columns and full-width spans) snapshots all of the program's static memory - .text, .rodata,
    .data and .bss, i.e. everything the linker placed - before the asm call and checks afterwards
    that nothing changed except framebuffer B and the globals the drawer is allowed to write.
-   (The framebuffer guards alone missed review round 1's translated-drawer bug, which wrote
-   through a pointer walking 320 bytes per pixel from a .bss scratch object.)
+   (The framebuffer guards alone cannot see e.g. a store pointer walking 320 bytes per pixel
+   through .bss; this check reports it from the first sampled case.)
 
-   Calling convention (review round 2): every asm drawer call goes through cgd_test_abi_call()
+   Calling convention: every asm drawer call goes through cgd_test_abi_call()
    (abi_call.S), which checks that r8-r14 and r15 come back unchanged.
 
-   1-pixel columns (review round 2): R_DrawColumn_SH4 / R_DrawColumnLow_SH4 take a separate
+   1-pixel columns: R_DrawColumn_SH4 / R_DrawColumnLow_SH4 take a separate
    path for dc_yl == dc_yh that saves no registers and reads dc_colormap directly. The "1px"
    passes draw only such columns (every colormap kind, unregistered table, non-contiguous
    columnofs) with the stray-write check after every call. */
@@ -382,9 +382,8 @@ static void test_expand(int N)
 	for(int n = 0; n < N; n++, cases++) {
 		for(int i = 0; i < 256; i++) pal[i] = (uint16_t)rnd();
 		cgd_expand_build_pal32(pal32, pal);
-		/* the first cases use the sizes the presenter passes: 3,200 px per strip (STRIP_ROWS = 10
-		   rows of 320, src/gint/video.c) and the 6,400 px maximum of this buffer, then the
-		   plain entry's table threshold (256) and its neighbours; then random sizes */
+		/* the first cases use fixed sizes: 3,200 px and the 6,400 px maximum of this buffer,
+		   then the plain entry's table threshold (256) and its neighbours; then random sizes */
 		static const int fixed[] = { 3200, 3200, 6400, 6400, 16, 16, 240, 240, 256, 256, 272, 272 };
 		int np = n < (int)(sizeof fixed / sizeof *fixed) ? fixed[n] : 16 * rndr(1, 400);
 		int so = 4 * rndn(8);
@@ -427,7 +426,8 @@ static int32_t exp_div(int32_t a, int32_t b)
 
 static void test_div(int N)
 {
-	/* a == INT_MIN: review round 1 found 32768 < |b| < 65536 returning a wrong-signed value */
+	/* a == INT_MIN against boundary divisors: a >> 16 second guard (instead of >> 15) would
+	   return wrong-signed values for 32768 < |b| < 65536 */
 	static const int32_t bs[] = { 1, -1, 2, -2, 32767, -32767, 32768, -32768, 32769, -32769,
 		40000, -40000, 65535, -65535, 65536, -65536, 65537, -65537, 131072, -131072,
 		INT32_MAX, INT32_MIN };
@@ -680,7 +680,7 @@ int main(int argc, char **argv)
 	test_spans("R_DrawSpan(long)", ref_R_DrawSpan, R_DrawSpan_SH4, 0, NL);
 	test_spans("R_DrawSpanLow(long)", ref_R_DrawSpanLow, R_DrawSpanLow_SH4, 1, NL);
 	long_mode = 0;
-	/* 1-pixel columns (separate asm path since review round 2) */
+	/* 1-pixel columns (a separate asm path) */
 	one_px = 1;
 	test_columns("R_DrawColumn(1px)", ref_R_DrawColumn, R_DrawColumn_SH4, 0, 0, N / 4);
 	test_columns("R_DrawColumnLow(1px)", ref_R_DrawColumnLow, R_DrawColumnLow_SH4, 1, 0, N / 4);

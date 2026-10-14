@@ -1,10 +1,10 @@
 /* Host test for wad.c block-map mode (GWAD_MAP) with adversarial
-   Bfile_GetBlockAddress layouts (gint review round 2). wad.c is #included
+   Bfile_GetBlockAddress layouts. wad.c is #included
    so that memcpy/memcmp on fake P1 flash addresses (0x80000000..0x82000000)
    are redirected to a host buffer that simulates the flash (filled with
    0xEE outside the file's clusters).
 
-   Also checks the round-2 fix: a range ending at EOF is never mapped in
+   Also checks that a range ending at EOF is never mapped in
    place (the renderer may read W_LUMP_PAD bytes past it, which in flash
    are not the zeros of the engine's heap copy and of the RAM image). */
 #include "cgd_gint.h"
@@ -50,7 +50,7 @@ void ui_status(char const *a, char const *b, char const *c) { (void)a; (void)b; 
 size_t gmem_total_free(void) { return 64u << 20; }
 size_t gmem_largest_free(void) { return 64u << 20; }
 void PL_Log(const char *fmt, ...) { va_list a; va_start(a, fmt); printf("  [log] "); vprintf(fmt, a); va_end(a); }
-/* main.c's load-phase quit poll (round 3.2); may longjmp (taken request) */
+/* main.c's load-phase quit poll; may longjmp (taken request) */
 #include <setjmp.h>
 static long load_polls = 0;
 static jmp_buf *poll_jmp = NULL;
@@ -103,8 +103,8 @@ static void setup(int fsize, int const *kind, int const *slot)
 	g_file = malloc(fsize);
 	for(int i = 0; i < fsize; i++) g_file[i] = (uint8_t)(i * 7 + (i >> 12) * 13 + 1);
 	memcpy(g_file, "IWAD", 4);
-	/* An empty directory at offset 12 (PL_WadOpen checks the directory
-	   is inside the file since the final review) */
+	/* An empty directory at offset 12 (PL_WadOpen rejects a directory
+	   outside the file) */
 	memset(g_file + 4, 0, 8);
 	g_file[8] = 12;
 	g_nblk = (fsize + 4095) >> 12;
@@ -261,7 +261,7 @@ int main(void)
 	  CHECK(nz == 0, "RAM: %d of 136 bytes past EOF are non-zero", nz); }
 	PL_WadClose();
 
-	/* 9. Round 3.2: every engine WAD read and map is a quit-chord safe
+	/* 9. Every engine WAD read and map is a quit-chord safe
 	   point, polled first; a taken request (longjmp) leaves the WAD state
 	   and the statistics untouched; PL_WadOpen() never polls */
 	for(int i = 0; i < N; i++) { kind[i] = K_P2; slot[i] = 30 + i; }
@@ -288,7 +288,7 @@ int main(void)
 		"WAD state intact after the poll left"); }
 	PL_WadClose();
 
-	/* 10. Round 3.3: PL_WadIsSlow() is 1 for the flash block map and BFile
+	/* 10. PL_WadIsSlow() is 1 for the flash block map and BFile
 	   reads (the engine then keeps hot lumps in the zone), 0 for the RAM
 	   image and with no WAD; it stays 1 when gwad_remap() falls back from
 	   MAP to BFILE */
@@ -316,9 +316,9 @@ int main(void)
 	PL_WadClose();
 	gwad_ram_allowed = false;
 
-	/* 11. Final review: the map is checked against the file at open, as
-	   gwad_remap() did: block 0 must hold the header, and sampled blocks
-	   (middle, last, directory) must match a BFile read. A mismatch means
+	/* 11. The map is checked against the file at open: block 0 must hold
+	   the header, and sampled blocks (middle, last, directory) must match
+	   a BFile read. A mismatch means
 	   BFile reads, never wrong data. */
 	{ struct { char const *tag; int block; } bad[] = {
 		{ "header block", 0 }, { "middle block", N / 2 }, { "last block", N - 1 } };

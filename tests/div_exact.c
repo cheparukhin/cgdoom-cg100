@@ -1,4 +1,4 @@
-/* Exactness test of the step-2 division helpers of m_fixed.h
+/* Exactness test of the exact division helpers of m_fixed.h
    (make test-div on the host, make test-div-sim in the SH simulator).
 
    IntDivPos(n, d) must equal the C quotient n / d for every int n and d > 0.

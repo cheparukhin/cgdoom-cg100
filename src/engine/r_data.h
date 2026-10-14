@@ -43,10 +43,11 @@ extern byte**			texturecomposite;
 const byte* R_GetColumnComposite( int tex );
 
 // Retrieve column data for span blitting.
-/* CGDoom (step 2): inline, with the lump lookup through
+/* CGDoom: inline, with the lump lookup through
    W_CacheLumpNumConstFast, so a wall column whose patch is already cached
-   costs no call (it was R_GetColumn -> W_CacheLumpNumConst -> Z_ChangeTag2 ->
-   PL_IsWadPointer). Same result and same zone state as vanilla's. */
+   costs no call (instead of R_GetColumn -> W_CacheLumpNumConst ->
+   Z_ChangeTag2 -> PL_IsWadPointer). Same result and same zone state as
+   vanilla's. */
 static inline const byte* R_GetColumn( int tex, int col )
 {
   int lump, ofs;

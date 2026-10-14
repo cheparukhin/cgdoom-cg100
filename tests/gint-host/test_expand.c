@@ -9,7 +9,7 @@
    persistent table through the CPU-independent pieces:
    - the table layout is the one of src/engine/sh4/cgd_sh4.h
      (pal32[k] = pal[k ^ 0x80] * 0x00010001);
-   - a whole frame (DMA mode, one call) and 10-row strips (strip mode)
+   - a whole frame (one call, as the DMA path does) and 10-row strips
      expand to the big-endian memory image the SH would see;
    - a count that is not a positive multiple of 16 writes nothing (as the
      asm entry). */

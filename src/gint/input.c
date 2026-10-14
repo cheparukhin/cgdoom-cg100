@@ -13,7 +13,7 @@
    interprets keys by physical position. gint's event queue
    is simply left to overflow (events are dropped).
 
-   Consequence (gint review round 2): gint's freeze-abort chord
+   Consequence: gint's freeze-abort chord
    SHIFT+7+3+AC/ON (keysc_tick) never fires. It tests keydown(), which
    answers from the keydev state that only advances when events are
    un-queued (pollevent/getkey/clearevents), and a full queue also stops
@@ -22,7 +22,7 @@
    scans from the 35 Hz tic interrupt (ginp_abort_chord) and latches a
    quit request that the foreground takes (gquit_poll, also called from
    every wait loop of this file); abort() is only the fallback for a hang
-   (round 3.1, see time.c). */
+   (see time.c). */
 
 #include "cgd_gint.h"
 
@@ -83,8 +83,8 @@ static void idle(void)
 
 void ginp_wait_release(void)
 {
-	/* Require a few consecutive empty scans (bounces). Bounded (gint
-	   review round 1): a stuck or worn key, or a matrix position that reads
+	/* Require a few consecutive empty scans (bounces). Bounded: a stuck
+	   or worn key, or a matrix position that reads
 	   1 on some unit, must not keep us from ever returning to MPM. gpSP
 	   bounds the same wait (20000 polls). The poll cap only covers the
 	   case where PL_GetMicros() does not advance: polls are ~2 ms apart
@@ -93,8 +93,8 @@ void ginp_wait_release(void)
 	int clean = 0;
 	uint32_t start = PL_GetMicros();
 	for(int polls = 0; clean < 3; polls++) {
-		/* Every UI wait is a quit-chord poll point (gint review round
-		   3.1): the chord itself may be what is held here */
+		/* Every UI wait is a quit-chord poll point: the chord itself
+		   may be what is held here */
 		gquit_poll();
 		if(ginp_any_key())
 			clean = 0;
@@ -111,7 +111,7 @@ void ginp_wait_release(void)
 
 bool ginp_wait_any_key(int timeout_ms)
 {
-	/* Edge-triggered (gint review round 3.1): a key already down at entry
+	/* Edge-triggered: a key already down at entry
 	   (still held from the game, pinned under an object, a stuck matrix
 	   bit) is not a press, or idle_quit()'s "press any key to stay" never
 	   quits and PL_Fatal's message is dismissed unread. A key released
@@ -155,7 +155,7 @@ static int first_key(uint8_t const *st)
 
 int ginp_wait_raw_key(int timeout_ms)
 {
-	/* Bounded (gint review round 2): no OS auto power-off while we own
+	/* Bounded: no OS auto power-off while we own
 	   the interrupts. Poll cap for a frozen clock, as in ginp_wait_any_key */
 	ginp_wait_release();
 	uint8_t st[12];
@@ -232,7 +232,7 @@ int ginp_getkey_timeout(int timeout_ms)
 	}
 
 	while(1) {
-		/* Quit chord request (gint review round 3.1): may not return */
+		/* Quit chord request: may not return */
 		gquit_poll();
 		ginp_scan(now);
 		uint32_t t = PL_GetMicros();
@@ -295,22 +295,22 @@ int ginp_getkey(void)
 	if(!ginp_idle_hook)
 		return ginp_getkey_timeout(-1);
 
-	/* Idle timeout (critique §C7, gint review round 1): the add-in owns
-	   the interrupts, so the OS's auto power-off never runs while we wait
-	   here. After GINP_IDLE_MS of idleness, let the hook decide (it offers
-	   to quit, or longjmps to the exit path). When it returns, the screen
+	/* Idle timeout: the add-in owns the interrupts, so the OS's auto
+	   power-off cannot run while we wait here. After GINP_IDLE_MS of
+	   idleness, let the hook decide (it offers to quit, or longjmps to the
+	   exit path). When it returns, the screen
 	   it drew must be repainted: report GK_NONE, which every caller treats
 	   as "redraw and wait again".
 
-	   Idleness is time.c's "no change of the keyboard state" (gint review
-	   round 3.2), the measure of the in-game idle exit. A per-call timeout
-	   restarted on every returned key: an arrow pinned down auto-repeats
-	   every 70 ms forever and kept the launcher drawing at ~14 Hz until
-	   the battery was flat. It also counts the time spent in other waits
+	   Idleness is time.c's "no change of the keyboard state", the measure
+	   of the in-game idle exit. A per-call timeout would restart on every
+	   returned key: an arrow pinned down auto-repeats every 70 ms forever
+	   and would keep the launcher drawing at ~14 Hz until the battery is
+	   flat. It also counts the time spent in other waits
 	   (the controls editor's key capture times out after GINP_IDLE_MS, and
 	   the hook then runs at once, not 10 minutes later). */
 	if(!gtime_ticking()) {
-		/* No tic timer: the per-call timeout of round 1 */
+		/* No tic timer: a per-call GINP_IDLE_MS timeout */
 		int k = ginp_getkey_timeout(GINP_IDLE_MS);
 		if(k != GK_NONE)
 			return k;

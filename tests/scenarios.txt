@@ -5,7 +5,8 @@
 # $WADS expands to the Freedoom 0.13 directory (absolute path). Each run also
 # gets "-crc <out>/<name>.crc"; tests/golden/<name>.crc holds the reference.
 # A line with golden=<other> is a variant that must reproduce <other>'s CRCs
-# exactly (WAD copy path, small/multiple zones); it has no golden of its own.
+# exactly (WAD copy path, zones, poison, -rlimits small, -slowwad); it has no
+# golden of its own.
 # Runner: tests/run-scenarios.sh (make golden / make test-host / make test-asan).
 
 # Doom (Freedoom phase 1)
@@ -18,13 +19,13 @@ e1m1-exit   -iwad $WADS/freedoom1.wad -warp 1 1 -tics 800 -input builtin:explore
 e1m8-finale -iwad $WADS/freedoom1.wad -warp 1 8 -tics 1000 -exitat 60
 title       -iwad $WADS/freedoom1.wad -tics 1200
 demo1       -iwad $WADS/freedoom1.wad -playdemo DEMO1 -tics 2000
-# Beyond vanilla's renderer limits (step 2, design B10): up to 251 visplanes,
+# Beyond vanilla's renderer limits: up to 251 visplanes,
 # 547 drawsegs and 179 vissprites per frame (vanilla: 128/256/128; the old
 # engine stopped with "R_FindPlane: no more visplanes")
 e2m4-limits -iwad $WADS/freedoom1.wad -warp 2 4 -tics 700 -input builtin:noclip
 # Ordinary play that overflowed the unused wall-texture midpoints in
-# R_StoreWallRange (external review, 2026-10-11): the ASan/UBSan run stopped
-# at tic ~1500; the frames are those of the unfixed engine
+# R_StoreWallRange before it was fixed (the ASan/UBSan run stopped at tic
+# ~1500); the fix changed no frame
 e2m5-walk   -iwad $WADS/freedoom1.wad -warp 2 5 -tics 2400 -input builtin:walk -skill 4
 
 # Doom II (Freedoom phase 2)
@@ -33,8 +34,7 @@ map07       -iwad $WADS/freedoom2.wad -warp 7 -tics 700 -input builtin:noclip
 map30-cast  -iwad $WADS/freedoom2.wad -warp 30 -tics 1200 -exitat 40
 demo2-1     -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000
 
-# Step 3 optional renderer modes and frame pacing (default output unchanged;
-# these have their own goldens, see tests/golden/CHANGES.md)
+# Optional renderer modes and frame pacing (each with its own golden)
 #   -lowdetail: low detail (160 columns, Chocolate Doom drawers)
 #   -viewsize N: screenblocks
 #   builtin:options: menu Options > Detail, view size keys 10..7..11..9,
@@ -64,7 +64,7 @@ map07-poison golden=map07 -iwad $WADS/freedoom2.wad -warp 7 -tics 700 -input bui
 # drawsegs/vissprites doubling, one-wall openings blocks); same frames
 e2m4-rsmall  golden=e2m4-limits -iwad $WADS/freedoom1.wad -warp 2 4 -tics 700 -input builtin:noclip -rlimits small -fragment 4096 -poison 0xa5
 map01-rsmall golden=map01 -iwad $WADS/freedoom2.wad -warp 1 -tics 900 -input builtin:explore -rlimits small
-# -slowwad (step 3): mapped lumps copied into the zone while it keeps a
+# -slowwad: mapped lumps copied into the zone while it keeps a
 # reserve, level precaching, purge at level start; same frames
 e1m1-slow    golden=e1m1 -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -slowwad
 demo2-1-slow golden=demo2-1 -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000 -slowwad

@@ -52,7 +52,7 @@
 #define SIL_TOP			2
 #define SIL_BOTH		3
 
-/* CGDoom (step 2, design B10): drawsegs grow on demand (R_GrowDrawSegs)
+/* CGDoom: drawsegs grow on demand (R_GrowDrawSegs)
    from vanilla's 256 up to MAXDRAWSEGS; at the limit walls are dropped as
    vanilla did at 256 */
 #define MAXDRAWSEGS_INITIAL	256

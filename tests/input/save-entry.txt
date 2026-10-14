@@ -5,8 +5,8 @@
 20
 # Slot 0: pick an empty slot and save the pre-filled map name at once.
 # Use and Weapon 1 are pressed together with EXE: the presses after the one
-# that starts the text entry must not be typed (follow-ups review: with
-# Interact on EXE, "E1M1" became "E1M1 ")
+# that starts the text entry must not be typed (with Interact on EXE,
+# "E1M1" would become "E1M1 ")
 1 menu
 3
 1 back

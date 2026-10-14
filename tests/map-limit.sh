@@ -4,11 +4,10 @@
 #   map-limit.sh -bin <cgdoom-host> [-out DIR]
 #
 # The engine is linuxdoom-1.10's and has HUD titles, par times and intermission
-# level names for the 32 Doom II maps only. The launcher used to offer start
-# maps up to 99, and a WAD with a MAP33 (the BFG/Unity doom2.wad) then read past
-# mapnames2[] in HU_Start. The launcher now stops at 32, and G_InitNew limits a
-# Doom II map to 32 (as it limits a Doom map to 9) for any start: launcher,
-# -warp, save or demo. Here -warp 33 must start MAP32. Exit status 0 = PASS.
+# level names for the 32 Doom II maps only: a start at MAP33 of a WAD that has
+# one (the BFG/Unity doom2.wad) would read past mapnames2[] in HU_Start. So
+# G_InitNew limits a Doom II map to 32 (as it limits a Doom map to 9) for any
+# start: -warp, save or demo. Here -warp 33 must start MAP32. Exit status 0 = PASS.
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BIN=

@@ -1,14 +1,15 @@
 /* CGDoom gint platform: diagnostics screen, microbenchmarks, PL_Log.
 
    Everything here exists to answer the questions that only hardware can
-   answer (notes/research-critique.md §E): what the loader announced, which
+   answer (the hardware probes listed in docs/DEVELOPMENT.md §7.1): what
+   the loader announced, which
    LCD controller we run on, where the stack is, the clock registers, the heap
    layout, the WAD block map (P1/P2/P0 counts, physical range), UTLB
    repairs, and flash vs SDRAM / display push timings. Shown on screen only
    (an fxlink text channel would need the USB driver and a connected host).
 
    Pages (LEFT/RIGHT): System, Memory, Storage/WAD (with a read-only
-   block-map probe of a WAD, final review), Benchmarks, Log. */
+   block-map probe of a WAD), Benchmarks, Log. */
 
 #include "cgd_gint.h"
 
@@ -117,7 +118,7 @@ static void run_bench_once(bench_t *b, uint8_t const *fb)
 static void run_bench(void)
 {
 	/* prof_exec() reads *prof_tcnt, NULL when gint's profiler found no
-	   free TMU (gint review round 2) */
+	   free TMU */
 	if(!gtime_prof_ok())
 		return;
 
@@ -200,7 +201,8 @@ static void page_system(void)
 		LINE("UTLB pages not pinned (URB %d)", gtlb_stats.urb_orig);
 	LINE("Clock now: %s; games: %s", gclk_name(gclk_current()),
 		gtlb_stats.safe ? "OS clock (safe start)" : "F4");
-	/* Final review: whether the 35 Hz TMU tic was obtained (critique §E) */
+	/* Whether the 35 Hz TMU tic was obtained (one of the hardware probes
+	   listed in docs/DEVELOPMENT.md §7.1) */
 	if(gtime_ticking())
 		LINE("Tic timer: TMU %d (35 Hz)%s", gtime_tic_timer(),
 			gtlb_stats.safe ? "; SAFE START" : "");
@@ -239,12 +241,12 @@ static void page_memory(void)
 	}
 }
 
-/* Storage probe (final review): open a WAD in block-map mode from the
-   launcher, without the RAM image, and close it again (nothing is
-   written), so the Storage page shows the Bfile_GetBlockAddress results
-   and the UTLB slots the world switches changed (critique §E items 4, 5)
-   before any game. The engine is not re-entrant: after a game the add-in
-   exits, so this is the only way to see them on this screen. */
+/* Storage probe: open a WAD in block-map mode from the launcher, without
+   the RAM image, and close it again (nothing is written), so the Storage
+   page shows the Bfile_GetBlockAddress results and the UTLB slots the
+   world switches changed (hardware probes listed in docs/DEVELOPMENT.md
+   §7.1) before any game. The engine is not re-entrant: after a game the
+   add-in exits, so this is the only way to see them on this screen. */
 static gfs_entry_t const *g_wads;
 static int g_wad_count, g_wad_sel;
 static char g_probe_name[GFS_LIST_NAME];

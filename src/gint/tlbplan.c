@@ -6,7 +6,7 @@
    same functions against a simulated UTLB and check that no step ever
    leaves two valid entries for one page.
 
-   Why pinning (gint review round 1): gint switches VBR back to the OS in
+   Why pinning: gint switches VBR back to the OS in
    gint_world_switch_out() and to ours only in gint_world_switch_in(), so
    the P0 code that runs in between (our os_* callbacks between OS calls,
    gint_call, the on-chip memory restore, the canary check, the funbind
@@ -155,11 +155,11 @@ int gtlb_plan_repair(gtlb_view_t *v, gtlb_entry_t const *table,
 
 void gtlb_track_image(int8_t *slot, int n)
 {
-	/* gint review round 2: the snapshot also holds the ~50 pages MPM maps
-	   beyond the image (55 under v1.1/dynload, 48 under Feb-2025). Nothing
-	   executes there, so keeping them in slot[] only made every repair
-	   overwrite the OS's fresh entries in those slots with useless
-	   mappings, and drowned real image-page repairs in the counter. Their
+	/* The snapshot also holds the pages MPM maps beyond the image (55
+	   under mpm.bin 1.1). Nothing executes there, so keeping them in
+	   slot[] would make every repair overwrite the OS's fresh entries in
+	   those slots with useless mappings, and drown real image-page
+	   repairs in the counter. Their
 	   table[] entries stay: the miss handler still reloads them on demand,
 	   and gtlb_plan_unpin() puts them back at exit. */
 	if(n <= 0)
@@ -171,12 +171,13 @@ void gtlb_track_image(int8_t *slot, int n)
 int gtlb_plan_unpin(gtlb_view_t *v, gtlb_entry_t const *table,
 	int8_t const *slot_orig, gtlb_op_t *ops, int max_ops)
 {
-	/* gint review round 2: at exit, put every snapshot page back in the
-	   slot MPM loaded it into, and nowhere else. The Feb-2025 mpm.bin
-	   (and a1a2cc3, 0fb6cec) only rewrites slots 0..47 and 55..63 on the
-	   next launch and never sets MMUCR.TI, so a copy of a ROM page left
-	   in slots 48..54 (our pinned slots, or a miss-handler reload) would
-	   duplicate the VPN MPM maps again: UTLB multiple hit, CPU reset.
+	/* At exit, put every snapshot page back in the slot MPM loaded it
+	   into, and nowhere else (defence in depth: mpm.bin 1.1 flushes the
+	   TLB and rewrites MMUCR before the next launch anyway). A loader
+	   that rewrites only some slots and never sets MMUCR.TI would
+	   otherwise find a copy of a ROM page left elsewhere (a pinned slot,
+	   or a miss-handler reload) duplicating the VPN it maps again: UTLB
+	   multiple hit, CPU reset.
 	   Loading page p into its original slot makes the executor drop every
 	   other entry of that 64 KiB page (pinned copy, handler copy, foreign
 	   overlapping entry). Pages already alone in their slot are skipped. */

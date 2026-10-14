@@ -422,9 +422,8 @@ int PL_FileRead(const char *name, void *buf, int size)
     return (int)rc;
 }
 
-/* The engine must only create strict 8.3 names (design.md §7, enforced by
-   the calculator platform too): on the host a violation is fatal so that
-   tests catch it. */
+/* The engine must only create strict 8.3 names (enforced by the calculator
+   platform too): on the host a violation is fatal so that tests catch it. */
 int CGD_ValidName83(const char *name);
 static void check_83(const char *op, const char *name)
 {

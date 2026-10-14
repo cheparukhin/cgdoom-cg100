@@ -18,7 +18,7 @@
              alignment of the stage boundary is tried (stage s = [s*II + off, (s+1)*II + off) for
              each off that keeps op 0 in its stage), so "infeasible" is a proof for the split
       --shipped      check the loop of ../r_draw_sh4.S (table SHIPPED) against the model instead
-      --war1         give anti-dependences latency 1 (the model before review round 3)
+      --war1         give anti-dependences latency 1 (a stricter model that forbids a WAR pair in one cycle)
 
 Model. Every op of one loop pass gets an issue time t; the loop body is the ops sorted by t mod II
 ("row"), the stage is t div II. A constraint (src, dst, lat, dist) means
@@ -27,8 +27,8 @@ lat >= 1 is a true dependence (RAW, or the @-Rn base update between two stores).
 anti-dependence (WAR): dst overwrites a register that src reads. Both may then issue in the same cycle
 provided src is the FIRST of the pair (pipesim.py: the second instruction of a pair must not read or
 write a register written by the first, nothing forbids writing one the first reads). The hand-written
-R_DrawSpan loop relies on this twice per pass (h_A'|f_B' and d_A|a_B); with --war1 (latency 1, the
-old model) its r0 cycle f -> g -> h -> f' costs 2+3+1 per pixel and the model wrongly says II >= 12.
+R_DrawSpan loop relies on this twice per pass (h_A'|f_B' and d_A|a_B); with --war1 (latency 1) its
+r0 cycle f -> g -> h -> f' costs 2+3+1 per pixel and the model wrongly says II >= 12.
 Resources per row: at most 2 instructions, at most 1 EX and at most 1 LS (MT pairs with anything).
 A row with one instruction is padded with a nop, so every pair starts 4-byte aligned (pipesim.py's
 default pairing rule) when the loop head is aligned.
@@ -323,8 +323,8 @@ def solve(ops, cons, II, node_limit=None, stage=None, off=0):
 
 def solve_staged(ops, cons, II, node_limit, stage):
     """solve() with a pinned stage split, at every alignment of the stage boundary that keeps op 0
-    (t = 0) inside its stage. (Review round 3: anchoring the boundary at op 0 alone missed schedules
-    with a stage-1 op before row 0, e.g. spanlow max --stage1 <shipped>,Bk: "no schedule".)"""
+    (t = 0) inside its stage. (Anchoring the boundary at op 0 alone would miss schedules with a
+    stage-1 op before row 0, e.g. spanlow max --stage1 <shipped>,Bk.)"""
     s0, nodes, exact = stage[ops[0][0]], 0, True
     for k in range(II):
         off = -s0 * II - k
@@ -393,8 +393,8 @@ def main():
     ap.add_argument("--px", type=int, default=2, help="pixels (texels for the low kinds) per loop pass")
     ap.add_argument("--max-ii", type=int, default=None, help="give up above this II (default: ResMII + 8)")
     ap.add_argument("--node-limit", type=int, default=None, help="search nodes per II before giving up")
-    ap.add_argument("--war1", action="store_true", help="give anti-dependences latency 1 (the pre-review-3 "
-                    "model, which forbids a WAR pair in one cycle: it puts R_DrawSpan at II=12)")
+    ap.add_argument("--war1", action="store_true", help="give anti-dependences latency 1 (a stricter model "
+                    "that forbids a WAR pair in one cycle: it puts R_DrawSpan at II=12)")
     ap.add_argument("--stage1", metavar="OPS", help="two-stage loop with these ops (comma-separated, e.g. "
                     "Be,Bf,Bg) in stage 1 and all others in stage 0 (every alignment of the stage "
                     "boundary is tried): keeps the shipped prologue/epilogue split")

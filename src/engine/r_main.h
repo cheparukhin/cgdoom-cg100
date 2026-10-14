@@ -163,7 +163,7 @@ void R_RenderPlayerView (player_t *player);
 void R_Init (void);
 
 // Called by M_Responder.
-// CGDoom step 3: vanilla's signature again (blocks 3..11, detail 0 = high,
+// CGDoom: vanilla's signature (blocks 3..11, detail 0 = high,
 // 1 = low); takes effect at the next frame (R_ExecuteSetViewSize).
 void R_SetViewSize (int blocks, int detail);
 void R_ExecuteSetViewSize (void);

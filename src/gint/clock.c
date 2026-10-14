@@ -5,9 +5,8 @@
      first run).
    - GCLK_F4 (every game): gint's CLOCK_SPEED_F4 (235.93 MHz CPU, the bus
      left at the OS's 58.98 MHz). Shipped by OutRun on the fx-CG100.
-   CalcLoverHK's Ptune4 F5 (the same CPU clock with a 117.96 MHz bus, which
-   some units cannot run) was an opt-in level until 2026-10-14; the game
-   plays normally at F4 (notes/design.md §11).
+   CalcLoverHK's Ptune4 F5 (the same CPU clock with a 117.96 MHz bus) is not
+   offered: some units cannot run it, and the game plays normally at F4.
 
    gint saves the OS clock when it starts, restores it on every world switch
    and when the add-in exits (drv_cpg hsave/hrestore), then re-applies ours

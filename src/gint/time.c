@@ -11,18 +11,18 @@
      64 bits; PL_GetMicros returns the low 32 bits (wraps at 2^32 us), the
      timerless PL_GetTics fallback uses all of them.
    - PL_WaitTics sleeps until the tic counter reaches the target, with an
-     interrupt-cancellable sleep (gint review round 2): a plain
+     interrupt-cancellable sleep: a plain
      `while(tics < until) sleep();` loses the wake-up when the tic lands
      between the test and the sleep instruction, and the frame then waits
      for the next interrupt (up to ~8 ms, the 128 Hz keyboard scan).
-   - Emergency quit (gint review rounds 2 and 3.1): gint's SHIFT+7+3+AC/ON
+   - Emergency quit: gint's SHIFT+7+3+AC/ON
      chord cannot fire in CGDoom (input.c), so the tic interrupt checks
      the same chord on a raw scan. It only latches a request: the
      foreground takes it at its next poll (gquit_poll(), main.c, from
      PL_GetTics and the UI key waits; gquit_poll_load() from every WAD
-     read/map, round 3.2), closes the WAD, finishes a demo being recorded,
-     hands the engine's delayed saves and the settings to the file layer
-     and takes the normal exit path, which writes them. Only if nothing
+     read/map), closes the WAD, hands the engine's delayed saves and the
+     settings to the file layer and takes the normal exit path, which
+     writes them. Only if nothing
      takes the request while the chord stays held for GTIME_ABORT_HOLD_TICS
      does the interrupt call abort(), once: gint's exit (main.c's
      destructor: WAD file close, UTLB normalisation; then kquit) without
@@ -32,7 +32,7 @@
      level loads read the WAD all along. Taking the request, PL_Fatal and
      the exit path disarm that fallback, so it never interrupts the exit's
      file writes.
-   - Key activity (round 3.1): the same scan records the tic of the last
+   - Key activity: the same scan records the tic of the last
      change of the keyboard state, for main.c's in-game idle exit. A change,
      not "a key is down", so that a pinned or stuck key does not keep the
      calculator on forever. */
@@ -49,16 +49,16 @@ static volatile int g_tics = 0;
 static int g_tic_timer = -1;
 static bool g_prof_ok = false;
 /* Sleep of the running PL_WaitTics (on its stack), cancelled by the tic.
-   The tic clears it (round 3.1): after a chord abort the foreground never
+   The tic clears it: after a chord abort the foreground never
    returns to clear it itself, and later tics must not write into that dead
    stack frame. */
 static cpu_csleep_t * volatile g_tic_ics = NULL;
 
-/* Emergency quit (round 3.1) */
+/* Emergency quit */
 static volatile bool g_quit_req = false;    /* chord seen, not yet taken */
 static volatile bool g_abort_armed = true;  /* hang fallback allowed */
 static int g_chord_tics = 0;                /* tics in a row with the chord */
-/* Key activity (round 3.1) */
+/* Key activity */
 static uint8_t g_last_scan[12];
 static volatile int g_key_tic = 0;          /* tic of the last scan change */
 
@@ -153,8 +153,8 @@ bool gtime_prof_ok(void)
 }
 
 /* Microseconds since gtime_init, split so that the integer part does not
-   wrap (round 3.1: a 32.32 accumulator wrapped after 2^32 us = 71.6 min,
-   and the fallback tic count derived from it jumped back by ~150k tics) */
+   wrap (a 32.32 accumulator would wrap after 2^32 us = 71.6 min, and the
+   fallback tic count derived from it would jump back by ~150k tics) */
 static uint64_t g_us_total = 0;     /* whole microseconds */
 static uint32_t g_us_frac = 0;      /* fraction, 0.32 fixed point */
 static uint32_t g_us_last = 0;      /* last prof_tcnt value */

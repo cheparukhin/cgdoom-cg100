@@ -1,4 +1,4 @@
-/* Host unit test for src/gint/input.c (gint review round 1):
+/* Host unit test for src/gint/input.c:
    - ginp_wait_release() is bounded (3 s, or a poll cap when the clock does
      not advance) and still waits for a real release;
    - ginp_wait_any_key() and the idle hook of ginp_getkey().
@@ -21,11 +21,11 @@ static uint32_t press_at = 0;        /* press a key at this time (0: never) */
 static int press_word = 0, press_bits = 0;
 
 uint32_t PL_GetMicros(void) { return now_us; }
-/* main.c's foreground safe point (round 3.1) */
+/* main.c's foreground safe point */
 static long polls = 0;
 void gquit_poll(void) { polls++; }
 
-/* time.c's tic scan (round 3.2): tics since the keyboard state changed,
+/* time.c's tic scan: tics since the keyboard state changed,
    sampled at every sleep() and every query */
 static bool ticking = true;
 static uint16_t seen_keys[6];
@@ -117,7 +117,7 @@ static void test_wait_any_key(void)
 	CHECK(!ginp_wait_any_key(1000), "frozen clock: bounded");
 }
 
-/* Round 3.1: edge-triggered; a key held or stuck at entry is no press */
+/* Edge-triggered; a key held or stuck at entry is no press */
 static void test_wait_any_key_edge(void)
 {
 	/* Pinned key: idle_quit()'s "press any key to stay" times out */
@@ -176,8 +176,8 @@ static void test_idle_hook(void)
 	ginp_idle_hook = NULL;
 }
 
-/* Round 3.1: the idle hook under a pinned key (EXE, not an arrow: no
-   repeat) now quits: idle_quit()'s wait returns false */
+/* The idle hook under a pinned key (EXE, not an arrow: no repeat)
+   quits: idle_quit()'s wait returns false */
 static bool idle_stay = true;
 static void hook_like_idle_quit(void)
 {
@@ -199,7 +199,7 @@ static void test_idle_pinned(void)
 	ginp_idle_hook = NULL;
 }
 
-/* Round 3.2: idleness is "no keyboard change", not "no key returned" */
+/* Idleness is "no keyboard change", not "no key returned" */
 static int code_word(int code) { return PL_KEY_BYTE(code) / 2; }
 static int code_bits(int code)
 {
@@ -262,7 +262,7 @@ static void test_idle_activity(void)
 	CHECK(k == GK_NONE && hook_calls == 1 && now_us - t0 < 1000000,
 		"capture timeout: hook at once (%d, %u us)", hook_calls, now_us - t0);
 
-	/* No tic timer: the per-call timeout of round 1 */
+	/* No tic timer: a per-call GINP_IDLE_MS timeout */
 	reset();
 	ticking = false;
 	step_us = 100000;
@@ -275,7 +275,7 @@ static void test_idle_activity(void)
 	ginp_idle_hook = NULL;
 }
 
-/* Round 2: the emergency abort chord (time.c's tic interrupt) */
+/* The emergency abort chord (time.c's tic interrupt) */
 static void set_key(uint8_t st[12], int code) { st[PL_KEY_BYTE(code)] |= PL_KEY_BIT(code); }
 static void test_abort_chord(void)
 {
@@ -307,7 +307,7 @@ static void test_abort_chord(void)
 	memset((void *)cgd_host_keysc, 0, sizeof cgd_host_keysc);
 }
 
-/* Round 2: the key capture of the controls editor is bounded */
+/* The key capture of the controls editor is bounded */
 static void test_wait_raw_key(void)
 {
 	reset();
@@ -322,7 +322,7 @@ static void test_wait_raw_key(void)
 	CHECK(code == -1, "raw key timeout with a frozen clock");
 }
 
-/* Final review: safe start = DEL (0x44) held when the add-in starts, read
+/* Safe start = DEL (0x44) held when the add-in starts, read
    from a raw scan */
 static void test_safe_start(void)
 {

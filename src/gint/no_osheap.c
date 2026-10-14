@@ -8,7 +8,7 @@
    the fxlibc constructors allocate too. Once _uram is exhausted those
    requests would fall through to the OS heap: OS code on API 2, and on any
    OS string gint maps to API 0 a jump to the fx-CG50 syscall gate
-   0x80020070, which does not exist on the fx-CG100 (gint review round 1).
+   0x80020070, which does not exist on the fx-CG100.
 
    Defining kmalloc_arena_osheap here makes the linker take this definition
    and never pull gint's arena_osheap.o (nothing else is in that object).

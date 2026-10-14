@@ -151,7 +151,7 @@ void V_MarkRect( int x,int y,int width,int height )
 } 
 
 
-/* CGDoom (step 2): one row of V_CopyRect. The status-bar widgets copy
+/* CGDoom: one row of V_CopyRect. The status-bar widgets copy
    rows of a few tens of bytes every frame, which fxlibc's memcpy does byte
    by byte below 64 bytes. Source and destination have the same x and
    SCREENWIDTH-byte rows, so they are usually equally aligned: copy words. */

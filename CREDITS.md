@@ -50,8 +50,7 @@ These projects were read as references while the port was designed. No code was 
 listed above:
 
 - KhiCAS (Bernard Parisse), and its use of MPM and the faster bus;
-- gpSP-sh4-jit's 10-row display strips through on-chip X/Y memory and its Ptune4 F5 overclock (CalcLoverHK's
-  Ptune4), which earlier builds of this port offered as options;
+- gpSP-sh4-jit's display strips through on-chip X/Y memory and CalcLoverHK's Ptune4 overclock presets;
 - OutRun and Squish It (Slyvtt);
 - NESizm, Prizoop, fxcraft and libsyscall (CalcLoverHK);
 - PythonExtra;

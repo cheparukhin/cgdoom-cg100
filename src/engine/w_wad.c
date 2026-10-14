@@ -148,7 +148,7 @@ int W_InitMultipleFiles(void)
   W_LumpMapped = (byte *)Z_Malloc(numlumps, PU_STATIC, 0);
   memset(W_LumpMapped, 0, numlumps);
 
-  /* CGDoom step 3: RAM residency policy (see W_CopySlowLump) */
+  /* CGDoom: RAM residency policy (see W_CopySlowLump) */
   W_WadSlow = PL_WadIsSlow() ? true : false;
 
   return 1; // CX port
@@ -247,9 +247,9 @@ void W_ReadLump(int lump, void* dest )
 }
 
 
-/* CGDoom step 3: RAM residency of a slow WAD mapping (design §7, research-
-   critique C1). When PL_WadIsSlow() (e.g. the WAD is mapped from NOR flash,
-   whose line fills are several times slower than RAM), a lump that could be
+/* CGDoom: RAM residency of a slow WAD mapping. When PL_WadIsSlow() (e.g.
+   the WAD is mapped from NOR flash, whose line fills are much slower than
+   SDRAM, and the overclock does not speed them up), a lump that could be
    referenced in place is copied into the zone instead, with the tag the
    caller asked for (so PU_CACHE copies stay purgeable, exactly like copies of
    unmappable lumps), as long as the zone keeps at least W_SLOW_RESERVE free
@@ -281,7 +281,7 @@ static boolean W_CopySlowLump(int bytes)
   return total - CGD_Stats.ZoneUsed - (bytes + 64) >= reserve;
 }
 
-/* CGDoom step 3: called by P_SetupLevel before a level is loaded, with a
+/* CGDoom: called by P_SetupLevel before a level is loaded, with a
    slow WAD mapping only. Copies count as used zone memory, so without this
    the previous level's cached lumps would keep the zone at the reserve and
    the new level's lumps would all be referenced in place: purge every
@@ -307,15 +307,16 @@ void W_SlowLevelStart(void)
   }
 }
 
-/* Step 3 review: R_PrecacheLevel caches a lump only through this test. The
+/* CGDoom: R_PrecacheLevel caches a lump only through this test. The
    reserve check of W_ReadLumpWithZ_Malloc covers mappable lumps only:
    unmappable ones (BFile mode, lumps across flash blocks, misaligned) are
-   always copied, so an unbounded precache read the level's whole graphics
-   set from the slow storage even when it was larger than the zone (host
-   -fragment 16 -slowwad -zone 2048, e1m1: about 1.7 MiB of extra reads, the
-   zone full and most of them purged again before use). Lumps that are
-   already cached are skipped as well: re-caching them with PU_CACHE only
-   changes their tag, which would demote a lump someone holds PU_STATIC. */
+   always copied, so an unbounded precache would read the level's whole
+   graphics set from the slow storage even when it is larger than the zone
+   (host -fragment 16 -slowwad -zone 2048, e1m1: about 1.7 MiB of extra
+   reads, the zone full and most of them purged again before use). Lumps
+   that are already cached are skipped as well: re-caching them with
+   PU_CACHE only changes their tag, which would demote a lump someone holds
+   PU_STATIC. */
 boolean W_SlowPrecacheWanted(int lump)
 {
   return lump >= 0 && lump < numlumps && !lumpcache[lump]
@@ -345,9 +346,9 @@ void * W_ReadLumpWithZ_Malloc(int lump,int tag,int iEnableFlash)
   if (padded > wad_end - position)
     padded = (wad_end - position > size) ? wad_end - position : size;
 
-  /* Referenced in place only if the whole padded range is in the WAD (gint
-     review R2-7): a lump whose pad would cross the end of the WAD is copied
-     with a zero-filled pad instead, on every platform, so the renderer never
+  /* Referenced in place only if the whole padded range is in the WAD: a
+     lump whose pad would cross the end of the WAD is copied with a
+     zero-filled pad instead, on every platform, so the renderer never
      reads whatever follows the WAD in the mapping (flash bytes, another
      file, unmapped memory) and the output does not depend on it. */
   if(iEnableFlash && padded == size + W_LUMP_PAD)
@@ -363,7 +364,7 @@ void * W_ReadLumpWithZ_Malloc(int lump,int tag,int iEnableFlash)
     CGD_Stats.UnalignedLumpsLoadedTotal += lumpinfo[lump].size;
   }
 
-  /* Step 3: a slow mapping is copied to the zone while there is room */
+  /* CGDoom: a slow mapping is copied to the zone while there is room */
   int slowcopy = 0;
   if(mapped && aligned && W_WadSlow) {
     if(W_CopySlowLump(size + W_LUMP_PAD)) {

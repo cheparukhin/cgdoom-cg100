@@ -1,16 +1,22 @@
 /* CGDoom platform API (PL_*).
 
    The portable engine (src/engine) reaches the platform only through these
-   functions. Implementations: src/gint (fx-CG100/CG50) and src/host (macOS
-   host, also built for the SH simulator with -DPL_SIM). See notes/design.md §3.
+   functions. Implementations: src/gint (fx-CG100) and src/host (macOS
+   host, also built for the SH simulator with -DPL_SIM).
    All sizes and offsets are in bytes.
 
-   Additions to design.md §3 (documented here; all header-only except
-   PL_WadIsSlow):
+   Besides the calls (all header-only except PL_WadIsSlow):
    - PL_KEY_BYTE/PL_KEY_BIT/PL_KeySet/PL_KeyDown: layout helpers for the
      12-byte keyboard state of PL_ScanKeyboard.
    - Precise semantics for PL_FileRead (partial reads) and PL_WadRead.
-   - PL_WadIsSlow (engine step 3), see below. */
+   - PL_WadIsSlow, see below.
+
+   gint contract: PL_GetTics, PL_WadRead and PL_WadMap may not return. They
+   are the poll points of the quit chord and the in-game idle exit, and
+   longjmp to the single exit path (src/gint/main.c), which is safe only
+   because the engine runs once per launch. PL_WadOpen is deliberately not a
+   poll point (it runs before the game, mostly in world switches, during
+   which the tic TMU is paused). */
 
 #ifndef PLATFORM_H
 #define PLATFORM_H
@@ -22,12 +28,14 @@
 
 /* Show msg, wait for a key, clean exit. Never returns. */
 void PL_Fatal(const char *msg) __attribute__((noreturn));
-/* Debug log (host: stderr; gint: no-op or fxlink). */
+/* Debug log (host: stderr; gint: a RAM ring buffer shown on the Log page of
+   Diagnostics, diag.c). */
 void PL_Log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 /* ---- Time ------------------------------------------------------------------ */
 
-/* 35 Hz monotonic counter since start (TICRATE). */
+/* 35 Hz monotonic counter since start (TICRATE). gint: may not return
+   (quit chord, in-game idle exit; see the top of this file). */
 int      PL_GetTics(void);
 /* Free-running microsecond counter (wraps) for FPS/profiling. */
 uint32_t PL_GetMicros(void);
@@ -80,15 +88,17 @@ static inline int PL_KeyDown(const uint8_t state[12], int code)
 int         PL_WadOpen(const char *name);
 void        PL_WadClose(void);
 /* Read [offset, offset+size) into dst; returns bytes read (== size unless out
-   of range or I/O error). Gathers fragments. */
+   of range or I/O error). Gathers fragments. gint: may not return (quit
+   chord; see the top of this file). */
 int         PL_WadRead(void *dst, int offset, int size);
 /* Zero-copy pointer to [offset, offset+size) if the range is contiguous in
    readable (cached) memory, else NULL. The engine only uses it for lumps;
-   pointer stays valid until PL_WadClose. */
+   pointer stays valid until PL_WadClose. gint: may not return (quit chord;
+   see the top of this file). */
 const void *PL_WadMap(int offset, int size);
 /* True if p was returned by PL_WadMap (never freed by the engine). */
 int         PL_IsWadPointer(const void *p);
-/* (Step 3 addition.) 1 if PL_WadMap pointers are in slow memory such as NOR
+/* 1 if PL_WadMap pointers are in slow memory such as NOR
    flash (calculator flash block-map or BFile modes), so the engine should
    prefer copying hot lumps into the zone (it then copies mappable lumps while
    the zone keeps a free reserve, and precaches each level's graphics); 0 if

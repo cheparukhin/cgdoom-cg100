@@ -39,7 +39,7 @@
 
 typedef int fixed_t;
 
-/* CGDoom port (step 1, notes/engine-changes.md): vanilla-exact fixed point.
+/* CGDoom port: vanilla-exact fixed point.
    CGDoom's bit-serial FixedMul rounded toward zero and its FixedDiv dropped
    the last quotient bit, which broke vanilla demo sync; these follow
    linuxdoom-1.10 exactly (tests/fixed_exact.c: make test-fixed and
@@ -64,15 +64,11 @@ static inline fixed_t FixedMul(fixed_t a, fixed_t b)
 fixed_t FixedDiv	(fixed_t a, fixed_t b);
 
 
-/* CGDoom port (step 2, notes/engine-changes.md): exact replacements for
-   signed C divisions on hot paths: signed divisions whose divisor is known to
-   be positive go through libgcc's unsigned divider instead of the signed
-   __sdivsi3_i4i. The gain is small: on SH4 the two cost the same (about 30
-   to 60 instructions per call depending on operand size, measured in the
-   step 2 review); IntCycleFill wins by doing fewer divisions. An earlier
-   version of this comment said 160-580 for the signed one, which was simprof
-   charging __udivsi3_i4i work to the __sdivsi3_i4i symbol (see
-   notes/engine-changes.md, step 2 (a) and step 2 review).
+/* CGDoom port: exact replacements for signed C divisions on hot paths:
+   signed divisions whose divisor is known to be positive go through libgcc's
+   unsigned divider instead of the signed __sdivsi3_i4i. The gain is small: on
+   SH4 the two cost the same (about 30 to 60 instructions per call depending
+   on operand size); IntCycleFill wins by doing fewer divisions.
    tests/div_exact.c (make test-div, test-div-sim) checks both helpers
    against the C operators.
 

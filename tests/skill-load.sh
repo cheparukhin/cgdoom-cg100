@@ -4,11 +4,11 @@
 #
 #   skill-load.sh -bin <cgdoom-host> [-out DIR]
 #
-# External review: G_DoLoadGame set gameskill to the save's skill before
-# G_InitNew, which switches the fast monsters by comparing the old and the
-# new skill. A Nightmare save loaded from the title of a fresh session (each
-# launch on the calculator is one) then had normal-speed monsters, and a
-# normal save loaded during a Nightmare game kept fast ones. The host's
+# G_DoLoadGame must not set gameskill to the save's skill before G_InitNew,
+# which switches the fast monsters by comparing the old and the new skill:
+# a Nightmare save loaded from the title of a fresh session (each launch on
+# the calculator is one) would then have normal-speed monsters, and a
+# normal save loaded during a Nightmare game would keep fast ones. The host's
 # -gamelog reports the skill (4 = Nightmare) and the tics of a demon's run
 # state (sargtics: 2 normal, 1 fast). Exit status 0 = PASS.
 

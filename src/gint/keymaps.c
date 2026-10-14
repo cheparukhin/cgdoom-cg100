@@ -17,12 +17,12 @@
    FORMAT (was (-)), and AC is 0x07 (gint keydev.c CG100_keymap, MPM, gpSP).
 
    The Doom menu key (KEY_ESCAPE) is hardwired to KEYCODE_MENU (0x84) in the
-   engine, which is the OK key in the middle of the fx-CG100 D-pad. If the
-   engine exports `int CGD_EscapeKeycode` (requested), we set it to BACK
-   (0x82); otherwise OK stays the menu key and is left
-   unbound by our presets. With BACK as the menu key, OK is a second Enter
-   key in the Doom menu (CGD_EnterKeycode2, final review) as long as no
-   action is bound to it. */
+   engine, which is the OK key in the middle of the fx-CG100 D-pad. The
+   engine exports `int CGD_EscapeKeycode` (cgdoom-kbd.c), and we set it to
+   BACK (0x82); without it (a weak reference) OK stays the menu key and is
+   left unbound by our presets. With BACK as the menu key, OK is a second
+   Enter key in the Doom menu (CGD_EnterKeycode2) as long as no action is
+   bound to it. */
 
 #include "cgd_gint.h"
 #include "cgdoom-kbd.h"
@@ -69,10 +69,8 @@ _Static_assert(CGDOOM_KEYMAP_SIZE == 24, "keymaps below have 24 entries");
    on the tab keys beside UP, map on CATALOG, pause/FPS on the page keys),
    left thumb on SHIFT (fire) / ALPHA (use) / VARIABLE (run), BACK opens the
    Doom menu, weapons on the digits. Every one of the 24 actions is bound;
-   OK, HOME, ON, SETTINGS, TOOLS, sqrt and ) are left free (TOOLS, sqrt and
-   ) were the frameskip, heap statistics and profiler keys until
-   2026-10-14). No binding needs the abort
-   chord SHIFT+7+3+AC (time.c). */
+   OK, HOME, ON, SETTINGS, TOOLS, sqrt and ) are left free. No binding
+   needs the abort chord SHIFT+7+3+AC (time.c). */
 static const CGDoom_Keymap keymap_cg100_thumbs = {
 	CG100_LEFT,       /* Turn left */
 	CG100_RIGHT,      /* Turn right */
@@ -166,7 +164,7 @@ char const *gkm_key_name(int code)
 	return n ? n : "?";
 }
 
-/* Requested engine hook (cgdoom-kbd.c): the matrix code that produces
+/* Engine hook (cgdoom-kbd.c): the matrix code that produces
    KEY_ESCAPE, defaulting to KEYCODE_MENU. Weak: absent -> address 0. */
 extern int CGD_EscapeKeycode __attribute__((weak));
 
@@ -182,13 +180,13 @@ int gkm_menu_key(void)
 	return KEYCODE_MENU;
 }
 
-/* Engine hook (gint review round 1; cgdoom-kbd.h, defined by the engine
-   since the engine follow-ups): the modifier the engine watches while the
-   player types a save-game name (digits with it held, letters without).
+/* Engine hook (cgdoom-kbd.h, defined by the engine): the modifier the
+   engine watches while the player types a save-game name (digits with it
+   held, letters without).
    Its default KEYCODE_ALPHA (0x71) is SHIFT on the fx-CG100, where ALPHA
    is 0x72. */
 
-/* Engine hook (final review): OK, the select key of every launcher screen,
+/* Engine hook: OK, the select key of every launcher screen,
    also acts as Enter in the Doom menu (unless the keymap binds it to an
    action). Only when BACK is the menu key: otherwise OK is KEY_ESCAPE
    (KEYCODE_MENU). Weak, like CGD_EscapeKeycode. */
@@ -228,8 +226,7 @@ int gkm_rebind_check(int code, char const **why)
 		return GKM_BIND_CANCEL;
 
 	/* The keys that mean "back" in every launcher screen cancel the
-	   capture (gint review round 1: pressing BACK/HOME to back out used to
-	   bind that key) */
+	   capture (pressing BACK/HOME to back out must not bind that key) */
 	if(code == CG100_BACK || code == CG100_HOME)
 		return GKM_BIND_CANCEL;
 
@@ -243,9 +240,7 @@ int gkm_rebind_check(int code, char const **why)
 	   it would trigger the menu along with the action. In a real build
 	   the cancel keys above already include it (BACK); this only fires
 	   when the engine lacks the CGD_EscapeKeycode hook and OK (0x84) stays
-	   the menu key.
-	   The text names the key (final review: it said "OK" whatever the
-	   menu key was). */
+	   the menu key. The text names the actual menu key. */
 	if(code == gkm_menu_key()) {
 		static char text[64];
 		snprintf(text, sizeof text,

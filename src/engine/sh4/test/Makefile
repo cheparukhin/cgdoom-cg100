@@ -60,11 +60,10 @@ $(OBJ)/p1_expand_sh4.o: $(SH4)/expand_sh4.S $(SH4)/sh4_asm.h
 $(ELF_P1): $(OBJ)/r_draw_sh4.o $(OBJ)/p1_expand_sh4.o $(OBJ)/r_draw_sh4_c.o $(TEST_OBJS) $(SIM_RUNTIME_OBJS)
 	$(call sim-link,$@,$(OBJ)/r_draw_sh4.o $(OBJ)/p1_expand_sh4.o $(OBJ)/r_draw_sh4_c.o $(TEST_OBJS))
 
-# Review round 2: every .S must assemble without -Wa,--dsp (the sim game's C flags, $(SIM_CC)
-# $(CGSIM_CFLAGS) -c, as that build used until it switched to the mnemonics) and give exactly the
-# section bytes and relocations of the DSP-mnemonic form (-DCGD_SH4_DSP_MNEMONICS -Wa,--dsp, what
-# the CMake and sim game builds now assemble), in both section layouts. sh4_asm.h encodes
-# ldrs/ldre/ldrc as raw opcodes for this.
+# Every .S must assemble without -Wa,--dsp (the sim game's C flags, $(SIM_CC) $(CGSIM_CFLAGS) -c)
+# and give exactly the section bytes and relocations of the DSP-mnemonic form
+# (-DCGD_SH4_DSP_MNEMONICS -Wa,--dsp, what the CMake and sim game builds assemble), in both
+# section layouts. sh4_asm.h encodes ldrs/ldre/ldrc as raw opcodes for this.
 CGSIM_FLAGS_COPY := $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host
 ASMCHECK := $(OBJ)/asmcheck
 asmcheck: $(SH4)/r_draw_sh4.S $(SH4)/expand_sh4.S $(SH4)/sh4_asm.h

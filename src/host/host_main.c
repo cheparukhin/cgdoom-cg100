@@ -1,4 +1,5 @@
-/* Headless host front-end for the CGDoom engine (see notes/design.md §4.2).
+/* Headless host front-end for the CGDoom engine (see docs/DEVELOPMENT.md §3,
+   "Host CLI").
 
    cgdoom-host -iwad <path> [-warp E M | -warp M] [-skill N] [-playdemo LUMP]
                [-tics N] [-input builtin:<name> | <file>] [-crc <file>]
@@ -133,8 +134,10 @@ static void gamelog_tic(int tic)
 }
 
 /* -demotrace: one line per tic at the end of G_Ticker (G_TicEndHook), in
-   the format of the linuxdoom-1.10 oracle used for demo sync (see
-   notes/engine-changes.md, "Demo sync"). It only reads game state. */
+   the format of the linuxdoom-1.10 oracle used for demo sync
+   (tools/demosync-oracle). The format is defined twice, here and in the
+   oracle's ORACLE_TraceTic, and the two must stay identical. It only reads
+   game state. */
 static FILE *demotrace_file = NULL;
 extern int prndindex;   /* m_random.c */
 

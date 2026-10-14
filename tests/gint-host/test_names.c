@@ -1,7 +1,7 @@
-/* Host unit test for src/gint/wadnames.c (gint review round 1), linked with
-   the engine's cgdoom-names.c:
-   the WAD base name given to the engine is whole (it used to be cut to 6
-   characters, so freedoom1/freedoom2 and plutonia/plutonia2 shared saves). */
+/* Host unit test for src/gint/wadnames.c, linked with the engine's
+   cgdoom-names.c: the WAD base name given to the engine is whole (cut to 6
+   characters, freedoom1/freedoom2 and plutonia/plutonia2 would share
+   saves). */
 
 #include "cgd_gint.h"
 #include "cgdoom.h"

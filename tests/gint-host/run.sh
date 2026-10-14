@@ -2,8 +2,8 @@
 # Host unit tests for the gint platform layer (src/gint), with stubbed gint
 # headers (stub/). Nothing here runs on the calculator: these tests cover
 # the pure logic of the platform (file layer, WAD access, UTLB planning,
-# heap discovery, input waits, tic/chord/idle timing, keymap/name helpers,
-# pixel expansion, fatal-error hints).
+# heap arenas and zones, input waits, tic/chord/idle timing, keymap/name
+# helpers, pixel expansion, fatal-error hints).
 #
 #   sh tests/gint-host/run.sh            build into $OUT and run every test
 #   CGD_TEST_WADS="a.wad b.wad" sh ...   also run the WAD tests on these
