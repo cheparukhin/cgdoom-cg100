@@ -48,6 +48,12 @@ void ST_Ticker (void);
    done by ST_Drawer) */
 void ST_doPaletteStuff (void);
 
+#if CGD_EXTRAS
+/* CGDoom: the HUD over a full-screen view (CGD_FEAT_FULLHUD), drawn after
+   the view in every frame */
+void ST_DrawFullscreenHUD (void);
+#endif
+
 // Called by main loop.
 void ST_Drawer (boolean fullscreen, boolean refresh);
 

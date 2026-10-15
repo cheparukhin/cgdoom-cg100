@@ -41,6 +41,7 @@
 
 #include "st_stuff.h"
 #include "st_lib.h"
+#include "m_swap.h"
 #include "r_local.h"
 
 #include "p_local.h"
@@ -927,6 +928,74 @@ static void ST_UpdateColored (st_number_t *num, st_percent_t *per,
   else
     STlib_updateNum(num, refresh);
   v_patchpal = v_palette;
+}
+#endif
+
+#if CGD_EXTRAS
+//
+// CGDoom: the full-screen HUD (CGD_FEAT_FULLHUD, as Crispy Doom's): at the
+// largest view size, where the status bar is hidden, the ready ammo,
+// health, armour and keys are drawn over the view at the bar's height, the
+// first two at the left edge, the others at the right edge. No background:
+// the view under them is drawn again every frame. Colours as on the bar
+// (CGD_FEAT_COLORNUMS).
+//
+
+/* A tall number right-aligned at x, as STlib_drawNum (negative: 0) */
+static void ST_HudNum (int x, int y, int num)
+{
+  int w = SHORT(tallnum[0]->width);
+
+  if (num < 0)
+    num = 0;
+  if (!num)
+    V_DrawPatch (x - w, y, FG, tallnum[0]);
+  while (num)
+  {
+    x -= w;
+    V_DrawPatch (x, y, FG, tallnum[num % 10]);
+    num /= 10;
+  }
+}
+
+void ST_DrawFullscreenHUD (void)
+{
+  ammotype_t type = weaponinfo[plyr->readyweapon].ammo;
+  /* The left group as at the left end of the bar; the right one (armour,
+     keys) moved to the screen's right edge, where the bar's ammo table
+     was */
+  int dl = -ST_BARX;
+  int dr = SCREENWIDTH - 2 - SHORT(keys[0]->width) - ST_KEY0X;
+
+#if CGD_TRUECOLOR
+  boolean colored = (CGD_Features & CGD_FEAT_COLORNUMS) != 0;
+  if (colored)
+    v_patchpal = ST_AmmoColor ();
+#endif
+  if (type != am_noammo)
+    ST_HudNum (ST_AMMOX + dl, ST_AMMOY, plyr->ammo[type]);
+#if CGD_TRUECOLOR
+  if (colored)
+    v_patchpal = ST_HealthColor ();
+#endif
+  ST_HudNum (ST_HEALTHX + dl, ST_HEALTHY, plyr->health);
+  V_DrawPatch (ST_HEALTHX + dl, ST_HEALTHY, FG, tallpercent);
+#if CGD_TRUECOLOR
+  if (colored)
+    v_patchpal = ST_ArmorColor ();
+#endif
+  ST_HudNum (ST_ARMORX + dr - 4, ST_ARMORY, plyr->armorpoints);
+  V_DrawPatch (ST_ARMORX + dr - 4, ST_ARMORY, FG, tallpercent);
+#if CGD_TRUECOLOR
+  v_patchpal = v_palette;
+#endif
+
+  if (keyboxes_0 >= 0)
+    V_DrawPatch (ST_KEY0X + dr, ST_KEY0Y, FG, keys[keyboxes_0]);
+  if (keyboxes_1 >= 0)
+    V_DrawPatch (ST_KEY1X + dr, ST_KEY1Y, FG, keys[keyboxes_1]);
+  if (keyboxes_2 >= 0)
+    V_DrawPatch (ST_KEY2X + dr, ST_KEY2Y, FG, keys[keyboxes_2]);
 }
 #endif
 

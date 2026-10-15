@@ -247,6 +247,12 @@ void D_Display (void)
   if (gamestate == GS_LEVEL && automapoverlay && gametic)
     AM_Drawer ();
 
+#if CGD_EXTRAS
+  if (gamestate == GS_LEVEL && gametic && viewheight == SCREENHEIGHT
+    && !AM_FULLMAP && (CGD_Features & CGD_FEAT_FULLHUD))
+    ST_DrawFullscreenHUD ();
+#endif
+
   if (gamestate == GS_LEVEL && gametic)
     HU_Drawer ();
 

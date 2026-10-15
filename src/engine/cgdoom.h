@@ -157,7 +157,10 @@ extern int CGD_PlayDemoOnly;
                                    overlay that turns with the player;
                                    kills, items, secrets and time shown
                                    (am_map.c) */
-#define CGD_FEATURE_COUNT 6
+#define CGD_FEAT_FULLHUD  0x40  /* the largest view size shows health,
+                                   armour, ammo and keys over the view
+                                   (st_stuff.c) */
+#define CGD_FEATURE_COUNT 7
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
 #if CGD_EXTRAS && CGD_TRUECOLOR
