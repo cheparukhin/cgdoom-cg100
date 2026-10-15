@@ -275,8 +275,10 @@ void F_TextWrite (void)
   V_MarkRect (0, 0, SCREENWIDTH, SCREENHEIGHT);
 
   // draw some of the text onto the screen
-  cx = 10;
-  cy = 10;
+  /* CGDoom: from (10, 10) of the 320x200 layout, centred on a larger
+     screen (V_DrawLayoutPatch); clipped at the screen's edge */
+  cx = WIDESCREENDELTA + 10;
+  cy = HEIGHTDELTA + 10;
   ch = finaletext;
 
   count = (finalecount - 10)/TEXTSPEED;
@@ -289,7 +291,7 @@ void F_TextWrite (void)
       break;
     if (c == '\n')
     {
-      cx = 10;
+      cx = WIDESCREENDELTA + 10;
       cy += 11;
       continue;
     }
@@ -510,7 +512,7 @@ void F_CastPrint (const char* text)
     }
 
     w = SHORT (hu_font[c]->width);
-    V_DrawPatch(cx, 180, 0, hu_font[c]);
+    V_DrawLayoutPatch(cx, 180, 0, hu_font[c]);
     cx+=w;
   }
 
@@ -531,7 +533,9 @@ void F_CastDrawer (void)
   const patch_t*  patch;
 
   // erase the entire screen to a background
-  V_DrawPatch (0,0,0,(const patch_t*) W_CacheLumpNameConst("BOSSBACK", PU_CACHE));
+  /* CGDoom: centred on a larger screen, with black borders; the name and
+     the monster are in its 320x200 layout */
+  V_DrawFullscreenPatch (0, "BOSSBACK");
 
   F_CastPrint (castorder[castnum].name);
 
@@ -543,9 +547,9 @@ void F_CastDrawer (void)
 
   patch = (const patch_t*)W_CacheLumpNumConst ((lump+firstspritelump), PU_CACHE);
   if (flip)
-    V_DrawPatchFlipped (160,170,0,patch);
+    V_DrawPatchFlipped (WIDESCREENDELTA+160,HEIGHTDELTA+170,0,patch);
   else
-    V_DrawPatch (160,170,0,patch);
+    V_DrawLayoutPatch (160,170,0,patch);
 }
 
 
@@ -561,7 +565,8 @@ void F_DrawPatchCol( int  x,const patch_t* patch, int  col )
   int  count;
 
   column = (column_t *)((byte *)patch + INTFromBytes((const byte*)&(patch->columnofsLE[col])));
-  desttop = screens[0]+x;
+  /* CGDoom: the 200 rows of the layout, centred on a taller screen */
+  desttop = screens[0]+HEIGHTDELTA*SCREENWIDTH+x;
 
   // step through the posts in a column
   while (column->topdelta != 0xff )
@@ -603,6 +608,20 @@ void F_BunnyScroll (void)
     scrolled = 320;
   if (scrolled < 0)
     scrolled = 0;
+
+#if SCREENWIDTH != ORIGWIDTH || SCREENHEIGHT != ORIGHEIGHT
+  /* CGDoom: a wider screen shows more of the 640-column panorama, centred
+     where vanilla's 320 columns are, as far as the panorama goes; the rows
+     above and below it are black */
+  scrolled -= WIDESCREENDELTA;
+  if (scrolled > 640 - SCREENWIDTH)
+    scrolled = 640 - SCREENWIDTH;
+  if (scrolled < 0)
+    scrolled = 0;
+  V_FillPixels (screens[0], HEIGHTDELTA*SCREENWIDTH, V_PIXEL(0));
+  V_FillPixels (screens[0] + (HEIGHTDELTA+ORIGHEIGHT)*SCREENWIDTH,
+    (SCREENHEIGHT-HEIGHTDELTA-ORIGHEIGHT)*SCREENWIDTH, V_PIXEL(0));
+#endif
 
   for ( x=0 ; x<SCREENWIDTH ; x++)
   {

@@ -30,6 +30,7 @@
 #include "m_swap.h"
 #include "hu_stuff.h"
 #include "hu_lib.h"
+#include "st_stuff.h"
 #include "w_wad.h"
 
 //#include "s_sound.h"
@@ -49,7 +50,8 @@
 #define HU_TITLET (mapnamest[gamemap-1])*/
 #define HU_TITLEHEIGHT 1
 #define HU_TITLEX 0
-#define HU_TITLEY (167 - SHORT(hu_font[0]->height))
+/* CGDoom: just above the status bar (y 168 in vanilla's 320x200) */
+#define HU_TITLEY (ST_Y - 1 - SHORT(hu_font[0]->height))
 
 #define HU_INPUTTOGGLE 't'
 #define HU_INPUTX HU_MSGX

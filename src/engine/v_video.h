@@ -114,6 +114,12 @@ void V_DrawPatch(int x,int y, int scrn,const patch_t*	patch);
    finale), centred on a larger screen whose borders it clears */
 void V_DrawFullscreenPatch(int scrn, const char *lumpname);
 
+/* CGDoom: draws a patch at (x, y) of the 320x200 layout of the 2D screens
+   (menus, intermission, finale), which is centred on a larger screen like
+   the full-screen pictures */
+#define V_DrawLayoutPatch(x,y,scrn,patch) \
+	V_DrawPatch((x) + WIDESCREENDELTA, (y) + HEIGHTDELTA, scrn, patch)
+
 // Draw a linear block of pixels into the view buffer.
 void V_DrawBlock( int x, int y,int scrn,int width,int height,const pixel_t* src );
 

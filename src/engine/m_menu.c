@@ -153,7 +153,7 @@ typedef struct menu_s
     menuitem_t*		menuitems;	// menu items
     void		(*routine)();	// draw routine
     short		x;
-    short		y;		// x,y of menu
+    short		y;		// x,y of menu (CGDoom: in the 320x200 layout)
     short		lastOn;		// last item user was on in menu
 } menu_t;
 
@@ -497,7 +497,7 @@ void M_DrawLoad(void)
 {
     int             i;
 
-    V_DrawPatchDirect (72,28,0,W_CacheLumpNamePatch("M_LOADG",PU_CACHE));
+    V_DrawLayoutPatch (72,28,0,W_CacheLumpNamePatch("M_LOADG",PU_CACHE));
     M_DrawSaveLoadBorder(LoadDef.x,LoadDef.y,LINEHEIGHT,load_end);
     for (i = 0;i < load_end; i++)
     {
@@ -523,14 +523,14 @@ void M_DrawSaveLoadBorder(int x,int y,int height,int count)
   for(int j = 0; j < count; j++)
   {
     p = W_CacheLumpNamePatch("M_LSLEFT", PU_CACHE);
-    V_DrawPatchDirect (x-8,y+7,0,p);
+    V_DrawLayoutPatch (x-8,y+7,0,p);
 
     p = W_CacheLumpNamePatch("M_LSCNTR", PU_CACHE);
     for (i = 0; i < 24; i++)
-      V_DrawPatchDirect (x+8*i,y+7,0,p);
+      V_DrawLayoutPatch (x+8*i,y+7,0,p);
 
     p = W_CacheLumpNamePatch("M_LSRGHT", PU_CACHE);
-    V_DrawPatchDirect (x+8*24,y+7,0,p);
+    V_DrawLayoutPatch (x+8*24,y+7,0,p);
 
     y += height;
   }
@@ -571,7 +571,7 @@ void M_DrawSave(void)
 {
     int             i;
 
-    V_DrawPatchDirect (72,28,0,W_CacheLumpNamePatch("M_SAVEG",PU_CACHE));
+    V_DrawLayoutPatch (72,28,0,W_CacheLumpNamePatch("M_SAVEG",PU_CACHE));
     M_DrawSaveLoadBorder(LoadDef.x,LoadDef.y,LINEHEIGHT,load_end);
     for (i = 0;i < load_end; i++)
     {
@@ -716,7 +716,7 @@ void M_Sound(int choice)
 //
 void M_DrawMainMenu(void)
 {
-  V_DrawPatchDirect (94,2,0,W_CacheLumpNamePatch("M_DOOM",PU_CACHE));
+  V_DrawLayoutPatch (94,2,0,W_CacheLumpNamePatch("M_DOOM",PU_CACHE));
 }
 
 
@@ -727,8 +727,8 @@ void M_DrawMainMenu(void)
 //
 void M_DrawNewGame(void)
 {
-  V_DrawPatchDirect (96,14,0,W_CacheLumpNamePatch("M_NEWG",PU_CACHE));
-  V_DrawPatchDirect (54,38,0,W_CacheLumpNamePatch("M_SKILL",PU_CACHE));
+  V_DrawLayoutPatch (96,14,0,W_CacheLumpNamePatch("M_NEWG",PU_CACHE));
+  V_DrawLayoutPatch (54,38,0,W_CacheLumpNamePatch("M_SKILL",PU_CACHE));
 }
 
 void M_NewGame(int choice)
@@ -754,7 +754,7 @@ int     epi;
 
 void M_DrawEpisode(void)
 {
-  V_DrawPatchDirect (54,38,0,W_CacheLumpNamePatch("M_EPISOD",PU_CACHE));
+  V_DrawLayoutPatch (54,38,0,W_CacheLumpNamePatch("M_EPISOD",PU_CACHE));
 }
 
 void M_VerifyNightmare(int ch)
@@ -808,11 +808,11 @@ static const char	msgNames[2][9]		= {"M_MSGOFF","M_MSGON"};
 
 void M_DrawOptions(void)
 {
-  V_DrawPatchDirect (108,15,0,W_CacheLumpNamePatch("M_OPTTTL",PU_CACHE));
+  V_DrawLayoutPatch (108,15,0,W_CacheLumpNamePatch("M_OPTTTL",PU_CACHE));
 
-  V_DrawPatchDirect (OptionsDef.x + 175,OptionsDef.y+LINEHEIGHT*detail,0,W_CacheLumpNamePatch(detailNames[detailLevel],PU_CACHE));
+  V_DrawLayoutPatch (OptionsDef.x + 175,OptionsDef.y+LINEHEIGHT*detail,0,W_CacheLumpNamePatch(detailNames[detailLevel],PU_CACHE));
 
-  V_DrawPatchDirect (OptionsDef.x + 120,OptionsDef.y+LINEHEIGHT*messages,0,W_CacheLumpNamePatch(msgNames[showMessages],PU_CACHE));
+  V_DrawLayoutPatch (OptionsDef.x + 120,OptionsDef.y+LINEHEIGHT*messages,0,W_CacheLumpNamePatch(msgNames[showMessages],PU_CACHE));
 }
 
 void M_Options(int choice)
@@ -951,28 +951,28 @@ void M_DrawThermo ( int	x,  int	y,  int	thermWidth,  int	thermDot )
   int i;
 
   xx = x;
-  V_DrawPatchDirect(xx,y,0,W_CacheLumpNamePatch("M_THERML",PU_CACHE));
+  V_DrawLayoutPatch(xx,y,0,W_CacheLumpNamePatch("M_THERML",PU_CACHE));
   xx += 8;
   for (i=0;i<thermWidth;i++)
   {
-    V_DrawPatchDirect(xx,y,0,W_CacheLumpNamePatch("M_THERMM",PU_CACHE));
+    V_DrawLayoutPatch(xx,y,0,W_CacheLumpNamePatch("M_THERMM",PU_CACHE));
     xx += 8;
   }
-  V_DrawPatchDirect(xx,y,0,W_CacheLumpNamePatch("M_THERMR",PU_CACHE));
+  V_DrawLayoutPatch(xx,y,0,W_CacheLumpNamePatch("M_THERMR",PU_CACHE));
 
-  V_DrawPatchDirect((x+8) + thermDot*8,y,0,W_CacheLumpNamePatch("M_THERMO",PU_CACHE));
+  V_DrawLayoutPatch((x+8) + thermDot*8,y,0,W_CacheLumpNamePatch("M_THERMO",PU_CACHE));
 }
 
 
 
 void M_DrawEmptyCell( menu_t*	menu,  int		item )
 {
-  V_DrawPatchDirect (menu->x - 10,menu->y+item*LINEHEIGHT - 1, 0,W_CacheLumpNamePatch("M_CELL1",PU_CACHE));
+  V_DrawLayoutPatch (menu->x - 10,menu->y+item*LINEHEIGHT - 1, 0,W_CacheLumpNamePatch("M_CELL1",PU_CACHE));
 }
 
 void M_DrawSelCell( menu_t*	menu,  int		item )
 {
-  V_DrawPatchDirect (menu->x - 10,menu->y+item*LINEHEIGHT - 1, 0,W_CacheLumpNamePatch("M_CELL2",PU_CACHE));
+  V_DrawLayoutPatch (menu->x - 10,menu->y+item*LINEHEIGHT - 1, 0,W_CacheLumpNamePatch("M_CELL2",PU_CACHE));
 }
 
 
@@ -1044,6 +1044,8 @@ int M_StringHeight(char* string)
 //
 //      Write a string using the hu_font
 //
+/* CGDoom: (x, y) is a position of the 320x200 layout, centred on a larger
+   screen (V_DrawLayoutPatch); the text is clipped at the screen's edge */
 void M_WriteText
 ( int		x,
   int		y,
@@ -1054,8 +1056,10 @@ void M_WriteText
     int		c;
     int		cx;
     int		cy;
-		
 
+
+    x += WIDESCREENDELTA;
+    y += HEIGHTDELTA;
     ch = string;
     cx = x;
     cy = y;
@@ -1359,13 +1363,13 @@ void M_Drawer (void)
   for (i=0;i<max;i++)
   {
     if (currentMenu->menuitems[i].name[0])
-      V_DrawPatchDirect (x,y,0,W_CacheLumpNamePatch(currentMenu->menuitems[i].name ,PU_CACHE));
+      V_DrawLayoutPatch (x,y,0,W_CacheLumpNamePatch(currentMenu->menuitems[i].name ,PU_CACHE));
     y += LINEHEIGHT;
   }
 
 
   // DRAW SKULL
-  V_DrawPatchDirect(x + SKULLXOFF,currentMenu->y - 5 + itemOn*LINEHEIGHT, 0,W_CacheLumpNamePatch(skullName[whichSkull],PU_CACHE));
+  V_DrawLayoutPatch(x + SKULLXOFF,currentMenu->y - 5 + itemOn*LINEHEIGHT, 0,W_CacheLumpNamePatch(skullName[whichSkull],PU_CACHE));
 }
 
 
