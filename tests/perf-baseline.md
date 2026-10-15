@@ -81,6 +81,38 @@ Instructions per frame, same window, with `-lowdetail` (160 columns), `-viewsize
 Low detail saves 34–39%, view size 9 saves 13–16% and view size 7 saves 32–38%. Cycles drop by about the same
 amount (within 0.8 points). Game tics and the status bar cost the same in every mode; only rendering gets cheaper.
 
+## Screen formats
+
+The same measure in the three builds of `src/platform/cgd_config.h` (DEVELOPMENT.md §2.7), each with its SH4 drawers,
+the HD build with its extras on as shipped: `make VARIANT=wide perf-sim` and `make VARIANT=hd perf-sim` at commit
+`dd2e68d`, against `make perf-sim` at the same commit. Every run reproduced its goldens (`tests/golden-wide`,
+`tests/golden-hd`).
+
+| scenario | input | 320x200 8-bit | 396x224 8-bit | HD (396x224 RGB565) |
+|---|---|---|---|---|
+| e1m1 | explore | 1,115,825 | 1,415,627 (+26.9%) | 1,891,836 (+69.5%) |
+| e1m2 | noclip | 1,020,497 | 1,284,534 (+25.9%) | 1,957,148 (+91.8%) |
+| e1m3 | walk | 843,128 | 1,093,171 (+29.7%) | 1,335,851 (+58.4%) |
+| e2m2 | noclip | 690,883 | 814,281 (+17.9%) | 1,119,008 (+62.0%) |
+| e3m4 | explore | 1,086,252 | 1,379,360 (+27.0%) | 1,617,683 (+48.9%) |
+| demo1 | demo | 1,701,401 | 2,098,318 (+23.3%) | 2,348,255 (+38.0%) |
+| map01 | explore | 1,001,242 | 1,296,936 (+29.5%) | 1,535,762 (+53.4%) |
+| map07 | noclip | 881,932 | 1,105,809 (+25.4%) | 1,542,801 (+74.9%) |
+| demo2-1 | demo | 1,677,049 | 2,088,855 (+24.6%) | 2,324,624 (+38.6%) |
+
+- **Widescreen:** the view has 41% more pixels (396x192 against 320x168); the frame costs 18–30% more.
+- **True colour** adds one instruction per pixel to every drawer loop (`src/engine/sh4/README.md`), the extras add
+  their own costs, and the presenter copies the frame for the DMA (not counted here). The demos, played without the
+  automap, cost 38–39% more than the 320x200 build.
+- **Translucency** is drawn by C drawers (`R_DrawTLOverColumn`, `R_DrawTLAddColumn`). In map01 it costs 5% of the
+  frame on average (1,595,584 against 1,517,949 cycles per frame with `-features` minus `translucent`), but frames
+  where overlapping translucent sprites fill the view cost up to 3.3 times as much: frame 793 takes 16,663,831
+  cycles, 5,099,261 without translucency and 2,059,374 in the 320x200 build (`-simmarks`).
+- **The `noclip` scenarios are not like for like:** their script presses the Map key twice, which in the HD build
+  leaves the automap overlay on (the 3D view plus every map line rotated each frame), where the other builds show
+  the map alone. In e1m2 the overlay's drawing (`AM_rotatePoint`, `AM_drawFline`, `AM_drawWalls`, `AM_clipMline`)
+  is about 23% of the cycles.
+
 ## Where the time goes
 
 Shares of simulator cycles from the PC profiles (`build-sim/perf/<name>.top` has the top 25 functions):
@@ -169,6 +201,8 @@ make sim             # build-sim/cgdoom-sim.elf (SH4 drawers; C only: make SIM_B
 make test-sim        # quick check: the first 60 tics of e1m1, map01 and demo1 against the goldens
 make test-sim-full   # all 35 scenarios in the simulator against the goldens (about 4 min)
 make perf-sim        # the per-frame table and the e1m1/map01/demo1 profiles (about 1 min); output in build-sim/perf/
+make VARIANT=hd sim-tool   # once per screen format (VARIANT=wide|hd): build-sim-hd/tools/sh-elf-run64
+make VARIANT=hd perf-sim   # the per-frame table for that format; output in build-sim-hd/perf/
 ```
 
 `src/sim/perf-sim.sh -bin <elf>` takes `-only NAME` (repeatable: the scenarios of `tests/scenarios.txt`), `-prof NAME`

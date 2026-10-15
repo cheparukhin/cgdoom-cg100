@@ -248,8 +248,9 @@ saved in one loads in the other. CGDoom does not know the two quick keys: when i
 CGDoom HD goes back to their default keys.
 
 **Speed.** CGDoom HD draws 39% more pixels, at two bytes each instead of one, so it is slower than
-CGDoom. Compare the two with the timedemo (Diagnostics → Benchmarks, key **1**). *Detail* and *View size*
-make it faster as they do in CGDoom. It needs about 53 KB more RAM, and by calculation the packed
+CGDoom: in the simulator a frame costs 40–70% more. See-through explosions and fireballs right in front of
+you slow it down the most. Compare the two with the timedemo (Diagnostics → Benchmarks, key **1**).
+*Detail* and *View size* make it faster as they do in CGDoom. It needs about 53 KB more RAM, and by calculation the packed
 shareware WAD still fits in RAM.
 
 ## Saves and files

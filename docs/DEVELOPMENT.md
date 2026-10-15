@@ -583,6 +583,11 @@ CGDoom; e1m1 and map01 are the closest comparisons.
   - low detail: −34 to −39%;
   - view size 9: −13 to −16%;
   - view size 7: −32 to −38%.
+- **Screen formats** (§2.7), against the 320x200 build ([perf-baseline](../tests/perf-baseline.md#screen-formats)):
+  - 396x224 8-bit: +18 to +30%, for 41% more pixels;
+  - HD: +38 to +39% in the demos and +49 to +70% in the bot and walk scenarios (the `noclip` ones leave only the
+    HD build in the automap overlay, so they do not compare). Its translucent sprites use C drawers: 5% of the
+    frame on average in map01, but up to 3.3 times the frame when overlapping translucent sprites fill the view.
 - **The simulator charges 1 cycle per instruction (plus 2 per taken branch)** and models no cache or dual
   issue, so the SH4 drawers' gain is a lower bound. Under the SH-4A pipeline model
   (`src/engine/sh4/README.md` §3), the drawers run 2.4–3.2× faster than GCC's C drawers over a frame's call mix
