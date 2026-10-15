@@ -240,7 +240,8 @@ static void test_malloc(void)
 	for(int i = 0; i < 33 * 7; i++) CHECK(((uint8_t *)c)[i] == 0);
 	free(b); free(a); free(c);
 	CHECK(sim_heap_check() == 0);
-	{ volatile size_t huge = (size_t)-8; CHECK(malloc(huge) == NULL); }           /* absurd request fails cleanly */
+	/* absurd request fails cleanly (volatile p: GCC elides a malloc whose result is only compared with NULL) */
+	{ volatile size_t huge = (size_t)-8; void *volatile p = malloc(huge); CHECK(p == NULL); }
 
 	/* randomized stress with content verification */
 	enum { N = 400 };
