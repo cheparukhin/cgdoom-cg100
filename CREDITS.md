@@ -43,6 +43,10 @@ and of nDoom.
 - **Chocolate Doom:** the corrected low-detail semantics, used by the C drawers in `src/engine/r_draw.c`
   and by the SH4 drawers. Also `M_ChangeDetail`, and the `MAXSEGS` sizing of the clip-range array in
   `r_bsp.c`.
+- **Crispy Doom** (Fabian Greffrath and contributors): the designs that CGDoom HD's features follow,
+  written anew for this engine: the "Hor+" widescreen view, the aspect-ratio correction, the automap
+  overlay with rotation and level statistics, the coloured status-bar numbers, the full-screen HUD, the
+  crosshair, and quicksave over the last loaded game.
 
 ## Projects consulted
 
