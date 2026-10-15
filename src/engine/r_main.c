@@ -121,17 +121,9 @@ angle_t						xtoviewangle[SCREENWIDTH+1];
 //fixed_t*					finecosine = &finesine[FINEANGLES/4];
 
 
-const lighttable_t*				scalelight[LIGHTLEVELS_MAX][MAXLIGHTSCALE];
+const lighttable_t*				scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
 const lighttable_t*				scalelightfixed[MAXLIGHTSCALE];
-/* (aligned: macOS's linker would align a 32 KiB byte array to 32 KiB) */
-zlight_t					zlight[LIGHTLEVELS_MAX][MAXLIGHTZ_MAX]
-  __attribute__((aligned(32)));
-#if CGD_EXTRAS
-/* CGDoom: the light constants (r_main.h), set by R_InitLightTables */
-int						lightlevels = 16, lightsegshift = 4;
-int						lightbright = 1;
-int						maxlightz = 128, lightzshift = 20;
-#endif
+const lighttable_t*				zlight[LIGHTLEVELS][MAXLIGHTZ];
 
 // bumped light from gun blasts
 int							extralight;			
@@ -545,31 +537,11 @@ void R_InitLightTables (void)
   int		startmap; 	
   int		scale;
 
-#if CGD_EXTRAS
-  /* CGDoom: vanilla's constants, or the smooth ones (r_main.h) */
-  if (CGD_Features & CGD_FEAT_SMOOTHLIGHT)
-  {
-    lightlevels = 16 << 1;
-    lightsegshift = 4 - 1;
-    lightbright = 1 << 1;
-    maxlightz = 128 << 3;
-    lightzshift = 20 - 3;
-  }
-  else
-  {
-    lightlevels = 16;
-    lightsegshift = 4;
-    lightbright = 1;
-    maxlightz = 128;
-    lightzshift = 20;
-  }
-#endif
-
   // Calculate the light levels to use
   //  for each level / distance combination.
   for (i=0 ; i< LIGHTLEVELS ; i++)
   {
-    startmap = ((LIGHTLEVELS-LIGHTBRIGHT-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
+    startmap = ((LIGHTLEVELS-1-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
     for (j=0 ; j<MAXLIGHTZ ; j++)
     {
       scale = FixedDiv ((ORIGWIDTH/2*FRACUNIT), (j+1)<<LIGHTZSHIFT);
@@ -582,11 +554,7 @@ void R_InitLightTables (void)
       if (level >= NUMCOLORMAPS)
         level = NUMCOLORMAPS-1;
 
-#if CGD_EXTRAS
-      zlight[i][j] = (zlight_t)level;
-#else
       zlight[i][j] = colormaps + level*256;
-#endif
     }
   }
 }
@@ -768,7 +736,7 @@ void R_ExecuteSetViewSize (void)
   //  for each level / scale combination.
   for (i=0 ; i< LIGHTLEVELS ; i++)
   {
-    startmap = ((LIGHTLEVELS-LIGHTBRIGHT-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
+    startmap = ((LIGHTLEVELS-1-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
     for (j=0 ; j<MAXLIGHTSCALE ; j++)
     {
       /* CGDoom: j is a vertical scale, larger by ASPECT_NUM/ASPECT_DEN

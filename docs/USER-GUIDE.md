@@ -226,10 +226,8 @@ root. With the packed shareware WAD they take about 4.1 MB, which may not leave 
 - **DOOM's proportions.** DOOM was drawn for 4:3 monitors, where its pixels were taller than wide. The
   view is stretched by 6/5 vertically, so rooms, monsters and weapons have the shapes they were drawn
   with.
-- **Smoother lighting.** The light fades with distance in finer steps.
 - **See-through effects.** Fireballs, plasma, BFG blasts, bullet puffs, smoke and teleport fog are
-  translucent: an explosion in your face no longer hides the monster behind it. Fire, plasma and the gun
-  flash glow.
+  translucent: an explosion in your face no longer hides the monster behind it. Fire and plasma glow.
 - **Coloured numbers** on the status bar: health is red below 25%, gold below 50%, green up to 100% and
   blue above; armour is green or blue by armour type; ammo is red when low and gold below half; all
   three are gray in god mode.
@@ -251,7 +249,7 @@ CGDoom HD goes back to their default keys.
 
 **Speed.** CGDoom HD draws 39% more pixels, at two bytes each instead of one, so it is slower than
 CGDoom. Compare the two with the timedemo (Diagnostics → Benchmarks, key **1**). *Detail* and *View size*
-make it faster as they do in CGDoom. It needs about 80 KB more RAM, and by calculation the packed
+make it faster as they do in CGDoom. It needs about 53 KB more RAM, and by calculation the packed
 shareware WAD still fits in RAM.
 
 ## Saves and files

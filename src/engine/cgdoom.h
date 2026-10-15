@@ -137,30 +137,27 @@ extern int CGD_PlayDemoOnly;
 /* Rendering features beyond vanilla, as bits of CGD_Features. The builds
    with CGD_EXTRAS (cgd_config.h; the HD build) have them all, on by default;
    the others have none. None changes game state, so demos stay in sync
-   either way. Set before D_DoomMain (host -features); the names are for the
-   host's option. */
+   either way. Set before D_DoomMain (host -features); the names, indexed by
+   bit, are for the host's option. */
 #define CGD_FEAT_ASPECT   0x01  /* aspect-ratio correction: the 3D view
                                    scaled 6/5 vertically, as DOOM's 320x200
                                    looked on a 4:3 monitor (r_main.c) */
-#define CGD_FEAT_SMOOTHLIGHT 0x02 /* smooth diminishing lighting: twice the
-                                   sector light levels, distance steps 8
-                                   times finer (r_main.h) */
-#define CGD_FEAT_TRANSLUCENT 0x04 /* see-through fireballs, plasma, BFG,
-                                   puffs and fog, glowing gun flash; true
-                                   colour only (r_things.c) */
-#define CGD_FEAT_COLORNUMS 0x08 /* status-bar health, armour and ammo
+#define CGD_FEAT_TRANSLUCENT 0x02 /* see-through fireballs, plasma, BFG,
+                                   puffs and fog; true colour only
+                                   (r_things.c) */
+#define CGD_FEAT_COLORNUMS 0x04 /* status-bar health, armour and ammo
                                    coloured by level; true colour only
                                    (st_stuff.c) */
-#define CGD_FEAT_CROSSHAIR 0x10 /* a small yellow cross at the centre of
+#define CGD_FEAT_CROSSHAIR 0x08 /* a small yellow cross at the centre of
                                    the view (r_main.c) */
-#define CGD_FEAT_AUTOMAP  0x20  /* automap: the map key also gives an
+#define CGD_FEAT_AUTOMAP  0x10  /* automap: the map key also gives an
                                    overlay that turns with the player;
                                    kills, items, secrets and time shown
                                    (am_map.c) */
-#define CGD_FEAT_FULLHUD  0x40  /* the largest view size shows health,
+#define CGD_FEAT_FULLHUD  0x20  /* the largest view size shows health,
                                    armour, ammo and keys over the view
                                    (st_stuff.c) */
-#define CGD_FEATURE_COUNT 7
+#define CGD_FEATURE_COUNT 6
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
 #if CGD_EXTRAS && CGD_TRUECOLOR

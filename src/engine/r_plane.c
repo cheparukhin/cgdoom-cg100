@@ -121,7 +121,7 @@ int						spanstop[SCREENHEIGHT];
 //
 // texture mapping
 //
-const zlight_t*				planezlight;
+const lighttable_t**			planezlight;
 fixed_t					planeheight;
 
 fixed_t					yslope[SCREENHEIGHT];
@@ -312,7 +312,7 @@ void R_MapPlane( int y, int	x1,  int x2 )
     if (index >= MAXLIGHTZ )
       index = MAXLIGHTZ-1;
 
-    ds_colormap = ZLIGHT_MAP(planezlight[index]);
+    ds_colormap = planezlight[index];
   }
 
   ds_y = y;
@@ -569,7 +569,7 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
     ds_source = (const byte*)W_CacheLumpNumConst(firstflat +flattranslation[pl->picnum],PU_STATIC);
 
     planeheight = abs(pl->height-viewz);
-    light = (pl->lightlevel >> LIGHTSEGSHIFT)+extralight*LIGHTBRIGHT;
+    light = (pl->lightlevel >> LIGHTSEGSHIFT)+extralight;
 
     if (light >= LIGHTLEVELS)
       light = LIGHTLEVELS-1;

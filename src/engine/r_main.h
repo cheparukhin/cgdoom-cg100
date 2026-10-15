@@ -76,43 +76,17 @@ extern int		loopcount;
 
 // Lighting constants.
 // Now why not 32 levels here?
-/* CGDoom: the CGD_EXTRAS builds also have smooth diminishing lighting
-   (CGD_FEAT_SMOOTHLIGHT, Crispy Doom's values for 32 colormaps): twice the
-   sector light levels (LIGHTBRIGHT levels per step of extralight and of
-   the walls' fake contrast) and distance steps 8 times finer. There these
-   constants are variables (R_InitLightTables) and the tables are sized for
-   the smooth values; zlight then holds colormap numbers instead of
-   pointers (32 KiB instead of 128 KiB), read through ZLIGHT_MAP. */
-#if CGD_EXTRAS
-extern int		lightlevels, lightsegshift, lightbright;
-extern int		maxlightz, lightzshift;
-#define LIGHTLEVELS		lightlevels
-#define LIGHTSEGSHIFT		lightsegshift
-#define LIGHTBRIGHT		lightbright
-#define MAXLIGHTZ		maxlightz
-#define LIGHTZSHIFT		lightzshift
-#define LIGHTLEVELS_MAX		32
-#define MAXLIGHTZ_MAX		1024
-typedef byte			zlight_t;
-#define ZLIGHT_MAP(z)		(colormaps + (z)*256)
-#else
 #define LIGHTLEVELS	        16
 #define LIGHTSEGSHIFT	         4
-#define LIGHTBRIGHT		1
-#define MAXLIGHTZ	       128
-#define LIGHTZSHIFT		20
-#define LIGHTLEVELS_MAX		LIGHTLEVELS
-#define MAXLIGHTZ_MAX		MAXLIGHTZ
-typedef const lighttable_t*	zlight_t;
-#define ZLIGHT_MAP(z)		(z)
-#endif
 
 #define MAXLIGHTSCALE		48
 #define LIGHTSCALESHIFT		12
+#define MAXLIGHTZ	       128
+#define LIGHTZSHIFT		20
 
-extern const lighttable_t*	scalelight[LIGHTLEVELS_MAX][MAXLIGHTSCALE];
+extern const lighttable_t*	scalelight[LIGHTLEVELS][MAXLIGHTSCALE];
 extern const lighttable_t*	scalelightfixed[MAXLIGHTSCALE];
-extern zlight_t			zlight[LIGHTLEVELS_MAX][MAXLIGHTZ_MAX];
+extern const lighttable_t*	zlight[LIGHTLEVELS][MAXLIGHTZ];
 
 extern int		extralight;
 extern const lighttable_t*	fixedcolormap;

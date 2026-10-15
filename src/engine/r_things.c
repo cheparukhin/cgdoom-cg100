@@ -730,7 +730,7 @@ void R_AddSprites (sector_t* sec)
   // Well, now it will be done.
   sec->validcount = validcount;
 
-  lightnum = (sec->lightlevel >> LIGHTSEGSHIFT)+extralight*LIGHTBRIGHT;
+  lightnum = (sec->lightlevel >> LIGHTSEGSHIFT)+extralight;
 
   if (lightnum < 0)		
     spritelights = scalelight[0];
@@ -797,15 +797,10 @@ static void R_DrawPSprite (pspdef_t* psp)
   // store information in a vissprite
   vis = &avis;
   vis->mobjflags = 0;
-  /* CGDoom: the gun flash glows over the scene (CGD_FEAT_TRANSLUCENT):
-     added, which keeps its white core (laid over at 21/32 it was duller
-     than the opaque flash) */
+  /* CGDoom: the weapon and its flash stay opaque, as in vanilla
+     (translucent, the flash was duller laid over, or tinted the walls
+     behind it added) */
   vis->tl = TL_NONE;
-#if CGD_EXTRAS && CGD_TRUECOLOR
-  if ((CGD_Features & CGD_FEAT_TRANSLUCENT)
-    && psp == &viewplayer->psprites[ps_flash])
-    vis->tl = TL_ADD;
-#endif
   vis->texturemid = (BASEYCENTER<<FRACBITS)+FRACUNIT/2-(psp->sy-spritetopoffset[lump])
     + pspriteshift;
   vis->x1 = x1 < 0 ? 0 : x1;
@@ -865,7 +860,7 @@ static void R_DrawPlayerSprites (void)
   pspdef_t*	psp;
 
   // get light level
-  lightnum = (viewplayer->mo->subsector->sector->lightlevel >> LIGHTSEGSHIFT) + extralight*LIGHTBRIGHT;
+  lightnum = (viewplayer->mo->subsector->sector->lightlevel >> LIGHTSEGSHIFT) + extralight;
 
   if (lightnum < 0)		
     spritelights = scalelight[0];
