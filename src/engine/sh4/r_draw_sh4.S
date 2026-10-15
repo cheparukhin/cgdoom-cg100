@@ -1,8 +1,10 @@
-/* r_draw_sh4.S - SH4AL-DSP (SH-4A, big-endian) column and span drawers for CGDoom.
+/* r_draw_sh4.S - SH4AL-DSP (SH-4A, big-endian) column and span drawers for CGDoom, 8-bit pixels
+   (palette indices; the RGB565 drawers of CGD_TRUECOLOR are in r_draw16_sh4.S).
 
    Drop-in replacements for the vanilla r_draw.c drawers: void(void), reading the same engine
    globals, bit-exact output (see test/ref_draw.c and test/test_sh4.c). Design notes, pipeline
-   schedules and measurements: README.md.
+   schedules and measurements: README.md. Any SCREENWIDTH that is a multiple of 4 below 512
+   (src/platform/cgd_config.h: 320 or 396).
 
    Conventions used throughout:
    - GCC/Renesas SH ABI: r0-r7, T, MACH/MACL are clobbered; r8-r14 are saved when used.
@@ -21,6 +23,22 @@
      load->EX 2, load->address 3, load->store data 2 (see README "Pipeline model"). */
 
 #include "sh4_asm.h"
+#include "cgd_config.h"
+
+#if !CGD_TRUECOLOR
+
+/* Row step: SCREENWIDTH bytes, built as mov #ROWQ + shll2 (320 = 80 << 2, 396 = 99 << 2) */
+#define ROWQ		(SCREENWIDTH / 4)
+#if SCREENWIDTH % 4 != 0 || ROWQ > 127
+#error "r_draw_sh4.S: SCREENWIDTH must be a multiple of 4 below 512"
+#endif
+/* Fuzz: counts up to FUZZ_MAXCOUNT (a full-height column) stay in the asm; the offset table holds
+   FUZZ_COPIES copies of fuzzoffset[], enough for fuzzpos (<= 49) + FUZZ_MAXCOUNT + 1 entries */
+#define FUZZ_MAXCOUNT	(SCREENHEIGHT - 1)
+#define FUZZ_COPIES	((FUZZ_MAXCOUNT + 1 + 49 + 49) / 50)
+#if FUZZ_MAXCOUNT > 255
+#error "r_draw_sh4.S: SCREENHEIGHT above 256"
+#endif
 
 /* Rotated colormap check, shared by all drawers.
    In:  CM = colormap pointer, TBL = &cgd_sh4_cmaps.  Clobbers T0, T1, T.
@@ -45,14 +63,15 @@
    count = dc_yh - dc_yl; if (count < 0) return;
    dest = ylookup[dc_yl] + columnofs[dc_x];
    frac = dc_texturemid + (dc_yl - centery) * dc_iscale;
-   do { *dest = dc_colormap[dc_source[(frac >> 16) & 127]]; dest += 320; frac += dc_iscale; }
+   do { *dest = dc_colormap[dc_source[(frac >> 16) & 127]]; dest += SCREENWIDTH; frac += dc_iscale; }
    while (count--);
 
    Loop: 2 pixels (a, b) per iteration, 16 instructions, 8 cycles (4 cycles/pixel), software
    pipelined over 2 stages: an iteration computes the texel addresses of pair k and loads its
    texel a, and finishes pair k-1 (colour a, texel b, store a, colour b, store b).
-   Registers: r0 texel/colour index, r1 dest pointer (incremented by 320 before each store),
-   r2 step9, r3 -25, r4 frac9 (next pixel), r5 dc_source, r6 rotated colormap base, r7 320,
+   Registers: r0 texel/colour index, r1 dest pointer (incremented by SCREENWIDTH before each
+   store), r2 step9, r3 -25, r4 frac9 (next pixel), r5 dc_source, r6 rotated colormap base,
+   r7 SCREENWIDTH,
    r8/r9 texel address of a/b, r10 colour.
    n = count+1 pixels are covered by N = (n+1)/2 pairs: prologue (stage 0 of pair 0), N-1 loop
    iterations, epilogue (stage 1 of pair N-1, whose pixel b is only stored if n is even; when
@@ -135,10 +154,10 @@ cgd_col_disp:
 	mov	#1, r0
 	add	r7, r1			/* dest */
 	LDRE(.Lc_re)
-	mov	#80, r7
+	mov	#ROWQ, r7
 	cmp/eq	r0, r10			/* count == 1: no loop iteration */
-	shll2	r7			/* r7 = 320 */
-	sub	r7, r1			/* r1 = dest - 320 */
+	shll2	r7			/* r7 = SCREENWIDTH */
+	sub	r7, r1			/* r1 = dest - SCREENWIDTH */
 	bt/s	.Lc_epi			/* 2 pixels: stage 1 of pair 0 only */
 	mov.b	@r8, r0			/* texel a of pair 0 */
 cgd_col_n2:
@@ -253,11 +272,11 @@ ENDFUNC(R_DrawColumn_SH4)
 
    Fast path needs columnofs[x+1] == columnofs[x] + 1 (always true with R_InitBuffer); the two
    pixels are written right to left with pre-decrement stores from dest + 2, then the pointer
-   moves by 322 to the next row. Loop: 2 texels (4 pixels) per iteration, 18 instructions,
+   moves by SCREENWIDTH + 2 to the next row. Loop: 2 texels (4 pixels) per iteration, 18 instructions,
    9 cycles (2.25 cycles/pixel). Separate frac registers for texels a and b (each stepped by
    2*step9) remove the ordering constraint between them.
    Registers: r0 texel, r1 frac9 a, r11 frac9 b, r2 2*step9, r3 -25, r4 dest+2, r5 dc_source,
-   r6 rotated colormap, r7 322, r8/r9 texel address a/b, r10 colour.
+   r6 rotated colormap, r7 SCREENWIDTH + 2, r8/r9 texel address a/b, r10 colour.
    1 texel (dc_yl == dc_yh) takes a separate straight-line path (.Ll_one): no
    register saves, no colormap or contiguity check, no loop set-up. 2 texels branch once, to
    the epilogue.
@@ -330,7 +349,7 @@ cgd_coll_disp:
 	mov.l	@r5, r5			/* r5 = dc_source */
 	mov.l	@r0, r0			/* ylookup[dc_yl] */
 	cmp/eq	r4, r10			/* columnofs not contiguous: C path */
-	mov.w	.Ll_322, r7
+	mov.w	.Ll_row2, r7
 	bf	.Ll_slowpop
 	add	r0, r4			/* dest */
 	sts	macl, r0
@@ -450,7 +469,7 @@ cgd_coll_one:
 cgd_coll_one_end:
 
 	.balign 2
-.Ll_322:	.word	322
+.Ll_row2:	.word	SCREENWIDTH + 2
 	.balign 4
 .Ll_yl:		.long	_dc_yl
 .Ll_yh:		.long	_dc_yh
@@ -848,7 +867,7 @@ ENDFUNC(R_DrawSpanLow_SH4)
 /* R_DrawTranslatedColumn / R_DrawTranslatedColumnLow
    *dest = dc_colormap[dc_translation[dc_source[frac >> 16]]]   (arithmetic shift, no mask)
    Low: x = dc_x << 1, pixels at columnofs[x] and columnofs[x+1] (two pointers, no precondition).
-   Shared body: every texel is stored through r4 and through r8, both stepped by 320.
+   Shared body: every texel is stored through r4 and through r8, both stepped by SCREENWIDTH.
    Low: r8 = second destination. Normal: r8 = r4, so the second store rewrites the same byte
    with the same value, and no other memory is touched (test_sh4.c's stray-write check covers
    all static memory, not just the framebuffer guards). */
@@ -915,8 +934,8 @@ FUNC(R_DrawTranslatedColumn_SH4)
 	mov.l	.Lt_texmid, r0
 	mov.l	@r0, r0
 	add	r0, r1			/* r1 = frac */
-	mov	#80, r7
-	shll2	r7			/* r7 = 320 */
+	mov	#ROWQ, r7
+	shll2	r7			/* r7 = SCREENWIDTH */
 	ALIGN4
 cgd_tr_rs:
 2:	swap.w	r1, r0
@@ -960,9 +979,10 @@ ENDFUNC(R_DrawTranslatedColumn_SH4)
    if (!dc_yl) dc_yl = 1; if (dc_yh == viewheight-1) dc_yh = viewheight-2;   (globals)
    count = dc_yh - dc_yl; if (count < 0) return;
    *dest = colormaps[6*256 + dest[fuzzoffset[fuzzpos]]]; fuzzpos = (fuzzpos + 1) % 50 per row.
-   The offsets come from a 250-entry unrolled copy of fuzzoffset[] starting at fuzzpos, so the
-   loop has no wrap test (count <= 199, else C); fuzzpos += pixels (mod 50) at the end.
-   Rows are processed strictly in order (dest[-320] must see the row just written). */
+   The offsets come from an unrolled copy of fuzzoffset[] (FUZZ_COPIES x 50 entries) starting at
+   fuzzpos, so the loop has no wrap test (count <= FUZZ_MAXCOUNT, else C); fuzzpos += pixels
+   (mod 50) at the end. Rows are processed strictly in order (dest[-SCREENWIDTH] must see the row
+   just written). */
 
 	CGD_SH4_COLD
 	.balign 4
@@ -993,9 +1013,9 @@ FUNC(R_DrawFuzzColumn_SH4)
 	add	#-1, r0
 	mov.l	r0, @r5			/* dc_yh = viewheight - 2 */
 2:	sub	r1, r0			/* count */
-	mov	#199, r2
+	mov	#FUZZ_MAXCOUNT, r2
 	extu.b	r2, r2
-	cmp/hi	r2, r0			/* count < 0 (C returns) or count > 199 */
+	cmp/hi	r2, r0			/* count < 0 (C returns) or count > FUZZ_MAXCOUNT */
 	bt	.Lf_slowpop
 	mov	r0, r2
 	mov.l	.Lf_fuzzpos, r5
@@ -1034,8 +1054,8 @@ FUNC(R_DrawFuzzColumn_SH4)
 	add	#1, r2			/* pixels */
 	LDRS(.Lf_rs1)
 	LDRE(.Lf_re1)
-	mov	#80, r7
-	shll2	r7			/* 320 */
+	mov	#ROWQ, r7
+	shll2	r7			/* SCREENWIDTH */
 	tst	r3, r3
 	bf	.Lf_low
 	LDRC(2)
@@ -1043,7 +1063,7 @@ FUNC(R_DrawFuzzColumn_SH4)
 	ALIGN4
 .Lf_rs1:
 cgd_fz_rs:
-	mov.w	@r1+, r0		/* +-320 */
+	mov.w	@r1+, r0		/* +-SCREENWIDTH */
 	mov.b	@(r0,r4), r0		/* dest[offset] */
 	mov.b	@(r0,r6), r3		/* colormaps[6*256 + ...] */
 	mov.b	r3, @r4
@@ -1071,7 +1091,7 @@ cgd_fz_end:
 	add	r7, r4
 .Lf_re2:	add	r7, r8
 
-.Lf_done:	/* fuzzpos = (fuzzpos + pixels) % 50, at most 248 */
+.Lf_done:	/* fuzzpos = (fuzzpos + pixels) % 50 */
 	mov	#50, r1
 3:	cmp/hs	r1, r5
 	bf	4f
@@ -1104,11 +1124,14 @@ ENDFUNC(R_DrawFuzzColumn_SH4)
 
 	.section .rodata
 	.balign 4
-/* fuzzoffset[] of r_draw.c (FUZZOFF = SCREENWIDTH), repeated 5 times */
+/* fuzzoffset[] of r_draw.c (FUZZOFF = SCREENWIDTH), repeated FUZZ_COPIES times */
+#define FO SCREENWIDTH
 cgd_sh4_fuzztab:
-	.rept 5
-	.short	320,-320,320,-320,320,320,-320,320,320,-320,320,320,320,-320,320,320,320,-320,-320,-320
-	.short	-320,320,-320,-320,320,320,320,320,-320,320,-320,320,320,-320,-320,320,320,-320,-320,-320
-	.short	-320,320,320,320,320,-320,320,320,-320,320
+	.rept FUZZ_COPIES
+	.short	FO,-FO,FO,-FO,FO,FO,-FO,FO,FO,-FO,FO,FO,FO,-FO,FO,FO,FO,-FO,-FO,-FO
+	.short	-FO,FO,-FO,-FO,FO,FO,FO,FO,-FO,FO,-FO,FO,FO,-FO,-FO,FO,FO,-FO,-FO,-FO
+	.short	-FO,FO,FO,FO,FO,-FO,FO,FO,-FO,FO
 	.endr
+
+#endif /* !CGD_TRUECOLOR */
 

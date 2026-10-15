@@ -1,14 +1,16 @@
 #!/bin/sh
 # Per-frame cost baseline of cgdoom-sim.elf in the SH simulator (needs sh-elf-run64: make sim-tool).
 #
-#   perf-sim.sh -bin build-sim/cgdoom-sim.elf [-from F] [-only NAME]... [-prof NAME]... [-out DIR]
+#   perf-sim.sh -bin build-sim/cgdoom-sim.elf [-from F] [-only NAME]... [-prof NAME]... [-golden DIR]
+#               [-out DIR]
 #
 # For each scenario of tests/scenarios.txt (default: the gameplay ones) runs the full scenario with
 # "-simstats -simwin F 0" (F = 42 by default: frames 0..41 are the level-start screen wipe, and the
 # level is loaded before frame 0) and prints a markdown table of the per-frame averages. The CRCs are
-# checked against the goldens on the way. Scenarios given with -prof (default e1m1 map01 demo1) also
-# record a PC profile of the window and print the top functions (src/sim/simprof).
-# Everything is written to DIR (default build-sim/perf). Runs are deterministic: same numbers every time.
+# checked against the goldens on the way (-golden, default tests/golden). Scenarios given with -prof
+# (default e1m1 map01 demo1) also record a PC profile of the window and print the top functions
+# (src/sim/simprof). Everything is written to the -out directory (default build-sim/perf), with the
+# simulator of ${SIM_BUILD:-build-sim}/tools. Runs are deterministic: same numbers every time.
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BIN=
@@ -30,11 +32,13 @@ while [ $# -gt 0 ]; do
     -only) ONLY="$ONLY $2"; shift 2;;
     -prof) PROF="$PROF $2"; shift 2;;
     -out) OUT=$2; shift 2;;
+    -golden) GOLDEN=$2; shift 2;;
     *) echo "unknown option $1" >&2; exit 2;;
     esac
 done
 [ -n "$BIN" ] || { echo "usage: $0 -bin <elf> [-from F] [-only NAME]... [-prof NAME]..." >&2; exit 2; }
-[ -x "$ROOT/build-sim/tools/sh-elf-run64" ] || { echo "perf-sim: needs build-sim/tools/sh-elf-run64 (make sim-tool)" >&2; exit 2; }
+RUN64=${SIM_BUILD:-$ROOT/build-sim}/tools/sh-elf-run64
+[ -x "$RUN64" ] || { echo "perf-sim: needs $RUN64 (make sim-tool)" >&2; exit 2; }
 [ -n "$ONLY" ] || ONLY="e1m1 e1m2 e1m3 e2m2 e3m4 demo1 map01 map07 demo2-1"
 [ -n "$PROF" ] || PROF="e1m1 map01 demo1"
 mkdir -p "$OUT" || exit 2

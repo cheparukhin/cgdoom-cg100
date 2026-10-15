@@ -7,13 +7,22 @@
      R_DrawColumnLow:  x = dc_x << 1 (local), writes columnofs[x] and columnofs[x+1]
      R_DrawSpanLow:    count = ds_x2 - ds_x1 before ds_x1 <<= 1; ds_x2 <<= 1
      R_DrawFuzzColumnLow / R_DrawTranslatedColumnLow: as Chocolate Doom.
-   Compiled with the test's -O2 these are also the "C" side of the benchmarks. */
+   Compiled with the test's -O2 these are also the "C" side of the benchmarks.
+   Pixels are pixel_t (test_globals.h): bytes, or RGB565 with CGD_TRUECOLOR, where the spectre
+   darkens through FUZZDARK instead of colormap 6, as in r_draw.c. */
 
 #include "test_globals.h"
 
 #define FRACBITS 16
 #define FUZZTABLE 50
 #define FUZZOFF (SCREENWIDTH)
+
+#if CGD_TRUECOLOR
+#define FUZZDARK(p)	((pixel_t)((((p) >> 1) & 0x7bef) + (((p) >> 2) & 0x39e7) \
+			  + (((p) >> 4) & 0x0861)))
+#else
+#define FUZZDARK(p)	(colormaps[6*256+(p)])
+#endif
 
 static const int fuzzoffset[FUZZTABLE] =
 {
@@ -32,7 +41,7 @@ static const int fuzzoffset[FUZZTABLE] =
 void ref_R_DrawColumn (void)
 {
   int			count;
-  byte*		dest;
+  pixel_t*		dest;
   fixed_t		frac;
   fixed_t		fracstep;
 
@@ -53,8 +62,8 @@ void ref_R_DrawColumn (void)
 void ref_R_DrawColumnLow (void)
 {
   int			count;
-  byte*		dest;
-  byte*		dest2;
+  pixel_t*		dest;
+  pixel_t*		dest2;
   fixed_t		frac;
   fixed_t		fracstep;
   int x;
@@ -79,7 +88,7 @@ void ref_R_DrawColumnLow (void)
 void ref_R_DrawFuzzColumn (void)
 {
   int			count;
-  byte*		dest;
+  pixel_t*		dest;
   fixed_t		frac;
   fixed_t		fracstep;
 
@@ -95,7 +104,7 @@ void ref_R_DrawFuzzColumn (void)
   frac = dc_texturemid + (dc_yl-centery)*fracstep;
   do
   {
-    *dest = colormaps[6*256+dest[fuzzoffset[fuzzpos]]];
+    *dest = FUZZDARK(dest[fuzzoffset[fuzzpos]]);
     if (++fuzzpos == FUZZTABLE)
       fuzzpos = 0;
     dest += SCREENWIDTH;
@@ -106,8 +115,8 @@ void ref_R_DrawFuzzColumn (void)
 void ref_R_DrawFuzzColumnLow (void)
 {
   int			count;
-  byte*		dest;
-  byte*		dest2;
+  pixel_t*		dest;
+  pixel_t*		dest2;
   int x;
 
   if (!dc_yl)
@@ -122,8 +131,8 @@ void ref_R_DrawFuzzColumnLow (void)
   dest2 = ylookup[dc_yl] + columnofs[x+1];
   do
   {
-    *dest = colormaps[6*256+dest[fuzzoffset[fuzzpos]]];
-    *dest2 = colormaps[6*256+dest2[fuzzoffset[fuzzpos]]];
+    *dest = FUZZDARK(dest[fuzzoffset[fuzzpos]]);
+    *dest2 = FUZZDARK(dest2[fuzzoffset[fuzzpos]]);
     if (++fuzzpos == FUZZTABLE)
       fuzzpos = 0;
     dest += SCREENWIDTH;
@@ -134,7 +143,7 @@ void ref_R_DrawFuzzColumnLow (void)
 void ref_R_DrawTranslatedColumn (void)
 {
   int			count;
-  byte*		dest;
+  pixel_t*		dest;
   fixed_t		frac;
   fixed_t		fracstep;
 
@@ -155,8 +164,8 @@ void ref_R_DrawTranslatedColumn (void)
 void ref_R_DrawTranslatedColumnLow (void)
 {
   int			count;
-  byte*		dest;
-  byte*		dest2;
+  pixel_t*		dest;
+  pixel_t*		dest2;
   fixed_t		frac;
   fixed_t		fracstep;
   int x;
@@ -183,7 +192,7 @@ void ref_R_DrawSpan (void)
 {
   fixed_t		xfrac;
   fixed_t		yfrac;
-  byte*		dest;
+  pixel_t*		dest;
   int			count;
   int			spot;
 
@@ -204,7 +213,7 @@ void ref_R_DrawSpanLow (void)
 {
   fixed_t		xfrac;
   fixed_t		yfrac;
-  byte*		dest;
+  pixel_t*		dest;
   int			count;
   int			spot;
 

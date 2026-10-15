@@ -1,16 +1,22 @@
 /* test_globals.h - the engine globals the drawers read, with CGDoom's declarations
-   (r_draw.c, r_main.c, r_data.c), defined by test_sh4.c. */
+   (r_draw.c, r_main.c, r_data.c), defined by test_sh4.c. The screen format (SCREENWIDTH,
+   SCREENHEIGHT, CGD_TRUECOLOR) comes from src/platform/cgd_config.h, as in the engine: the test
+   is built once per format (Makefile TV=...). */
 #ifndef TEST_GLOBALS_H
 #define TEST_GLOBALS_H
 
 #include <stdint.h>
+#include "cgd_config.h"
 
 typedef unsigned char byte;
-typedef byte lighttable_t;
+#if CGD_TRUECOLOR
+typedef uint16_t pixel_t;
+#else
+typedef byte pixel_t;
+#endif
+typedef pixel_t lighttable_t;
 typedef int fixed_t;
 
-#define SCREENWIDTH  320
-#define SCREENHEIGHT 200
 #define MAXWIDTH     1120
 #define MAXHEIGHT    832
 
@@ -23,7 +29,7 @@ extern int ds_y, ds_x1, ds_x2;
 extern const lighttable_t *ds_colormap;
 extern fixed_t ds_xfrac, ds_yfrac, ds_xstep, ds_ystep;
 extern const byte *ds_source;
-extern byte *ylookup[MAXHEIGHT];
+extern pixel_t *ylookup[MAXHEIGHT];
 extern int columnofs[MAXWIDTH];
 extern int centery, viewheight;
 extern const lighttable_t *colormaps;

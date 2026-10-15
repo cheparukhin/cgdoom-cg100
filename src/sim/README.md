@@ -29,7 +29,7 @@ Variables defined by `sim.mk` (set `SIM_BUILD` etc. *before* the include; append
 
 | variable | default / meaning |
 |---|---|
-| `SIM_BUILD` | `<root>/build-sim`; runtime objects go to `$(SIM_BUILD)/sim/` |
+| `SIM_BUILD` | `<root>/build-sim` (the root Makefile sets `build-sim$(VSUFFIX)` first: one directory per screen format, §9); runtime objects go to `$(SIM_BUILD)/sim/` |
 | `SIM_CC`, `SIM_AS`, `SIM_AR`, `SIM_OBJDUMP`, `SIM_SIZE`, `SIM_RUN` | `toolchain/bin/sh-elf-*` (absolute) |
 | `SIM_CFLAGS` | `-m4-nofpu -mb -O2 -std=gnu11 -fno-strict-aliasing -DPL_SIM -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -I src/sim` |
 | `SIM_ARCH`, `SIM_OPT` | `-m4-nofpu -mb`, `-O2`. `-m4a-nofpu` works too (the simulator decodes SH4A opcodes) |
@@ -287,7 +287,7 @@ G_Ticker, P_SetupLevel), so neither the engine nor src/host contains sim code. T
 `-simwin A B`, `-simstats`, `-simmarks` (see `cgdoom-hooks.c` and `tests/perf-baseline.md`).
 
 The engine selects the SH4 assembly drawers itself under `__sh__` (`CGD_SH4` in `src/engine/r_draw.h`), so the default
-ELF renders with them, as the calculator does. The `.S` files are assembled with `-Wa,--dsp -DCGD_SH4_DSP_MNEMONICS`
+ELF renders with them, as the calculator does, in every screen format. The `.S` files are assembled with `-Wa,--dsp -DCGD_SH4_DSP_MNEMONICS`
 (readable `ldrs`/`ldre`/`ldrc`) and `-MMD -MP`, and with `-DCGD_SH4_NO_ILRAM` (the simulator has no IL memory; the hot
 drawers go to `.text`). Variants, each in its own `SIM_BUILD` (objects are rebuilt when the variant of a build
 directory changes, `.cgsim-variant`):
@@ -296,14 +296,21 @@ directory changes, `.cgsim-variant`):
 |---|---|
 | `CGSIM_SH4=0` | C drawers only (`-DCGD_NO_SH4`, no `src/engine/sh4` objects), the C reference: `make SIM_BUILD=build-sim-c CGSIM_SH4=0 sim` |
 | `CGSIM_ILRAM=1` | the calculator's section layout (hot drawers in `.ilram`, which `sim.ld` places after `.text`) |
+| `VARIANT=wide`, `VARIANT=hd` | the root Makefile's screen formats (396×224 8-bit, 396×224 RGB565; `src/platform/cgd_config.h`): their defines on every object, `SIM_BUILD` defaulting to `build-sim-wide` / `build-sim-hd`, and the goldens of `tests/golden-wide` / `tests/golden-hd` (`GOLDEN_DIR`) |
+
+The tests compare with `$(GOLDEN_DIR)`, which a command-line `GOLDEN_DIR=<dir>` points elsewhere, e.g. at goldens
+generated from the host build of the same variant (`tests/run-scenarios.sh -mode golden -bin
+build-host-wide/cgdoom-host -golden <dir> -out <dir2>`, then `make VARIANT=wide GOLDEN_DIR=<dir> test-sim-full`). The
+scripts run with `SIM_BUILD` in their environment, so `simrun` uses that build directory's `tools/sh-elf-run64`
+(`make VARIANT=wide sim-tool` builds it there).
 
 | target | what |
 |---|---|
 | `make sim` | build the ELF |
-| `make test-sim` | `test-sim.sh`: first `SIM_TEST_TICS` (60) tics of e1m1, map01, demo1 must equal the first lines of the host goldens (~6 s) |
-| `make test-sim-full` | every scenario of `tests/scenarios.txt` through `tests/run-scenarios.sh -runner simrun` (35, ~245 s) |
+| `make test-sim` | `test-sim.sh`: first `SIM_TEST_TICS` (60) tics of e1m1, map01, demo1 must equal the first lines of the host goldens (~6 s; `-golden DIR`) |
+| `make test-sim-full` | every scenario of `tests/scenarios.txt` through `tests/run-scenarios.sh -runner simrun` (35, ~245 s at 320×200) |
 | `make test-demosync-sim` | `tests/demo-sync.sh` with the sim ELF: DEMO1-3 of the shareware `doom1.wad` given by `CGD_DOOM1_WAD` must give the same per-tic game-state traces as the host (`tests/demosync/*.ckpt`); skipped when `CGD_DOOM1_WAD` is not set |
-| `make perf-sim` | `perf-sim.sh`: per-frame insts/cycles table + PC profiles (needs sim64), results in `build-sim/perf/` |
+| `make perf-sim` | `perf-sim.sh`: per-frame insts/cycles table + PC profiles (needs sim64), results in `$(SIM_BUILD)/perf/` (`-golden DIR`) |
 
 The root Makefile also has two exactness tests for the simulator, outside `cgdoom.mk`. They are the gate
 for any SH-specific change to `FixedMul`/`FixedDiv` or the division helpers of `m_fixed.h`:

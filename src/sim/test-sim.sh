@@ -1,12 +1,12 @@
 #!/bin/sh
 # Short bit-exactness test of cgdoom-sim.elf against the host goldens.
 #
-#   test-sim.sh -bin build-sim/cgdoom-sim.elf [-tics N] [-only NAME]... [-out DIR]
+#   test-sim.sh -bin build-sim/cgdoom-sim.elf [-tics N] [-only NAME]... [-golden DIR] [-out DIR]
 #
 # Runs the named scenarios of tests/scenarios.txt (default: e1m1 map01 demo1) in the simulator
 # with "-tics N" appended (default 60; the last -tics wins), and checks that the per-frame CRC
-# lines are exactly the first lines of tests/golden/<name>.crc. Runs are deterministic, so a
-# shortened run renders the same frames as the start of the full one.
+# lines are exactly the first lines of DIR/<name>.crc (default tests/golden). Runs are
+# deterministic, so a shortened run renders the same frames as the start of the full one.
 # Exit status 0 if all passed.
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -25,6 +25,7 @@ while [ $# -gt 0 ]; do
     -tics) TICS=$2; shift 2;;
     -only) ONLY="$ONLY $2"; shift 2;;
     -out) OUT=$2; shift 2;;
+    -golden) GOLDEN=$2; shift 2;;
     *) echo "unknown option $1" >&2; exit 2;;
     esac
 done

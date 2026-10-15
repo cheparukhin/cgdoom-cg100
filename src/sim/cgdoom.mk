@@ -1,6 +1,6 @@
 # cgdoom.mk - CGDoom under the SH simulator (included by the root Makefile after sim.mk).
 #
-#   make sim            build-sim/cgdoom-sim.elf: src/engine (+ src/engine/sh4 when present) and
+#   make sim            $(SIM_BUILD)/cgdoom-sim.elf: src/engine (+ src/engine/sh4 when present) and
 #                       src/host, sh-elf-gcc -m4-nofpu -mb -O2 -DPL_SIM, no RANGECHECK (as on the
 #                       calculator), linked with the src/sim runtime and src/sim/cgdoom-hooks.c
 #   make test-sim       short bit-exactness check: the first SIM_TEST_TICS tics of a few scenarios
@@ -10,6 +10,12 @@
 #   make test-demosync-sim  DEMO1-3 of $CGD_DOOM1_WAD in the simulator: the per-tic traces must
 #                       match tests/demosync/*.ckpt like the host (tests/demo-sync.sh)
 #
+# Screen format: the root Makefile's VARIANT (empty, wide or hd; src/platform/cgd_config.h) adds
+# its defines (VARIANT_DEFS) to every object, and its SIM_BUILD default is build-sim$(VSUFFIX)
+# (build-sim, build-sim-wide, build-sim-hd). The tests compare with the goldens in $(GOLDEN_DIR)
+# (tests/golden$(VSUFFIX); GOLDEN_DIR=<dir> on the command line points them elsewhere). The scripts
+# get SIM_BUILD in their environment, so simrun uses $(SIM_BUILD)/tools/sh-elf-run64.
+#
 # The default ELF uses the SH4 assembly drawers of src/engine/sh4 (the engine selects them under
 # __sh__, r_draw.h CGD_SH4), as the calculator build does. Variants (use another SIM_BUILD):
 #   CGSIM_SH4=0         C drawers only (-DCGD_NO_SH4, no src/engine/sh4 objects): the C reference,
@@ -18,12 +24,13 @@
 #                       after .text) instead of the default -DCGD_SH4_NO_ILRAM (.text): the
 #                       simulator has no IL memory, the two layouts must render the same frames.
 #
-# Needs from the root Makefile: ROOT, ENGINE_SRC, HOST_SRC, RUN_SCEN.
+# Needs from the root Makefile: ROOT, ENGINE_SRC, HOST_SRC, RUN_SCEN, VARIANT_DEFS, GOLDEN_DIR.
 
 CGSIM_SH4      ?= 1
 CGSIM_ILRAM    ?= 0
 CGSIM_ELF      := $(SIM_BUILD)/cgdoom-sim.elf
-CGSIM_CFLAGS   := $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host
+CGSIM_CFLAGS   := $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host \
+                  $(VARIANT_DEFS)
 ifeq ($(CGSIM_SH4),0)
 CGSIM_ASM_SRC  :=
 CGSIM_C_SRC    := $(ENGINE_SRC) $(HOST_SRC)
@@ -40,7 +47,7 @@ CGSIM_OBJ      := $(CGSIM_C_SRC:$(ROOT)/src/%.c=$(SIM_BUILD)/%.o) \
                   $(patsubst $(ROOT)/src/%,$(SIM_BUILD)/%.o,$(CGSIM_ASM_SRC)) \
                   $(SIM_BUILD)/sim/cgdoom-hooks.o
 # Objects are rebuilt when the variant of this SIM_BUILD changes (the stamp is rewritten only then)
-CGSIM_VARIANT  := sh4=$(CGSIM_SH4) ilram=$(CGSIM_ILRAM)
+CGSIM_VARIANT  := sh4=$(CGSIM_SH4) ilram=$(CGSIM_ILRAM) defs=$(VARIANT_DEFS)
 CGSIM_STAMP    := $(SIM_BUILD)/.cgsim-variant
 CGSIM_STAMP_OK := $(shell mkdir -p $(SIM_BUILD) && \
                     { [ "`cat $(CGSIM_STAMP) 2>/dev/null`" = "$(CGSIM_VARIANT)" ] || \
@@ -76,14 +83,18 @@ $(SIM_BUILD)/sim/cgdoom-hooks.o: $(SIM_DIR)/cgdoom-hooks.c $(SIM_DIR)/sim.h
 -include $(wildcard $(SIM_BUILD)/engine/*.d $(SIM_BUILD)/engine/sh4/*.d $(SIM_BUILD)/host/*.d)
 
 test-sim: $(CGSIM_ELF)
-	@sh $(SIM_DIR)/test-sim.sh -bin $(CGSIM_ELF) -tics $(SIM_TEST_TICS)
+	@SIM_BUILD=$(SIM_BUILD) sh $(SIM_DIR)/test-sim.sh -bin $(CGSIM_ELF) -tics $(SIM_TEST_TICS) \
+	  -golden $(GOLDEN_DIR) -out $(SIM_BUILD)/tests-short
 
 test-sim-full: $(CGSIM_ELF)
-	@sh $(RUN_SCEN) -mode test -runner $(SIM_RUNNER) -bin $(CGSIM_ELF) -out $(SIM_BUILD)/tests
+	@SIM_BUILD=$(SIM_BUILD) sh $(RUN_SCEN) -mode test -runner $(SIM_RUNNER) -bin $(CGSIM_ELF) \
+	  -golden $(GOLDEN_DIR) -out $(SIM_BUILD)/tests
 
 # DEMO1-3 of $(CGD_DOOM1_WAD) in the simulator, same traces as the host (tests/demo-sync.sh)
 test-demosync-sim: $(CGSIM_ELF)
-	@sh $(ROOT)/tests/demo-sync.sh -runner $(SIM_RUNNER) -bin $(CGSIM_ELF) -out $(SIM_BUILD)/tests/demosync
+	@SIM_BUILD=$(SIM_BUILD) sh $(ROOT)/tests/demo-sync.sh -runner $(SIM_RUNNER) -bin $(CGSIM_ELF) \
+	  -out $(SIM_BUILD)/tests/demosync
 
 perf-sim: $(CGSIM_ELF)
-	@sh $(SIM_DIR)/perf-sim.sh -bin $(CGSIM_ELF)
+	@SIM_BUILD=$(SIM_BUILD) sh $(SIM_DIR)/perf-sim.sh -bin $(CGSIM_ELF) -golden $(GOLDEN_DIR) \
+	  -out $(SIM_BUILD)/perf

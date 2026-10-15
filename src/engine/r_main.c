@@ -684,7 +684,8 @@ void R_ExecuteSetViewSize (void)
      Low detail uses Chocolate Doom's drawers (fuzz and translated included,
      where vanilla kept the full-detail ones), see r_draw.c.
      SH4 builds (CGD_SH4, r_draw.h: __sh__ and not CGD_NO_SH4) use the
-     bit-exact *_SH4 assembly versions of src/engine/sh4 (README.md §7);
+     bit-exact *_SH4 assembly versions of src/engine/sh4 (README.md §7),
+     assembled for the build's pixel format (8-bit or RGB565, any width);
      they need cgd_sh4_set_colormaps() (R_InitColormaps), else they fall
      back to C. */
 #ifdef CGD_SH4

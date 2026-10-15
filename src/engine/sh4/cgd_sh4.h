@@ -5,10 +5,13 @@
 
    - Drawers: drop-in replacements for the vanilla r_draw.c drawers (void(void), reading the same
      globals: dc_* / ds_* / ylookup[] / columnofs[] / centery / viewheight / colormaps / fuzzpos).
-     They are bit-exact with the C versions (see test/ref_draw.c for the reference semantics).
-   - The fast paths need a "rotated" copy of the COLORMAP lump, registered with
-     cgd_sh4_set_colormaps(). When dc_colormap/ds_colormap does not point at a 256-byte map of the
-     registered lump (or nothing is registered), the drawers transparently fall back to C code.
+     They are bit-exact with the C versions (see test/ref_draw.c for the reference semantics), in
+     the build's screen format (src/platform/cgd_config.h): 8-bit pixels (r_draw_sh4.S) or RGB565
+     pixels with CGD_TRUECOLOR (r_draw16_sh4.S), at any SCREENWIDTH multiple of 4 below 512.
+   - The fast paths need a "rotated" copy of the light tables (colormaps: the COLORMAP lump, or
+     the RGB565 tables of CGD_TRUECOLOR), registered with cgd_sh4_set_colormaps(). When
+     dc_colormap/ds_colormap does not point at a 256-entry map of the registered tables (or nothing
+     is registered), the drawers transparently fall back to C code.
    - The column/span drawers use SH4AL-DSP zero-overhead repeat loops (ldrs/ldre/ldrc). They must
      only be called from foreground code, and NO code running in interrupt context may execute
      ldrs/ldre while they can run (gint does not save RS/RE on interrupts). Known offenders:
@@ -18,12 +21,14 @@
    - Section: hot code goes to ".ilram" (gint copies it to the on-chip IL memory at start-up and
      after world switches) unless CGD_SH4_NO_ILRAM is defined when assembling.
 
-   This header only uses <stdint.h>/<stddef.h>; it can be included from engine and platform code. */
+   This header only uses <stdint.h>/<stddef.h> and cgd_config.h (#defines only); it can be
+   included from engine and platform code. */
 #ifndef CGD_SH4_H
 #define CGD_SH4_H
 
 #include <stddef.h>
 #include <stdint.h>
+#include "cgd_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,20 +51,36 @@ void R_DrawFuzzColumnLow_SH4(void);
 void R_DrawTranslatedColumnLow_SH4(void);
 
 /* ---- Rotated colormaps (r_draw_sh4_c.c) ---------------------------------------------------------
-   rot must hold nmaps*256 bytes (any alignment; 32-byte alignment recommended). Builds
-   rot[k*256 + j] = colormaps[k*256 + (j ^ 0x80)] so the drawers can index a colormap with the
-   sign-extended texel byte (SH mov.b sign-extends). Call it after R_InitColormaps (and again
-   whenever the colormap lump moves or its contents change; vanilla never changes it). nmaps is
-   the number of 256-byte maps in the lump (W_LumpLength(COLORMAP) / 256 = 34 for DOOM), max 256.
+   One entry of a light table: a palette index, or an RGB565 colour with CGD_TRUECOLOR (the
+   engine's lighttable_t). */
+#if CGD_TRUECOLOR
+typedef uint16_t cgd_sh4_cm_t;
+#define CGD_SH4_MAXMAPS 128
+#else
+typedef uint8_t cgd_sh4_cm_t;
+#define CGD_SH4_MAXMAPS 256
+#endif
+
+/* rot must hold nmaps*256 entries (2-byte aligned for RGB565; 32-byte alignment recommended).
+   Builds rot[k*256 + j] = colormaps[k*256 + (j ^ 0x80)] so the drawers can index a colormap with
+   the sign-extended texel byte (SH mov.b sign-extends; doubled for 2-byte entries). Call it after
+   R_InitColormaps. nmaps is the number of 256-entry maps (W_LumpLength(COLORMAP) / 256 = 34 for
+   DOOM), at most CGD_SH4_MAXMAPS (more are not registered: the drawers use C for them).
    colormaps == NULL or nmaps <= 0 unregisters (all drawers then use their C fallbacks, except
    1-pixel columns of R_DrawColumn_SH4 / R_DrawColumnLow_SH4, which read dc_colormap directly). */
-void cgd_sh4_set_colormaps(const uint8_t *colormaps, int nmaps, uint8_t *rot);
+void cgd_sh4_set_colormaps(const cgd_sh4_cm_t *colormaps, int nmaps, cgd_sh4_cm_t *rot);
 
-/* State read by the assembly (do not modify directly). */
+/* Rebuilds the rotated copy from the registered tables: call it whenever their contents change
+   (the RGB565 light tables at every palette change, R_BuildLightTables; the 8-bit COLORMAP lump
+   never changes). Does nothing while nothing is registered. */
+void cgd_sh4_colormaps_changed(void);
+
+/* State read by the assembly (do not modify directly; src, nmaps and delta at offsets 0, 4, 8). */
 struct cgd_sh4_cmaps {
-	const uint8_t *src;   /* registered COLORMAP lump */
-	uint32_t nmaps;       /* number of maps covered (0 = disabled) */
-	intptr_t delta;       /* (rot + 128) - src: rotated base = colormap pointer + delta */
+	const cgd_sh4_cm_t *src;   /* registered light tables */
+	uint32_t nmaps;            /* number of maps covered (0 = disabled) */
+	intptr_t delta;            /* (rot + 128 entries) - src: rotated base = colormap pointer + delta */
+	cgd_sh4_cm_t *rot;         /* the rotated copy (for cgd_sh4_colormaps_changed) */
 };
 extern struct cgd_sh4_cmaps cgd_sh4_cmaps;
 

@@ -42,7 +42,8 @@
 # VARIANT selects the screen format (src/platform/cgd_config.h): empty for
 # the 320x200 8-bit build, "wide" (396x224, 8-bit) or "hd" (396x224, true
 # colour). Each variant builds into build-host-<variant>/ (and
-# build-host-asan-<variant>/) and has its goldens in tests/golden-<variant>/.
+# build-host-asan-<variant>/, and build-sim-<variant>/ for the simulator) and
+# has its goldens in tests/golden-<variant>/.
 
 ROOT        := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
@@ -312,6 +313,7 @@ clean:
 # Simulator builds (src/sim/sim.mk and src/sim/cgdoom.mk; optional)
 #---
 
+SIM_BUILD   ?= $(ROOT)/build-sim$(VSUFFIX)
 -include $(ROOT)/src/sim/sim.mk
 -include $(ROOT)/src/sim/cgdoom.mk
 

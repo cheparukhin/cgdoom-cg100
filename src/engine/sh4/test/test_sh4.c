@@ -14,7 +14,7 @@
    columns and full-width spans) snapshots all of the program's static memory - .text, .rodata,
    .data and .bss, i.e. everything the linker placed - before the asm call and checks afterwards
    that nothing changed except framebuffer B and the globals the drawer is allowed to write.
-   (The framebuffer guards alone cannot see e.g. a store pointer walking 320 bytes per pixel
+   (The framebuffer guards alone cannot see e.g. a store pointer walking a row per pixel
    through .bss; this check reports it from the first sampled case.)
 
    Calling convention: every asm drawer call goes through cgd_test_abi_call()
@@ -23,7 +23,12 @@
    1-pixel columns: R_DrawColumn_SH4 / R_DrawColumnLow_SH4 take a separate
    path for dc_yl == dc_yh that saves no registers and reads dc_colormap directly. The "1px"
    passes draw only such columns (every colormap kind, unregistered table, non-contiguous
-   columnofs) with the stray-write check after every call. */
+   columnofs) with the stray-write check after every call.
+
+   Screen format: the test is built once per format of src/platform/cgd_config.h (Makefile
+   TV=...: 320x200 or 396x224, 8-bit or RGB565 pixels), against the drawers assembled for it.
+   The views follow R_ExecuteSetViewSize's sizes for that screen. A "palette change" pass
+   rewrites the registered light tables, calls cgd_sh4_colormaps_changed() and draws again. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,25 +49,25 @@ int ds_y, ds_x1, ds_x2;
 const lighttable_t *ds_colormap;
 fixed_t ds_xfrac, ds_yfrac, ds_xstep, ds_ystep;
 const byte *ds_source;
-byte *ylookup[MAXHEIGHT];
+pixel_t *ylookup[MAXHEIGHT];
 int columnofs[MAXWIDTH];
 int centery, viewheight;
 const lighttable_t *colormaps;
 int fuzzpos;
 
 /* ---- memory ---- */
-#define GUARD 4096
+#define GUARD 4096                       /* pixels */
 #define FBSIZE (SCREENWIDTH * SCREENHEIGHT)
-static uint8_t fbA_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
-static uint8_t fbB_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
+static pixel_t fbA_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
+static pixel_t fbB_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
 #define FBA (fbA_mem + GUARD)
 #define FBB (fbB_mem + GUARD)
 
 #define NMAPS 34
-static uint8_t lumpbuf[(NMAPS + 2) * 256 + 64] __attribute__((aligned(32)));
-static uint8_t *lump;                    /* registered COLORMAP lump (deliberately misaligned) */
-static uint8_t rot[NMAPS * 256] __attribute__((aligned(32)));
-static uint8_t othercm[8 * 256 + 64];    /* an unregistered colormap area */
+static lighttable_t lumpbuf[(NMAPS + 2) * 256 + 64] __attribute__((aligned(32)));
+static lighttable_t *lump;               /* registered light tables (deliberately misaligned) */
+static lighttable_t rot[NMAPS * 256] __attribute__((aligned(32)));
+static lighttable_t othercm[8 * 256 + 64];   /* an unregistered colormap area */
 static uint8_t texbuf[1 << 16];          /* column textures */
 static uint8_t bigbuf[1 << 18];          /* translated columns: indices +-2^17 around the middle */
 static uint8_t flatbuf[4 * 4096 + 64];
@@ -76,12 +81,17 @@ static int rndr(int lo, int hi) { return lo + (int)rndn((uint32_t)(hi - lo + 1))
 typedef void (*drawfn)(void);
 void cgd_test_abi_call(drawfn fn, uint32_t out[9], uint32_t p);
 
+/* The view sizes of R_ExecuteSetViewSize (320x200: 320x200, 320x168, 224x112, 96x48) */
+#define SBARHEIGHT 32
+#define VIEWW(b) (((b) * SCREENWIDTH / 10) & ~7)
+#define VIEWH(b) (((b) * (SCREENHEIGHT - SBARHEIGHT) / 10) & ~7)
+#define VIEW(b) { VIEWW(b), VIEWH(b), (SCREENWIDTH - VIEWW(b)) / 2, (SCREENHEIGHT - SBARHEIGHT - VIEWH(b)) / 2 }
 struct view { int width, height, wx, wy; };
 static const struct view views[] = {
-	{ 320, 200, 0, 0 },     /* full screen (setblocks 11) */
-	{ 320, 168, 0, 0 },     /* CGDoom default (setblocks 10) */
-	{ 224, 112, 48, 28 },   /* setblocks 7 */
-	{ 96, 48, 112, 60 },    /* setblocks 3 */
+	{ SCREENWIDTH, SCREENHEIGHT, 0, 0 },                /* full screen (setblocks 11) */
+	{ SCREENWIDTH, SCREENHEIGHT - SBARHEIGHT, 0, 0 },   /* CGDoom default (setblocks 10) */
+	VIEW(7),
+	VIEW(3),
 };
 static const struct view *cur_view;
 static int odd_columnofs;   /* columnofs not contiguous (exercises the low-detail C path) */
@@ -98,7 +108,7 @@ static void set_view(const struct view *v)
 			int t = columnofs[i]; columnofs[i] = columnofs[i + 1]; columnofs[i + 1] = t;
 		}
 }
-static void set_ylookup(uint8_t *fb)
+static void set_ylookup(pixel_t *fb)
 {
 	for(int i = 0; i < cur_view->height; i++)
 		ylookup[i] = fb + (i + cur_view->wy) * SCREENWIDTH;
@@ -132,7 +142,7 @@ static int cmp_full(void)
 {
 	const uint32_t *a = (const uint32_t *)fbA_mem, *b = (const uint32_t *)fbB_mem;
 	for(unsigned i = 0; i < sizeof fbA_mem / 4; i++)
-		if(a[i] != b[i]) return (int)(i * 4) - GUARD;
+		if(a[i] != b[i]) return (int)(i * 4 / sizeof(pixel_t)) - GUARD;
 	return INT32_MIN;
 }
 static void resync(void) { memcpy(fbB_mem, fbA_mem, sizeof fbA_mem); }
@@ -217,12 +227,13 @@ static void call_asm(drawfn f, const char *name, long n)
 }
 
 /* ---- random parameter generation ---- */
-static const uint8_t *pick_colormap(int allow_bad)
+static const lighttable_t *pick_colormap(int allow_bad)
 {
 	int r = rndn(100);
 	if(!allow_bad || r < 85) return lump + 256 * rndn(NMAPS);
 	if(r < 90) return othercm + rndn(7 * 256);                      /* unregistered */
-	if(r < 95) return lump + 256 * rndn(NMAPS) + 1 + rndn(255);      /* misaligned in lump */
+	if(r < 93) return lump + 256 * rndn(NMAPS) + 1 + rndn(255);      /* misaligned in lump */
+	if(r < 95) return lump + 256 * rndn(NMAPS) + 128;                /* half a map in */
 	if(r < 98) return lump + 256 * NMAPS;                           /* just past the end */
 	return lump - 256;                                              /* just before */
 }
@@ -451,16 +462,21 @@ static void test_div(int N)
 	}
 }
 
+static void fill_maps(void)
+{
+	for(unsigned i = 0; i < sizeof lumpbuf / sizeof *lumpbuf; i++) lumpbuf[i] = (lighttable_t)rnd();
+}
+
 static void init_data(void)
 {
-	lump = lumpbuf + 256 + 7;    /* registered lump at an odd address, one map of slack before */
-	for(unsigned i = 0; i < sizeof lumpbuf; i++) lumpbuf[i] = (uint8_t)rnd();
-	for(unsigned i = 0; i < sizeof othercm; i++) othercm[i] = (uint8_t)rnd();
+	lump = lumpbuf + 256 + 7;    /* registered tables at an odd entry, one map of slack before */
+	fill_maps();
+	for(unsigned i = 0; i < sizeof othercm / sizeof *othercm; i++) othercm[i] = (lighttable_t)rnd();
 	for(unsigned i = 0; i < sizeof texbuf; i++) texbuf[i] = (uint8_t)rnd();
 	for(unsigned i = 0; i < sizeof bigbuf; i++) bigbuf[i] = (uint8_t)rnd();
 	for(unsigned i = 0; i < sizeof flatbuf; i++) flatbuf[i] = (uint8_t)rnd();
 	for(unsigned i = 0; i < sizeof transbuf; i++) transbuf[i] = (uint8_t)rnd();
-	for(unsigned i = 0; i < sizeof fbA_mem; i++) fbA_mem[i] = (uint8_t)rnd();
+	for(unsigned i = 0; i < sizeof fbA_mem / sizeof *fbA_mem; i++) fbA_mem[i] = (pixel_t)rnd();
 	resync();
 	colormaps = lump;
 	cgd_sh4_set_colormaps(lump, NMAPS, rot);
@@ -469,8 +485,9 @@ static void init_data(void)
 
 /*==== benchmarks =================================================================================*/
 
-struct colcase { int x, yl, yh, iscale, mid; const uint8_t *cm, *src; };
-struct spancase { int y, x1, x2, xf, yf, xs, ys; const uint8_t *cm, *src; };
+struct colcase { int x, yl, yh, iscale, mid; const lighttable_t *cm; const uint8_t *src; };
+struct spancase { int y, x1, x2, xf, yf, xs, ys; const lighttable_t *cm; const uint8_t *src; };
+#define BENCH_H (SCREENHEIGHT - SBARHEIGHT)     /* views[1] */
 #define NB 400
 static struct colcase cc[NB];
 static struct spancase sc[NB];
@@ -481,8 +498,8 @@ static void gen_cols(int lmin, int lmax, int low)
 	bench_pixels = 0;
 	for(int i = 0; i < NB; i++) {
 		int len = rndr(lmin, lmax);
-		cc[i].x = rndr(0, (320 >> low) - 1);
-		cc[i].yl = rndr(0, 168 - len);
+		cc[i].x = rndr(0, (SCREENWIDTH >> low) - 1);
+		cc[i].yl = rndr(0, BENCH_H - len);
 		cc[i].yh = cc[i].yl + len - 1;
 		cc[i].iscale = rndr(0x2000, 0x30000);
 		cc[i].mid = rndr(0, 0x800000);
@@ -495,11 +512,11 @@ static void gen_spans(int lmin, int lmax, int low)
 {
 	bench_pixels = 0;
 	for(int i = 0; i < NB; i++) {
-		int w = 320 >> low;
+		int w = SCREENWIDTH >> low;
 		int len = rndr(lmin >> low, lmax >> low);
 		if(len > w) len = w;
 		if(len < 1) len = 1;
-		sc[i].y = rndr(0, 167);
+		sc[i].y = rndr(0, BENCH_H - 1);
 		sc[i].x1 = rndr(0, w - len);
 		sc[i].x2 = sc[i].x1 + len - 1;
 		sc[i].xf = (int)rnd(); sc[i].yf = (int)rnd();
@@ -559,9 +576,10 @@ static void bench(void)
 	set_view(&views[1]);
 	set_ylookup(FBA);
 	colormaps = lump;
-	printf("benchmarks: per output pixel, call overhead included (sim64 counters; 'cyc' is the\n"
-	       "simulator's SH-1-style cycle model, NOT SH-4A timing - see README for pipeline estimates)\n");
-	static const int lens[][2] = { {10, 168}, {1, 1}, {2, 2}, {3, 3}, {8, 8}, {32, 32}, {100, 100}, {168, 168} };
+	printf("benchmarks (%dx%d, %d-bit pixels): per output pixel, call overhead included (sim64\n"
+	       "counters; 'cyc' is the simulator's SH-1-style cycle model, NOT SH-4A timing - see README\n"
+	       "for pipeline estimates)\n", SCREENWIDTH, SCREENHEIGHT, 8 * (int)sizeof(pixel_t));
+	static const int lens[][2] = { {10, BENCH_H}, {1, 1}, {2, 2}, {3, 3}, {8, 8}, {32, 32}, {100, 100}, {BENCH_H, BENCH_H} };
 	for(unsigned k = 0; k < sizeof lens / sizeof *lens; k++) {
 		gen_cols(lens[k][0], lens[k][1], 0);
 		sprintf(buf, "R_DrawColumn len %d..%d", lens[k][0], lens[k][1]);
@@ -572,17 +590,19 @@ static void bench(void)
 		sprintf(buf, "R_DrawColumnLow len %d..%d", lens[k][0], lens[k][1]);
 		bench_line(buf, run_cols, ref_R_DrawColumnLow, R_DrawColumnLow_SH4);
 	}
-	gen_cols(10, 168, 0);
+	gen_cols(10, BENCH_H, 0);
 	dc_translation = transbuf;
-	bench_line("R_DrawTranslatedColumn len 10..168", run_cols, ref_R_DrawTranslatedColumn, R_DrawTranslatedColumn_SH4);
+	sprintf(buf, "R_DrawTranslatedColumn len 10..%d", BENCH_H);
+	bench_line(buf, run_cols, ref_R_DrawTranslatedColumn, R_DrawTranslatedColumn_SH4);
 	{
-		/* fuzz: keep inside the view (rows 1..166) */
-		for(int i = 0; i < NB; i++) { if(cc[i].yl < 1) cc[i].yl = 1; if(cc[i].yh > 166) cc[i].yh = 166; }
+		/* fuzz: keep inside the view (rows 1 .. BENCH_H - 2) */
+		for(int i = 0; i < NB; i++) { if(cc[i].yl < 1) cc[i].yl = 1; if(cc[i].yh > BENCH_H - 2) cc[i].yh = BENCH_H - 2; }
 		bench_pixels = 0;
 		for(int i = 0; i < NB; i++) bench_pixels += cc[i].yh - cc[i].yl + 1;
-		bench_line("R_DrawFuzzColumn len ~10..166", run_cols, ref_R_DrawFuzzColumn, R_DrawFuzzColumn_SH4);
+		sprintf(buf, "R_DrawFuzzColumn len ~10..%d", BENCH_H - 2);
+		bench_line(buf, run_cols, ref_R_DrawFuzzColumn, R_DrawFuzzColumn_SH4);
 	}
-	static const int slens[][2] = { {20, 320}, {1, 1}, {4, 4}, {16, 16}, {64, 64}, {320, 320} };
+	static const int slens[][2] = { {20, SCREENWIDTH}, {1, 1}, {4, 4}, {16, 16}, {64, 64}, {SCREENWIDTH, SCREENWIDTH} };
 	for(unsigned k = 0; k < sizeof slens / sizeof *slens; k++) {
 		gen_spans(slens[k][0], slens[k][1], 0);
 		sprintf(buf, "R_DrawSpan len %d..%d", slens[k][0], slens[k][1]);
@@ -631,7 +651,7 @@ static int one(const char *name, int n)
 	set_view(&views[1]); set_ylookup(FBA);
 	for(unsigned i = 0; i < sizeof k / sizeof *k; i++) {
 		if(strcmp(name, k[i].name)) continue;
-		if(k[i].span) gen_spans(20, 320, 0); else gen_cols(10, 168, 0);
+		if(k[i].span) gen_spans(20, SCREENWIDTH, 0); else gen_cols(10, BENCH_H, 0);
 		for(int j = 0; j < n; j++) k[i].runner(k[i].f);
 		printf("%s: %ld pixels per run\n", name, bench_pixels);
 		return 0;
@@ -668,7 +688,7 @@ int main(int argc, char **argv)
 	test_fuzz("R_DrawFuzzColumnLow(oddcols)", ref_R_DrawFuzzColumnLow, R_DrawFuzzColumnLow_SH4, 1, N / 4);
 	test_columns("R_DrawTranslatedColumnLow(oddcols)", ref_R_DrawTranslatedColumnLow, R_DrawTranslatedColumnLow_SH4, 1, 1, N / 4);
 	odd_columnofs = 0;
-	/* full-height columns / full-width spans on 320x200, stray-write check after every asm call */
+	/* full-height columns / full-width spans on the full screen, stray-write check after every asm call */
 	long_mode = 1;
 	int NL = N / 100 + 8;
 	test_columns("R_DrawColumn(long)", ref_R_DrawColumn, R_DrawColumn_SH4, 0, 0, NL);
@@ -698,10 +718,20 @@ int main(int argc, char **argv)
 	test_columns("R_DrawColumnLow(1px,unreg)", ref_R_DrawColumnLow, R_DrawColumnLow_SH4, 1, 0, N / 8);
 	one_px = 0;
 	cgd_sh4_set_colormaps(lump, NMAPS, rot);
+	/* a palette change: new light tables, the rotated copy rebuilt in place */
+	fill_maps();
+	cgd_sh4_colormaps_changed();
+	test_columns("R_DrawColumn(newpal)", ref_R_DrawColumn, R_DrawColumn_SH4, 0, 0, N / 8);
+	test_columns("R_DrawColumnLow(newpal)", ref_R_DrawColumnLow, R_DrawColumnLow_SH4, 1, 0, N / 8);
+	test_columns("R_DrawTranslatedColumn(newpal)", ref_R_DrawTranslatedColumn, R_DrawTranslatedColumn_SH4, 0, 1, N / 8);
+	test_fuzz("R_DrawFuzzColumn(newpal)", ref_R_DrawFuzzColumn, R_DrawFuzzColumn_SH4, 0, N / 8);
+	test_spans("R_DrawSpan(newpal)", ref_R_DrawSpan, R_DrawSpan_SH4, 0, N / 8);
+	test_spans("R_DrawSpanLow(newpal)", ref_R_DrawSpanLow, R_DrawSpanLow_SH4, 1, N / 8);
 	test_expand(N / 10 + 20);
 	test_fill(N / 10 + 20);
 	test_div(N * 10);
 
-	printf("%ld cases, %d failures: %s\n", cases, failures, failures ? "FAIL" : "PASS");
+	printf("%dx%d %d-bit: %ld cases, %d failures: %s\n", SCREENWIDTH, SCREENHEIGHT,
+		8 * (int)sizeof(pixel_t), cases, failures, failures ? "FAIL" : "PASS");
 	return failures > 255 ? 255 : failures;
 }

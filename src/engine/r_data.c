@@ -661,21 +661,24 @@ void R_InitColormaps (void)
 #endif
 
 #ifdef CGD_SH4
-  /* The SH4 drawers index a "rotated" copy of the whole lump with the
+  /* The SH4 drawers index a "rotated" copy of the light tables with the
      sign-extended texel (src/engine/sh4/README.md §2, §7.2): one copy of
-     nmaps*256 bytes (34 maps = 8704 for DOOM), 32-byte aligned, kept for the
-     session like the lump itself. Colormap pointers outside the registered
-     lump (none in vanilla) make the drawers fall back to C. */
+     nmaps*256 entries (34 maps: 8704 bytes, or 17408 for the RGB565 tables),
+     32-byte aligned, kept for the session. The RGB565 copy follows the
+     tables: R_BuildLightTables rebuilds it (cgd_sh4_colormaps_changed) at
+     every palette change. Colormap pointers outside the registered tables
+     (none in vanilla) make the drawers fall back to C. */
   {
     int nmaps = W_LumpLength (W_GetNumForName ("COLORMAP")) / 256;
-    byte *rot = NULL;
+    lighttable_t *rot = NULL;
 
     if (nmaps > 0)
     {
-      if (nmaps > 256)
-        nmaps = 256;
-      rot = (byte *)Z_Malloc (nmaps * 256 + 31, PU_STATIC, NULL);
-      rot = (byte *)(((uintptr_t)rot + 31) & ~(uintptr_t)31);
+      if (nmaps > CGD_SH4_MAXMAPS)
+        nmaps = CGD_SH4_MAXMAPS;
+      rot = (lighttable_t *)Z_Malloc (nmaps * 256 * sizeof(lighttable_t) + 31,
+        PU_STATIC, NULL);
+      rot = (lighttable_t *)(((uintptr_t)rot + 31) & ~(uintptr_t)31);
     }
     cgd_sh4_set_colormaps (colormaps, nmaps, rot);
   }
