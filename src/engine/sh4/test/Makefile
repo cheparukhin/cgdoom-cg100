@@ -107,9 +107,10 @@ asmcheck: $(SH4_S:%=$(SH4)/%.S) $(SH4)/sh4_asm.h $(CONFIG_H)
 	    diff $(ASMCHECK)/$$f.sim.txt $(ASMCHECK)/$$f.dsp.txt | head -20; exit 1; fi; \
 	done; done; done; echo "asmcheck: $(SH4_S:%=%.S) build without -Wa,--dsp, identical to the --dsp mnemonic build (all formats)"
 
-# run: asmcheck, then the default format (ILRAM, .text and forced-P1 builds), then the others
+# run: asmcheck, then the default format (ILRAM, .text and forced-P1 builds), then the others;
+# with TV set, asmcheck and that format only (likewise bench and sizes)
 run: asmcheck run-tv
-	@set -e; for t in $(TVS); do $(MAKE) --no-print-directory TV=$$t run-tv; done
+	$(if $(TV),,@set -e; for t in $(TVS); do $(MAKE) --no-print-directory TV=$$t run-tv; done)
 run-tv: $(ELF) $(ELF_TEXT) $(if $(TV),,$(ELF_P1))
 	$(SIM_RUNNER) --stats $(ELF) test $(N)
 	$(SIM_RUNNER) $(ELF_TEXT) test 300
@@ -119,7 +120,7 @@ $(SIM_BUILD)/tools/sh-elf-run64:
 	$(MAKE) -C $(ROOT)/src/sim sim-tool
 
 bench: bench-tv
-	@set -e; for t in wide hd; do $(MAKE) --no-print-directory TV=$$t bench-tv; done
+	$(if $(TV),,@set -e; for t in wide hd; do $(MAKE) --no-print-directory TV=$$t bench-tv; done)
 bench-tv: $(ELF) $(SIM_BUILD)/tools/sh-elf-run64
 	$(SIM_RUNNER) $(ELF) bench
 
@@ -174,7 +175,7 @@ sched:
 	@set -e; for k in col collow span spanlow col16m collow16 span16 spanlow16; do $(MODSCHED) $$k max -q; done
 
 sizes: sizes-tv
-	@$(MAKE) --no-print-directory TV=hd sizes-tv
+	$(if $(TV),,@$(MAKE) --no-print-directory TV=hd sizes-tv)
 sizes-tv: $(SH4_S:%=$(OBJ)/%.o)
 	@$(SIM_BIN)/sh-elf-size -A $^ | grep -E '^(\.ilram|\.text|\.rodata|\.data|\.bss|[^ ]*\.o)'
 	@$(SIM_BIN)/sh-elf-nm -S --size-sort $^ | grep -i ' t '
