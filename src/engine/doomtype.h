@@ -43,6 +43,15 @@ typedef byte boolean;
 #define true 1
 #define false 0
 #endif
+/* CGDoom: a pixel of the engine's screens: a palette index, or RGB565 in
+   the true-colour build (src/platform/cgd_config.h) */
+#include "cgd_config.h"
+#if CGD_TRUECOLOR
+typedef uint16_t pixel_t;
+#else
+typedef byte pixel_t;
+#endif
+
 #define MAXCHAR		((char)0x7f)
 #define MAXSHORT	((short)0x7fff)
 

@@ -80,28 +80,20 @@ typedef enum
 // builds, OFF for calculator/release builds.
 
 //
-// For resize of screen, at start of game.
-// It will not work dynamically, see visplanes.
+// Screen size (CGDoom: src/platform/cgd_config.h, SCREENWIDTH and
+// SCREENHEIGHT). The 2D art (status bar, menus, intermission, finale, title
+// pages) keeps its 320x200 layout: ORIGWIDTH x ORIGHEIGHT, drawn centred
+// on a larger screen (WIDESCREENDELTA, HEIGHTDELTA), except the status bar,
+// which sits at the bottom.
 //
-#define	BASE_WIDTH		320
+#include "cgd_config.h"
 
-// It is educational but futile to change this
-//  scaling e.g. to 2. Drawing of status bar,
-//  menues etc. is tied to the scale implied
-//  by the graphics.
+#define ORIGWIDTH		320
+#define ORIGHEIGHT		200
+#define WIDESCREENDELTA		((SCREENWIDTH - ORIGWIDTH) / 2)
+#define HEIGHTDELTA		((SCREENHEIGHT - ORIGHEIGHT) / 2)
+
 #define	SCREEN_MUL		1
-//#define	INV_ASPECT_RATIO	(625/1000) // 0.75, ideally
-
-// Defines suck. C sucks.
-// C++ might sucks for OOP, but it sure is a better C.
-// So there.
-#define SCREENWIDTH  320
-
-//SCREEN_MUL*BASE_WIDTH //320
-#define SCREENHEIGHT 200
-//#define SCREENHEIGHT 200
-//(int)(SCREEN_MUL*BASE_WIDTH*INV_ASPECT_RATIO) //200
-#define SCREENOFFSET SCREENWIDTH*((240-SCREENHEIGHT)/2)
 
 
 

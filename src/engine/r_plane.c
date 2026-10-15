@@ -355,8 +355,10 @@ void R_ClearPlanes (void)
   angle = (viewangle-ANG90)>>ANGLETOFINESHIFT;
 
   // scale will be unit scale at SCREENWIDTH/2 distance
-  basexscale = FixedDiv (finecosine(angle),centerxfrac);
-  baseyscale = -FixedDiv (finesine[angle],centerxfrac);
+  // CGDoom: at the focal length (projection; centerxfrac in vanilla, which
+  // is the same but in widescreen)
+  basexscale = FixedDiv (finecosine(angle),projection);
+  baseyscale = -FixedDiv (finesine[angle],projection);
 }
 
 

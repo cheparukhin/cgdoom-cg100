@@ -66,6 +66,12 @@ int CGD_AutoFrameskip = 0;
 const char *CGD_WADFileName = NULL;
 int CGD_RecordDemoSlot = -1;
 int CGD_PlayDemoOnly = 0;
+int CGD_Features = CGD_FEATURES_DEFAULT;
+const char *const CGD_FeatureNames[CGD_FEATURE_COUNT + 1] = {
+	NULL,
+};
+int CGD_TrueColorExact = 0;
+int CGD_PaletteRedraw = 0;
 int CGD_TimeDemo = 0;
 int CGD_TimeDemoCount = 0;
 CGD_TimeDemoRun CGD_TimeDemoRuns[CGD_TIMEDEMO_MAX];

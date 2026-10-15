@@ -49,6 +49,8 @@
 #include "cgdoom.h"
 
 #include "r_data.h"
+#include "v_video.h"
+#include "i_video.h"
 
 //
 // Graphics.
@@ -170,6 +172,10 @@ fixed_t*			spriteoffset;
 fixed_t*			spritetopoffset;
 
 const lighttable_t		*colormaps;
+#if CGD_TRUECOLOR
+const byte			*colormaps8;
+static int			colormaps_n;	/* maps in the lump */
+#endif
 
 
 //
@@ -635,7 +641,24 @@ void R_InitColormaps (void)
   colormaps = (lighttable_t *)( ((int)colormaps + 255)&~0xff); 
   W_ReadLump (lump,colormaps); 
 */
+#if CGD_TRUECOLOR
+  /* CGDoom: the RGB565 tables, one per map of the lump, built from the
+     palette by R_BuildLightTables (first here, then at every I_SetPalette) */
+  {
+    void *p;
+
+    colormaps8 = (const byte *)W_CacheLumpNameConst ("COLORMAP", PU_STATIC);
+    colormaps_n = W_LumpLength (W_GetNumForName ("COLORMAP")) / 256;
+    if (colormaps_n < NUMCOLORMAPS + 1)
+      I_Error ("R_InitColormaps: COLORMAP has %d maps", colormaps_n);
+    p = Z_Malloc (colormaps_n * 256 * sizeof(lighttable_t) + 31, PU_STATIC,
+      NULL);
+    colormaps = (lighttable_t *)(((uintptr_t)p + 31) & ~(uintptr_t)31);
+    I_SetPalette ((const byte *)W_CacheLumpNameConst ("PLAYPAL", PU_CACHE));
+  }
+#else
   colormaps = (lighttable_t *)W_CacheLumpNameConst ("COLORMAP", PU_STATIC);
+#endif
 
 #ifdef CGD_SH4
   /* The SH4 drawers index a "rotated" copy of the whole lump with the
@@ -660,6 +683,46 @@ void R_InitColormaps (void)
 }
 
 
+
+#if CGD_TRUECOLOR
+//
+// R_BuildLightTables
+// CGDoom: the RGB565 light tables. Map k < NUMCOLORMAPS (light level k, 0 =
+// brightest) is the palette with each channel scaled by (32-k)/32, then
+// gamma-corrected: the light falls off in RGB, with none of COLORMAP's
+// snapping to the palette's few dark shades. The other maps (the
+// invulnerability map 32) are COLORMAP's, through the palette.
+// CGD_TrueColorExact uses COLORMAP for every map: then a frame is the 8-bit
+// build's frame through its palette, except under spectres (r_draw.c
+// FUZZDARK), which the tests compare.
+//
+void R_BuildLightTables (const byte *palette, const byte *gamma)
+{
+  lighttable_t *t = (lighttable_t *)colormaps;
+  int k, c;
+
+  for (k = 0; k < colormaps_n; k++, t += 256)
+  {
+    if (k >= NUMCOLORMAPS || CGD_TrueColorExact)
+    {
+      const byte *m = colormaps8 + k*256;
+      for (c = 0; c < 256; c++)
+        t[c] = v_palette[m[c]];
+      continue;
+    }
+    for (c = 0; c < 256; c++)
+    {
+      int r = gamma[palette[3*c] * (NUMCOLORMAPS-k) / NUMCOLORMAPS];
+      int g = gamma[palette[3*c+1] * (NUMCOLORMAPS-k) / NUMCOLORMAPS];
+      int b = gamma[palette[3*c+2] * (NUMCOLORMAPS-k) / NUMCOLORMAPS];
+      t[c] = (lighttable_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+    }
+  }
+#ifdef CGD_SH4
+  cgd_sh4_colormaps_changed ();
+#endif
+}
+#endif
 
 //
 // R_InitData

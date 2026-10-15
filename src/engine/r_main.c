@@ -63,6 +63,14 @@ fixed_t						centerxfrac;
 fixed_t						centeryfrac;
 fixed_t						projection;
 
+/* CGDoom: widescreen ("Hor+", as Crispy Doom): the view width that the
+   field of view and the scales are defined for, 320 at full size (blocks*32
+   below, >>detailshift). The view is wider (viewwidth); its centre is
+   centerx. projection, the focal length, is half this width, so a wider
+   screen shows more of the scene to the sides at the same scale. In the
+   320-wide build it equals viewwidth. */
+int						viewwidth_nonwide;
+
 // just for profiling purposes
 int							framecount;	
 
@@ -460,7 +468,9 @@ void R_InitTextureMapping (void)
   //
   // Calc focallength
   //  so FIELDOFVIEW angles covers SCREENWIDTH.
-  focallength = FixedDiv (centerxfrac,
+  // CGDoom: covers the non-widescreen width (projection); the angle range
+  // grows with the wider view.
+  focallength = FixedDiv (projection,
     finetangent[FINEANGLES/4+FIELDOFVIEW/2] );
 
   for (i=0 ; i<FINEANGLES/2 ; i++)
@@ -532,7 +542,7 @@ void R_InitLightTables (void)
     startmap = ((LIGHTLEVELS-1-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
     for (j=0 ; j<MAXLIGHTZ ; j++)
     {
-      scale = FixedDiv ((SCREENWIDTH/2*FRACUNIT), (j+1)<<LIGHTZSHIFT);
+      scale = FixedDiv ((ORIGWIDTH/2*FRACUNIT), (j+1)<<LIGHTZSHIFT);
       scale >>= LIGHTSCALESHIFT;
       level = startmap - scale/DISTMAP;
 
@@ -607,26 +617,32 @@ void R_ExecuteSetViewSize (void)
   /* CGDoom-specific function */
   V_Clear();
 
-  if (setblocks == 11)
+  /* CGDoom: SBARHEIGHT rows for the status bar; the smaller sizes keep
+     vanilla's proportions of the screen (blocks*32 x (blocks*168/10)&~7 on
+     a 320x200 screen) and its field of view (viewwidth_nonwide) */
+  if (setblocks >= 10)
   {
     scaledviewwidth = SCREENWIDTH;
-    viewheight = SCREENHEIGHT;
+    viewheight = setblocks == 11 ? SCREENHEIGHT : SCREENHEIGHT-SBARHEIGHT;
+    viewwidth_nonwide = ORIGWIDTH;
   }
   else
   {
-    scaledviewwidth = setblocks*32;
-    viewheight = (setblocks*168/10)&~7;
+    scaledviewwidth = (setblocks*SCREENWIDTH/10)&~7;
+    viewheight = (setblocks*(SCREENHEIGHT-SBARHEIGHT)/10)&~7;
+    viewwidth_nonwide = setblocks*ORIGWIDTH/10;
   }
 
   /* CGDoom: low detail through vanilla's detailshift path */
   detailshift = setdetail ? 1 : 0;
   viewwidth = scaledviewwidth>>detailshift;
+  viewwidth_nonwide >>= detailshift;
 
   centery = viewheight/2;
   centerx = viewwidth/2;
   centerxfrac = centerx<<FRACBITS;
   centeryfrac = centery<<FRACBITS;
-  projection = centerxfrac;
+  projection = (viewwidth_nonwide/2)<<FRACBITS;
 
   /* Drawer selection: the ONE place that picks the column/span drawers.
      Low detail uses Chocolate Doom's drawers (fuzz and translated included,
@@ -672,8 +688,8 @@ void R_ExecuteSetViewSize (void)
   R_InitTextureMapping ();
 
   // psprite scales
-  pspritescale = FRACUNIT*viewwidth/SCREENWIDTH;
-  pspriteiscale = FRACUNIT*SCREENWIDTH/viewwidth;
+  pspritescale = FRACUNIT*viewwidth_nonwide/ORIGWIDTH;
+  pspriteiscale = FRACUNIT*ORIGWIDTH/viewwidth_nonwide;
 
   // thing clipping
   for (i=0 ; i<viewwidth ; i++)
@@ -684,7 +700,7 @@ void R_ExecuteSetViewSize (void)
   {
     dy = ((i-viewheight/2)<<FRACBITS)+FRACUNIT/2;
     dy = abs(dy);
-    yslope[i] = FixedDiv ( (viewwidth<<detailshift)/2*FRACUNIT, dy);
+    yslope[i] = FixedDiv ( (viewwidth_nonwide<<detailshift)/2*FRACUNIT, dy);
   }
 
   for (i=0 ; i<viewwidth ; i++)
@@ -700,7 +716,7 @@ void R_ExecuteSetViewSize (void)
     startmap = ((LIGHTLEVELS-1-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
     for (j=0 ; j<MAXLIGHTSCALE ; j++)
     {
-      level = startmap - j*SCREENWIDTH/(viewwidth<<detailshift)/DISTMAP;
+      level = startmap - j*ORIGWIDTH/(viewwidth_nonwide<<detailshift)/DISTMAP;
 
       if (level < 0)
         level = 0;
@@ -795,7 +811,7 @@ void R_SetupFrame (player_t* player)
 
   if (player->fixedcolormap)
   {
-    fixedcolormap = colormaps + player->fixedcolormap*256*sizeof(lighttable_t);
+    fixedcolormap = colormaps + player->fixedcolormap*256;
 
     walllights = scalelightfixed;
 

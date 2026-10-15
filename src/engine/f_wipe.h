@@ -40,6 +40,8 @@ enum
 
 
 #ifdef ENABLE_F_WIPE
+/* CGDoom: returns 0 when the wipe cannot run (CGD_TRANSIENT_SCREENS: no
+   memory for its two screens); the caller then draws without a wipe */
 int wipe_StartScreen ();
 int wipe_EndScreen( int x,int y, int width, int	height );
 int wipe_ScreenWipe ( int wipeno, int width, int height, int ticks );

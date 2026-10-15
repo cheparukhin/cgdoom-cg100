@@ -52,13 +52,16 @@ ticcmd_t*	I_BaseTiccmd(void)
 }
 
 /* CGDoom: Screens are ordinary cached heap buffers, 32-byte aligned (cache
-   lines). screens[2] and [3] are the wipe buffers. Buffers are allocated on
-   first request, zeroed, and never freed. */
-byte *I_ScreenBase(int screen)
+   lines). screens[2] and [3] are the wipe buffers, screens[4] the status
+   bar's (32 rows). Buffers are allocated on first request, zeroed, and never
+   freed. */
+pixel_t *I_ScreenBase(int screen)
 {
-    static byte *buffers[5];
+    static pixel_t *buffers[5];
     static const int sizes[5] = {
-        320*200, 320*200, 320*200, 320*200, 320*32,
+        SCREENWIDTH*SCREENHEIGHT*PIXELBYTES, SCREENWIDTH*SCREENHEIGHT*PIXELBYTES,
+        SCREENWIDTH*SCREENHEIGHT*PIXELBYTES, SCREENWIDTH*SCREENHEIGHT*PIXELBYTES,
+        SCREENWIDTH*32*PIXELBYTES,
     };
 
     if (screen < 0 || screen >= 5)
@@ -66,7 +69,7 @@ byte *I_ScreenBase(int screen)
     if (!buffers[screen])
     {
         byte *raw = CGD_calloc(sizes[screen] + 31);
-        buffers[screen] = (byte *)(((uintptr_t)raw + 31) & ~(uintptr_t)31);
+        buffers[screen] = (pixel_t *)(((uintptr_t)raw + 31) & ~(uintptr_t)31);
     }
     return buffers[screen];
 }

@@ -46,7 +46,12 @@
 
 // Each screen is [SCREENWIDTH*SCREENHEIGHT]; 
 
-byte* screens[SCREEN_COUNT]; 
+pixel_t* screens[SCREEN_COUNT]; 
+
+#if CGD_TRUECOLOR
+uint16_t v_palette[256];
+int v_palette_serial;
+#endif
 
 int    dirtybox[4]; 
 
@@ -151,10 +156,22 @@ void V_MarkRect( int x,int y,int width,int height )
 } 
 
 
+/* CGDoom: fills count pixels with c */
+void V_FillPixels (pixel_t *dest, int count, pixel_t c)
+{
+#if CGD_TRUECOLOR
+  while (count-- > 0)
+    *dest++ = c;
+#else
+  memset (dest, c, count);
+#endif
+}
+
 /* CGDoom: one row of V_CopyRect. The status-bar widgets copy
    rows of a few tens of bytes every frame, which fxlibc's memcpy does byte
    by byte below 64 bytes. Source and destination have the same x and
-   SCREENWIDTH-byte rows, so they are usually equally aligned: copy words. */
+   SCREENWIDTH-pixel rows, so they are usually equally aligned: copy words.
+   n is in bytes. */
 static inline void V_CopyRow (byte *dest, const byte *src, int n)
 {
   if (n >= 64 || (((uintptr_t)dest ^ (uintptr_t)src) & 3))
@@ -175,8 +192,8 @@ static inline void V_CopyRow (byte *dest, const byte *src, int n)
 // 
 void V_CopyRect(int srcx,int srcy,int srcscrn,int width,int height,int destx,int desty,int destscrn ) 
 { 
-  byte* src;
-  byte* dest; 
+  pixel_t* src;
+  pixel_t* dest; 
 
 #ifdef RANGECHECK 
   if (srcx<0  ||srcx+width >SCREENWIDTH  || srcy<0 || srcy+height>SCREENHEIGHT  ||destx<0||destx+width >SCREENWIDTH
@@ -194,17 +211,17 @@ void V_CopyRect(int srcx,int srcy,int srcscrn,int width,int height,int destx,int
   dest = screens[destscrn]+SCREENWIDTH*desty+destx; 
   for ( ; height>0 ; height--) 
   { 
-    V_CopyRow (dest, src, width);
+    V_CopyRow ((byte *)dest, (const byte *)src, width * PIXELBYTES);
     src += SCREENWIDTH; 
     dest += SCREENWIDTH; 
   } 
 } 
 
-static void CopyColumn(byte *pTarget,const byte *pSource,int iLength)
+static void CopyColumn(pixel_t *pTarget,const byte *pSource,int iLength)
 {
   while(iLength) 
   { 
-    pTarget[0] = pSource[0];
+    pTarget[0] = V_PIXEL(pSource[0]);
     pSource++; 
     pTarget += SCREENWIDTH; 
     iLength--;
@@ -219,7 +236,7 @@ void V_DrawPatch(int x,int y,int scrn,const patch_t* patch)
 { 
   int  col; 
   //const column_t* column; 
-  byte* desttop;
+  pixel_t* desttop;
   int  w = SHORT(patch->width); 
   int h = SHORT(patch->height);
   if(w == 0)
@@ -255,7 +272,7 @@ void V_DrawPatch(int x,int y,int scrn,const patch_t* patch)
     while (pData[0] != 0xff ) 
     { 
       const byte * pSource = pData+3; 
-      byte* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
+      pixel_t* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
       int count = pData[1]; 
       pData += count + 4 ; 
 
@@ -267,11 +284,32 @@ void V_DrawPatch(int x,int y,int scrn,const patch_t* patch)
 //
 // V_DrawFullscreenPatch
 // CGDoom: Draws a full-screen patch (title, help, intermission pictures).
-// The whole lump is cached (the heap holds it) and drawn as a patch.
+// The whole lump is cached (the heap holds it) and drawn as a patch, centred
+// on a larger screen; the borders around it are cleared to black (palette
+// index 0, like the view border).
 //
 void V_DrawFullscreenPatch(int scrn, const char *lumpname)
 {
-  V_DrawPatch(0, 0, scrn, W_CacheLumpNamePatch(lumpname, PU_CACHE));
+#if SCREENWIDTH != ORIGWIDTH || SCREENHEIGHT != ORIGHEIGHT
+  pixel_t *p = screens[scrn];
+  pixel_t black = V_PIXEL(0);
+  int y;
+
+  V_FillPixels (p, HEIGHTDELTA*SCREENWIDTH, black);
+  for (y = 0; y < ORIGHEIGHT; y++)
+  {
+    pixel_t *row = p + (HEIGHTDELTA + y)*SCREENWIDTH;
+    V_FillPixels (row, WIDESCREENDELTA, black);
+    V_FillPixels (row + WIDESCREENDELTA + ORIGWIDTH,
+      SCREENWIDTH - WIDESCREENDELTA - ORIGWIDTH, black);
+  }
+  V_FillPixels (p + (HEIGHTDELTA + ORIGHEIGHT)*SCREENWIDTH,
+    (SCREENHEIGHT - HEIGHTDELTA - ORIGHEIGHT)*SCREENWIDTH, black);
+  if (!scrn)
+    V_MarkRect (0, 0, SCREENWIDTH, SCREENHEIGHT);
+#endif
+  V_DrawPatch(WIDESCREENDELTA, HEIGHTDELTA, scrn,
+    W_CacheLumpNamePatch(lumpname, PU_CACHE));
 }
 
 //
@@ -283,7 +321,7 @@ void V_DrawPatchFlipped(int x,int y,int scrn,const patch_t* patch)
 { 
   int  col; 
   //const column_t* column; 
-  byte* desttop;
+  pixel_t* desttop;
   int  w = SHORT(patch->width); 
   int h = SHORT(patch->height);
 
@@ -315,7 +353,7 @@ void V_DrawPatchFlipped(int x,int y,int scrn,const patch_t* patch)
     while (pData[0] != 0xff ) 
     { 
       const byte * pSource = pData+3; 
-      byte* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
+      pixel_t* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
       int count = pData[1]; 
       pData += count + 4 ; 
 
@@ -330,9 +368,9 @@ void V_DrawPatchFlipped(int x,int y,int scrn,const patch_t* patch)
 // V_DrawBlock
 // Draw a linear block of pixels into the view buffer.
 //
-void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const byte*  src ) 
+void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const pixel_t*  src ) 
 { 
-  byte* dest; 
+  pixel_t* dest; 
 
 #ifdef RANGECHECK 
   if (x<0 ||x+width >SCREENWIDTH || y<0 || y+height>SCREENHEIGHT || (unsigned)scrn>=SCREEN_COUNT )
@@ -348,7 +386,7 @@ void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const byt
 
   while (height--) 
   { 
-    memcpy (dest, src, width); 
+    memcpy (dest, src, width * sizeof(pixel_t)); 
     src += width; 
     dest += SCREENWIDTH; 
   } 
@@ -360,9 +398,9 @@ void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const byt
 // V_GetBlock
 // Gets a linear block of pixels from the view buffer.
 //
-void V_GetBlock( int  x, int  y, int  scrn, int  width, int  height, byte*  dest ) 
+void V_GetBlock( int  x, int  y, int  scrn, int  width, int  height, pixel_t*  dest ) 
 { 
-  byte* src; 
+  pixel_t* src; 
 
 #ifdef RANGECHECK 
   if (x<0 ||x+width >SCREENWIDTH || y<0 || y+height>SCREENHEIGHT  || (unsigned)scrn>=SCREEN_COUNT )
@@ -376,7 +414,7 @@ void V_GetBlock( int  x, int  y, int  scrn, int  width, int  height, byte*  dest
 
   while (height--) 
   { 
-    memcpy (dest, src, width); 
+    memcpy (dest, src, width * sizeof(pixel_t)); 
     src += SCREENWIDTH; 
     dest += width; 
   } 
@@ -390,17 +428,23 @@ void V_Init (void)
 { 
   /* screens[0] is the main screen */
   screens[0] = I_ScreenBase(0);
+#if CGD_TRANSIENT_SCREENS
+  /* No intermission screen; the wipe allocates screens[2] and [3] */
+  screens[1] = screens[2] = screens[3] = NULL;
+#else
   /* screens[1] is used for the level end sequence (intermission) */
   screens[1] = I_ScreenBase(1);
   /* screens[2] and screens[3] are used for wipe effects */
   screens[2] = I_ScreenBase(2);
   screens[3] = I_ScreenBase(3);
+#endif
   /* screens[4] is used for the status bar (allocated by st_stuff.c) */
   screens[4] = NULL;
 }
 
-/* CGDoom-specific function to clear screen when changing window size */
+/* CGDoom-specific function to clear screen when changing window size (the
+   area above the status bar) */
 void V_Clear (void)
 {
-  memset(screens[0], 0, 320*(200-32));
+  V_FillPixels(screens[0], SCREENWIDTH*(SCREENHEIGHT-32), V_PIXEL(0));
 }

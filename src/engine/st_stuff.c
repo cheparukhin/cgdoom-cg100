@@ -86,8 +86,16 @@
 #define ST_X     0
 #define ST_X2     104
 
-#define ST_FX       143
-#define ST_FY       169
+/* CGDoom: the status bar's positions are vanilla's 320x200 layout, where
+   the bar starts at y 168. On a larger screen the bar's 320 columns are
+   centred (ST_BARX) and its rows are the last 32 (ST_Y); the side strips are
+   filled in ST_refreshBackground. */
+#define ST_BARX   WIDESCREENDELTA
+#define ST_LX(x)  ((x) + ST_BARX)
+#define ST_LY(y)  ((y) - 168 + ST_Y)
+
+#define ST_FX       ST_LX(143)
+#define ST_FY       ST_LY(169)
 
 // Should be set to patch width
 //  for tall numbers later on
@@ -114,8 +122,8 @@
 #define ST_GODFACE    (ST_NUMPAINFACES*ST_FACESTRIDE)
 #define ST_DEADFACE    (ST_GODFACE+1)
 
-#define ST_FACESX    143
-#define ST_FACESY    168
+#define ST_FACESX    ST_LX(143)
+#define ST_FACESY    ST_LY(168)
 
 #define ST_EVILGRINCOUNT  (2*TICRATE)
 #define ST_STRAIGHTFACECOUNT (TICRATE/2)
@@ -136,106 +144,106 @@
 
 // AMMO number pos.
 #define ST_AMMOWIDTH  3 
-#define ST_AMMOX   44
-#define ST_AMMOY   171
+#define ST_AMMOX   ST_LX(44)
+#define ST_AMMOY   ST_LY(171)
 
 // HEALTH number pos.
 #define ST_HEALTHWIDTH  3 
-#define ST_HEALTHX   90
-#define ST_HEALTHY   171
+#define ST_HEALTHX   ST_LX(90)
+#define ST_HEALTHY   ST_LY(171)
 
 // Weapon pos.
-#define ST_ARMSX   111
-#define ST_ARMSY   172
-#define ST_ARMSBGX   104
-#define ST_ARMSBGY   168
+#define ST_ARMSX   ST_LX(111)
+#define ST_ARMSY   ST_LY(172)
+#define ST_ARMSBGX   ST_LX(104)
+#define ST_ARMSBGY   ST_LY(168)
 #define ST_ARMSXSPACE  12
 #define ST_ARMSYSPACE  10
 
 // Frags pos.
-#define ST_FRAGSX   138
-#define ST_FRAGSY   171 
+#define ST_FRAGSX   ST_LX(138)
+#define ST_FRAGSY   ST_LY(171)
 #define ST_FRAGSWIDTH  2
 
 // ARMOR number pos.
 #define ST_ARMORWIDTH  3
-#define ST_ARMORX   221
-#define ST_ARMORY   171
+#define ST_ARMORX   ST_LX(221)
+#define ST_ARMORY   ST_LY(171)
 
 // Key icon positions.
 #define ST_KEY0WIDTH  8
 #define ST_KEY0HEIGHT  5
-#define ST_KEY0X   239
-#define ST_KEY0Y   171
+#define ST_KEY0X   ST_LX(239)
+#define ST_KEY0Y   ST_LY(171)
 #define ST_KEY1WIDTH  ST_KEY0WIDTH
-#define ST_KEY1X   239
-#define ST_KEY1Y   181
+#define ST_KEY1X   ST_LX(239)
+#define ST_KEY1Y   ST_LY(181)
 #define ST_KEY2WIDTH  ST_KEY0WIDTH
-#define ST_KEY2X   239
-#define ST_KEY2Y   191
+#define ST_KEY2X   ST_LX(239)
+#define ST_KEY2Y   ST_LY(191)
 
 // Ammunition counter.
 #define ST_AMMO0WIDTH  3
 #define ST_AMMO0HEIGHT  6
-#define ST_AMMO0X   288
-#define ST_AMMO0Y   173
+#define ST_AMMO0X   ST_LX(288)
+#define ST_AMMO0Y   ST_LY(173)
 #define ST_AMMO1WIDTH  ST_AMMO0WIDTH
-#define ST_AMMO1X   288
-#define ST_AMMO1Y   179
+#define ST_AMMO1X   ST_LX(288)
+#define ST_AMMO1Y   ST_LY(179)
 #define ST_AMMO2WIDTH  ST_AMMO0WIDTH
-#define ST_AMMO2X   288
-#define ST_AMMO2Y   191
+#define ST_AMMO2X   ST_LX(288)
+#define ST_AMMO2Y   ST_LY(191)
 #define ST_AMMO3WIDTH  ST_AMMO0WIDTH
-#define ST_AMMO3X   288
-#define ST_AMMO3Y   185
+#define ST_AMMO3X   ST_LX(288)
+#define ST_AMMO3Y   ST_LY(185)
 
 // Indicate maximum ammunition.
 // Only needed because backpack exists.
 #define ST_MAXAMMO0WIDTH 3
 #define ST_MAXAMMO0HEIGHT 5
-#define ST_MAXAMMO0X  314
-#define ST_MAXAMMO0Y  173
+#define ST_MAXAMMO0X  ST_LX(314)
+#define ST_MAXAMMO0Y  ST_LY(173)
 #define ST_MAXAMMO1WIDTH ST_MAXAMMO0WIDTH
-#define ST_MAXAMMO1X  314
-#define ST_MAXAMMO1Y  179
+#define ST_MAXAMMO1X  ST_LX(314)
+#define ST_MAXAMMO1Y  ST_LY(179)
 #define ST_MAXAMMO2WIDTH ST_MAXAMMO0WIDTH
-#define ST_MAXAMMO2X  314
-#define ST_MAXAMMO2Y  191
+#define ST_MAXAMMO2X  ST_LX(314)
+#define ST_MAXAMMO2Y  ST_LY(191)
 #define ST_MAXAMMO3WIDTH ST_MAXAMMO0WIDTH
-#define ST_MAXAMMO3X  314
-#define ST_MAXAMMO3Y  185
+#define ST_MAXAMMO3X  ST_LX(314)
+#define ST_MAXAMMO3Y  ST_LY(185)
 
 // pistol
-#define ST_WEAPON0X   110 
-#define ST_WEAPON0Y   172
+#define ST_WEAPON0X   ST_LX(110)
+#define ST_WEAPON0Y   ST_LY(172)
 
 // shotgun
-#define ST_WEAPON1X   122 
-#define ST_WEAPON1Y   172
+#define ST_WEAPON1X   ST_LX(122)
+#define ST_WEAPON1Y   ST_LY(172)
 
 // chain gun
-#define ST_WEAPON2X   134 
-#define ST_WEAPON2Y   172
+#define ST_WEAPON2X   ST_LX(134)
+#define ST_WEAPON2Y   ST_LY(172)
 
 // missile launcher
-#define ST_WEAPON3X   110 
-#define ST_WEAPON3Y   181
+#define ST_WEAPON3X   ST_LX(110)
+#define ST_WEAPON3Y   ST_LY(181)
 
 // plasma gun
-#define ST_WEAPON4X   122 
-#define ST_WEAPON4Y   181
+#define ST_WEAPON4X   ST_LX(122)
+#define ST_WEAPON4Y   ST_LY(181)
 
 // bfg
-#define ST_WEAPON5X   134
-#define ST_WEAPON5Y   181
+#define ST_WEAPON5X   ST_LX(134)
+#define ST_WEAPON5Y   ST_LY(181)
 
 // WPNS title
-#define ST_WPNSX   109 
-#define ST_WPNSY   191
+#define ST_WPNSX   ST_LX(109)
+#define ST_WPNSY   ST_LY(191)
 
 // DETH title
-#define ST_DETHX   109
-#define ST_DETHY   191
+#define ST_DETHX   ST_LX(109)
+#define ST_DETHY   ST_LY(191)
 
 //Incoming messages window location
 //UNUSED
@@ -419,7 +427,27 @@ void ST_refreshBackground(void)
 
   if (st_statusbaron)
   {
-    V_DrawPatch(ST_X, 0, BG, sbar);
+#if SCREENWIDTH != ORIGWIDTH
+    /* CGDoom: the strips beside the bar get the view border's flat (as
+       Crispy Doom does), with the border's bottom edge along their top */
+    {
+      const byte *flat = (const byte *)W_CacheLumpNameConst (
+        gamemode == commercial ? "GRNROCK" : "FLOOR7_2", PU_CACHE);
+      const patch_t *edge = W_CacheLumpNamePatch ("BRDR_B", PU_CACHE);
+      pixel_t *dest = screens[BG];
+      int x, y;
+
+      for (y = 0; y < ST_HEIGHT; y++)
+        for (x = 0; x < SCREENWIDTH; x++)
+          *dest++ = V_PIXEL(flat[((y + ST_Y) & 63)*64 + (x & 63)]);
+      for (x = 0; x < ST_BARX; x += 8)
+      {
+        V_DrawPatch(x, 0, BG, edge);
+        V_DrawPatch(SCREENWIDTH - 8 - x, 0, BG, edge);
+      }
+    }
+#endif
+    V_DrawPatch(ST_BARX, 0, BG, sbar);
 
     if (netgame)
     {
@@ -500,6 +528,7 @@ void CGD_CycleGamma(void)
 {
   extern int usegamma;
   usegamma = (usegamma + 1) % 5;
+  CGD_Stats.GammaChanges++;
   I_SetPalette(NULL);
 
   extern char gammamsg[5][26];

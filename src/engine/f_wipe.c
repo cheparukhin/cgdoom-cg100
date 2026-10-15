@@ -41,23 +41,32 @@
 // when zero, stop the wipe
 static boolean go = 0;
 
-static byte* wipe_scr_start;
-static byte* wipe_scr_end;
-static byte* wipe_scr;
+static pixel_t* wipe_scr_start;
+static pixel_t* wipe_scr_end;
+static pixel_t* wipe_scr;
+
+/* CGDoom: the melt moves columns of two pixels */
+#if CGD_TRUECOLOR
+typedef uint32_t wipe_pair_t;
+#else
+typedef uint16_t wipe_pair_t;
+#endif
+
+#define WIPE_BYTES	(SCREENWIDTH*SCREENHEIGHT*PIXELBYTES)
 
 
 int wipe_initColorXForm( int width, int height, int ticks )
 {
   ticks= 0; //Shuts up GCC
-  memcpy(wipe_scr, wipe_scr_start, width*height);
+  memcpy(wipe_scr, wipe_scr_start, width*height*sizeof(pixel_t));
   return 0;
 }
 
 int wipe_doColorXForm( int width, int height, int ticks )
 {
   boolean changed;
-  byte* w;
-  byte* e;
+  pixel_t* w;
+  pixel_t* e;
   int  newval;
 
   changed = false;
@@ -114,7 +123,7 @@ int wipe_initMelt( int width, int height, int ticks )
   ticks= 0; //Shuts up GCC
 
   // copy start screen to main screen
-  memcpy(wipe_scr, wipe_scr_start, width*height);
+  memcpy(wipe_scr, wipe_scr_start, width*height*sizeof(pixel_t));
 
   /* CGDoom: Normally the wipe effect transposes the buffers in color-major
      order to better use the cache, but uses a screen-sized temporary buffer in
@@ -151,8 +160,8 @@ int wipe_doMelt( int width, int height, int ticks )
   int  dy;
   int  idx;
 
-  short* s;
-  short* d;
+  wipe_pair_t* s;
+  wipe_pair_t* d;
   boolean done = true;
 
   width/=2;
@@ -169,8 +178,8 @@ int wipe_doMelt( int width, int height, int ticks )
       {
         dy = (y[i] < 16) ? y[i]+1 : 8;
         if (y[i]+dy >= height) dy = height - y[i];
-        s = &((short *)wipe_scr_end)[y[i]*width+i]; /* Row-major order */
-        d = &((short *)wipe_scr)[y[i]*width+i];
+        s = &((wipe_pair_t *)wipe_scr_end)[y[i]*width+i]; /* Row-major order */
+        d = &((wipe_pair_t *)wipe_scr)[y[i]*width+i];
         idx = 0;
         for (j=dy;j;j--)
         {
@@ -179,8 +188,8 @@ int wipe_doMelt( int width, int height, int ticks )
           idx += width;
         }
         y[i] += dy;
-        s = &((short *)wipe_scr_start)[i]; /* Row-major order */
-        d = &((short *)wipe_scr)[y[i]*width+i];
+        s = &((wipe_pair_t *)wipe_scr_start)[i]; /* Row-major order */
+        d = &((wipe_pair_t *)wipe_scr)[y[i]*width+i];
         idx = 0;
         for (j=height-y[i];j;j--)
         {
@@ -197,6 +206,20 @@ int wipe_doMelt( int width, int height, int ticks )
 
 }
 
+/* CGDoom: CGD_TRANSIENT_SCREENS: screens[2] and [3] are allocated for the
+   duration of a wipe (malloc, 32-byte aligned) */
+#if CGD_TRANSIENT_SCREENS
+static void *wipe_alloc[2];
+
+static void wipe_FreeScreens (void)
+{
+  free (wipe_alloc[0]);
+  free (wipe_alloc[1]);
+  wipe_alloc[0] = wipe_alloc[1] = NULL;
+  screens[2] = screens[3] = NULL;
+}
+#endif
+
 int wipe_exitMelt( int width, int height, int ticks )
 {
   ticks= 0; //Shuts up GCC
@@ -204,14 +227,30 @@ int wipe_exitMelt( int width, int height, int ticks )
   height= 0;
 
   Z_Free(y);
+#if CGD_TRANSIENT_SCREENS
+  wipe_FreeScreens ();
+#endif
   return 0;
 }
 
 int wipe_StartScreen ()
 {
+#if CGD_TRANSIENT_SCREENS
+  for (int i = 0; i < 2; i++)
+  {
+    wipe_alloc[i] = malloc (WIPE_BYTES + 31);
+    if (!wipe_alloc[i])
+    {
+      wipe_FreeScreens ();
+      return 0;
+    }
+    screens[2+i] = (pixel_t *)(((uintptr_t)wipe_alloc[i] + 31)
+      & ~(uintptr_t)31);
+  }
+#endif
   wipe_scr_start = screens[2];
   I_ReadScreen(wipe_scr_start);
-  return 0;
+  return 1;
 }
 
 int wipe_EndScreen( int x, int y, int width, int height )

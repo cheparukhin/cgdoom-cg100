@@ -38,8 +38,27 @@
 #   make test-demosync-sim  test-demosync with cgdoom-sim.elf in the simulator
 #
 # The calculator build is CMake/fxSDK (CMakeLists.txt), not this Makefile.
+#
+# VARIANT selects the screen format (src/platform/cgd_config.h): empty for
+# the 320x200 8-bit build, "wide" (396x224, 8-bit) or "hd" (396x224, true
+# colour). Each variant builds into build-host-<variant>/ (and
+# build-host-asan-<variant>/) and has its goldens in tests/golden-<variant>/.
 
 ROOT        := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+
+VARIANT     ?=
+ifeq ($(VARIANT),)
+VARIANT_DEFS :=
+VSUFFIX      :=
+else ifeq ($(VARIANT),wide)
+VARIANT_DEFS := -DCGD_WIDESCREEN=1
+VSUFFIX      := -wide
+else ifeq ($(VARIANT),hd)
+VARIANT_DEFS := -DCGD_HD=1
+VSUFFIX      := -hd
+else
+$(error VARIANT must be empty, wide or hd)
+endif
 
 all: host
 .PHONY: all host host-asan golden test-host test-asan test-fixed test-names \
@@ -55,17 +74,19 @@ HOST_INC    := -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host
 HOST_WARN   := -Wall -Wextra -Wno-sign-compare -Wno-unused-parameter \
                -Wno-unused-but-set-variable -Wno-unused-but-set-parameter \
                -Wno-missing-field-initializers -Wno-deprecated-declarations
-HOST_CFLAGS := -std=gnu11 -O2 -g -DRANGECHECK $(HOST_WARN) $(HOST_INC)
+HOST_CFLAGS := -std=gnu11 -O2 -g -DRANGECHECK $(HOST_WARN) $(HOST_INC) $(VARIANT_DEFS)
 HOST_LDFLAGS :=
 
 # shift-base: DOOM left-shifts negative values everywhere (x<<FRACBITS); GCC
 # defines this as the usual two's complement shift, so it is not checked.
 ASAN_FLAGS  := -fsanitize=address,undefined -fno-sanitize=shift-base \
                -fno-sanitize-recover=all -fno-omit-frame-pointer
-ASAN_CFLAGS := -std=gnu11 -O1 -g -DRANGECHECK $(HOST_WARN) $(HOST_INC) $(ASAN_FLAGS)
+ASAN_CFLAGS := -std=gnu11 -O1 -g -DRANGECHECK $(HOST_WARN) $(HOST_INC) $(ASAN_FLAGS) \
+               $(VARIANT_DEFS)
 
-HOST_BUILD  := $(ROOT)/build-host
-ASAN_BUILD  := $(ROOT)/build-host-asan
+HOST_BUILD  := $(ROOT)/build-host$(VSUFFIX)
+ASAN_BUILD  := $(ROOT)/build-host-asan$(VSUFFIX)
+GOLDEN_DIR  := $(ROOT)/tests/golden$(VSUFFIX)
 
 HOST_OBJ    := $(ENGINE_SRC:$(ROOT)/src/%.c=$(HOST_BUILD)/%.o) \
                $(HOST_SRC:$(ROOT)/src/%.c=$(HOST_BUILD)/%.o)
@@ -103,15 +124,18 @@ SCENARIOS   := $(ROOT)/tests/scenarios.txt
 RUN_SCEN    := $(ROOT)/tests/run-scenarios.sh
 
 golden: host
-	@sh $(RUN_SCEN) -mode golden -bin $(HOST_BUILD)/cgdoom-host
+	@sh $(RUN_SCEN) -mode golden -bin $(HOST_BUILD)/cgdoom-host \
+	  -golden $(GOLDEN_DIR) -out $(HOST_BUILD)/tests
 
 test-host: host
-	@sh $(RUN_SCEN) -mode test -bin $(HOST_BUILD)/cgdoom-host
+	@sh $(RUN_SCEN) -mode test -bin $(HOST_BUILD)/cgdoom-host \
+	  -golden $(GOLDEN_DIR) -out $(HOST_BUILD)/tests
 
 test-asan: host-asan
 	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
 	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
-	 sh $(RUN_SCEN) -mode test -bin $(ASAN_BUILD)/cgdoom-host -out $(ASAN_BUILD)/tests
+	 sh $(RUN_SCEN) -mode test -bin $(ASAN_BUILD)/cgdoom-host -out $(ASAN_BUILD)/tests \
+	   -golden $(GOLDEN_DIR)
 	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
 	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
 	 sh $(ROOT)/tests/save-entry.sh -bin $(ASAN_BUILD)/cgdoom-host \
@@ -243,7 +267,7 @@ check-sh:
 	@mkdir -p $(SH_CHECK)
 	@fail=0; for f in $(ENGINE_SRC); do \
 	  $(SH_CC) -m4-nofpu -mb -O2 -std=gnu11 -fno-strict-aliasing -Wall \
-	    -I$(ROOT)/src/platform -I$(ROOT)/src/engine \
+	    $(VARIANT_DEFS) -I$(ROOT)/src/platform -I$(ROOT)/src/engine \
 	    -c $$f -o $(SH_CHECK)/`basename $$f .c`.o || fail=1; \
 	done; \
 	if [ $$fail = 0 ]; then echo "check-sh: all engine files compile"; \

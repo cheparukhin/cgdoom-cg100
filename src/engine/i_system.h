@@ -34,7 +34,7 @@
 /* CGDoom: zones come from PL_GetZones() (see D_DoomMain). */
 
 /* Extra CGDoom function supplying screen buffers (heap, 32-byte aligned) */
-byte *I_ScreenBase(int screen);
+pixel_t *I_ScreenBase(int screen);
 
 // Called by D_DoomLoop,
 // returns current time in tics (35 Hz, PL_GetTics).

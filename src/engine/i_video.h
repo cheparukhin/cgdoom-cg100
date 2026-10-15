@@ -47,7 +47,7 @@ void I_SetPalette(const byte* pal);
 
 void I_Flip (void);
 
-void I_ReadScreen (byte* scr);
+void I_ReadScreen (pixel_t* scr);
 
 //void I_BeginRead (void);
 //void I_EndRead (void);

@@ -46,8 +46,6 @@
 #define MAXWIDTH			1120
 #define MAXHEIGHT			832
 
-// status bar height at bottom of screen
-#define SBARHEIGHT			32
 
 //
 // All drawing to the view buffer is accomplished in this file.
@@ -59,13 +57,13 @@
 //
 
 
-byte*			viewimage; 
+pixel_t*		viewimage; 
 int				viewwidth;
 int				scaledviewwidth;
 int				viewheight;
 int				viewwindowx;
 int				viewwindowy; 
-byte*			ylookup[MAXHEIGHT]; 
+pixel_t*		ylookup[MAXHEIGHT]; 
 int				columnofs[MAXWIDTH]; 
 
 // Color tables for different players,
@@ -104,7 +102,7 @@ int				dccount;
 void R_DrawColumn (void) 
 { 
   int			count; 
-  byte*		dest; 
+  pixel_t*		dest; 
   fixed_t		frac;
   fixed_t		fracstep;
 
@@ -161,8 +159,8 @@ void R_DrawColumn (void)
 void R_DrawColumnLow (void) 
 { 
   int			count; 
-  byte*		dest; 
-  byte*		dest2;
+  pixel_t*		dest; 
+  pixel_t*		dest2;
   fixed_t		frac;
   fixed_t		fracstep;	 
   int			x;
@@ -222,6 +220,16 @@ static const int fuzzoffset[FUZZTABLE] =
 
 int	fuzzpos = 0; 
 
+/* CGDoom: the spectre's darkening of the pixel behind it. Vanilla maps its
+   palette index through colormap 6; in true colour, each RGB565 channel is
+   scaled by 13/16 (colormap 6's brightness, 26/32). */
+#if CGD_TRUECOLOR
+#define FUZZDARK(p)	((pixel_t)((((p) >> 1) & 0x7bef) + (((p) >> 2) & 0x39e7) \
+			  + (((p) >> 4) & 0x0861)))
+#else
+#define FUZZDARK(p)	(colormaps[6*256+(p)])
+#endif
+
 
 //
 // Framebuffer postprocessing.
@@ -234,7 +242,7 @@ int	fuzzpos = 0;
 void R_DrawFuzzColumn (void) 
 { 
   int			count; 
-  byte*		dest; 
+  pixel_t*		dest; 
   fixed_t		frac;
   fixed_t		fracstep;	 
 
@@ -304,7 +312,7 @@ void R_DrawFuzzColumn (void)
     //  a pixel that is either one column
     //  left or right of the current one.
     // Add index from colormap to index.
-    *dest = colormaps[6*256+dest[fuzzoffset[fuzzpos]]]; 
+    *dest = FUZZDARK(dest[fuzzoffset[fuzzpos]]); 
 
     // Clamp table lookup index.
     if (++fuzzpos == FUZZTABLE) 
@@ -323,8 +331,8 @@ void R_DrawFuzzColumn (void)
 void R_DrawFuzzColumnLow (void) 
 { 
   int			count; 
-  byte*		dest; 
-  byte*		dest2; 
+  pixel_t*		dest; 
+  pixel_t*		dest2; 
   int			x;
 
   // Adjust borders. Low... 
@@ -358,8 +366,8 @@ void R_DrawFuzzColumnLow (void)
 
   do 
   {
-    *dest = colormaps[6*256+dest[fuzzoffset[fuzzpos]]]; 
-    *dest2 = colormaps[6*256+dest2[fuzzoffset[fuzzpos]]]; 
+    *dest = FUZZDARK(dest[fuzzoffset[fuzzpos]]); 
+    *dest2 = FUZZDARK(dest2[fuzzoffset[fuzzpos]]); 
 
     // Clamp table lookup index.
     if (++fuzzpos == FUZZTABLE) 
@@ -388,7 +396,7 @@ byte*	translationtables;
 void R_DrawTranslatedColumn (void) 
 { 
   int			count; 
-  byte*		dest; 
+  pixel_t*		dest; 
   fixed_t		frac;
   fixed_t		fracstep;	 
 
@@ -453,8 +461,8 @@ void R_DrawTranslatedColumn (void)
 void R_DrawTranslatedColumnLow (void) 
 { 
   int			count; 
-  byte*		dest; 
-  byte*		dest2; 
+  pixel_t*		dest; 
+  pixel_t*		dest2; 
   fixed_t		frac;
   fixed_t		fracstep;	 
   int			x;
@@ -566,7 +574,7 @@ void R_DrawSpan (void)
 { 
   fixed_t		xfrac;
   fixed_t		yfrac; 
-  byte*		dest; 
+  pixel_t*		dest; 
   int			count;
   int			spot; 
 
@@ -614,7 +622,7 @@ void R_DrawSpanLow (void)
 { 
   fixed_t		xfrac;
   fixed_t		yfrac; 
-  byte*		dest; 
+  pixel_t*		dest; 
   int			count;
   int			spot; 
 
@@ -702,7 +710,7 @@ void R_InitBuffer( int	width,  int	height )
 void R_VideoErase ( unsigned ofs, int count ) 
 { 
   if(count <0)return;//hack
-  memset (screens[0]+ofs, 0, count); 
+  V_FillPixels (screens[0]+ofs, count, V_PIXEL(0)); 
 } 
 
 

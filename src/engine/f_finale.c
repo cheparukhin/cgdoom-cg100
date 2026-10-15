@@ -250,7 +250,7 @@ extern const patch_t *hu_font[HU_FONTSIZE];
 void F_TextWrite (void)
 {
   const byte* src;
-  byte* dest;
+  pixel_t* dest;
 
   int  x,y,w;
   int  count;
@@ -261,15 +261,15 @@ void F_TextWrite (void)
 
   // erase the entire screen to a tiled background
   src = (const byte*)W_CacheLumpNameConst( finaleflat , PU_CACHE);
-  dest = (byte*)screens[0];
+  dest = screens[0];
 
+  /* CGDoom: any screen width (vanilla's 64-pixel copies need a multiple of
+     64), through the palette in true colour */
   for (y=0 ; y<SCREENHEIGHT ; y++)
   {
-    for (x=0 ; x<SCREENWIDTH/64 ; x++)
-    {
-      memcpy (dest, src+((y&63)<<6), 64);
-      dest += 64;
-    }
+    const byte *row = src+((y&63)<<6);
+    for (x=0 ; x<SCREENWIDTH ; x++)
+      *dest++ = V_PIXEL(row[x&63]);
   }
 
   V_MarkRect (0, 0, SCREENWIDTH, SCREENHEIGHT);
@@ -556,8 +556,8 @@ void F_DrawPatchCol( int  x,const patch_t* patch, int  col )
 {
   column_t* column;
   byte* source;
-  byte* dest;
-  byte* desttop;
+  pixel_t* dest;
+  pixel_t* desttop;
   int  count;
 
   column = (column_t *)((byte *)patch + INTFromBytes((const byte*)&(patch->columnofsLE[col])));
@@ -572,7 +572,7 @@ void F_DrawPatchCol( int  x,const patch_t* patch, int  col )
 
     while (count--)
     {
-      *dest = *source++;
+      *dest = V_PIXEL(*source++);
       dest += SCREENWIDTH;
     }
     column = (column_t *)(  (byte *)column + column->length + 4 );

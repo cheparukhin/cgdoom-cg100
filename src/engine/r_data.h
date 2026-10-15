@@ -65,6 +65,15 @@ static inline const byte* R_GetColumn( int tex, int col )
 }
 
 
+#if CGD_TRUECOLOR
+/* CGDoom: true colour: the COLORMAP lump (palette indices; colormaps holds
+   its maps in RGB565) */
+extern const byte*		colormaps8;
+/* Rebuilds the RGB565 light tables (colormaps) for a palette (768 bytes)
+   and a gamma table (I_SetPalette) */
+void R_BuildLightTables (const byte *palette, const byte *gamma);
+#endif
+
 // I/O, setting up the stuff.
 void R_InitData (void);
 void R_PrecacheLevel (void);

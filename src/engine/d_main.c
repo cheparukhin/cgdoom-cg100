@@ -139,6 +139,7 @@ void D_Display (void)
   boolean     done;
   boolean     wipe;
   boolean     redrawsbar;
+  int         wipepalettes = 0;   /* CGDoom: CGD_Stats at the wipe's start */
 
   redrawsbar = false;
 
@@ -151,11 +152,12 @@ void D_Display (void)
   }
 
   // save the current screen if about to wipe
-  /* CGDoom: no wipe in a timedemo (vanilla timed its wipes too) */
-  if (gamestate != wipegamestate && !timingdemo)
+  /* CGDoom: no wipe in a timedemo (vanilla timed its wipes too), or
+     without memory for it (wipe_StartScreen) */
+  if (gamestate != wipegamestate && !timingdemo && wipe_StartScreen())
   {
     wipe = true;
-    wipe_StartScreen();
+    wipepalettes = CGD_Stats.PaletteChanges;
   }
   else
   {
@@ -174,7 +176,7 @@ void D_Display (void)
       break;
     if (automapactive)
       AM_Drawer ();
-    if (wipe || (viewheight != 200 && fullscreen) )
+    if (wipe || (viewheight != SCREENHEIGHT && fullscreen) )
       redrawsbar = true;
     if (inhelpscreensstate && !inhelpscreens)
       redrawsbar = true;              // just put away the help screen
@@ -182,10 +184,10 @@ void D_Display (void)
        bar is only drawn with the automap, so it is redrawn in full when the
        automap opens (vanilla did this through ST_Responder's AM_MSGENTERED,
        which CGDoom's automap does not send) */
-    if (automapactive && !automapactivestate && viewheight == 200)
+    if (automapactive && !automapactivestate && viewheight == SCREENHEIGHT)
       redrawsbar = true;
-    ST_Drawer ((boolean)(viewheight == 200), redrawsbar );
-    fullscreen = (boolean)(viewheight == 200);
+    ST_Drawer ((boolean)(viewheight == SCREENHEIGHT), redrawsbar );
+    fullscreen = (boolean)(viewheight == SCREENHEIGHT);
     break;
 
   case GS_INTERMISSION:
@@ -209,10 +211,19 @@ void D_Display (void)
      size (oldgamestate is reset by R_ExecuteSetViewSize above). Vanilla did
      this after HU_Drawer; doing it before keeps the HUD messages that are
      drawn in the border. */
+  /* (CGDoom true colour: also after a palette change, which recolours
+     everything only in the 8-bit build) */
+#if CGD_TRUECOLOR
+  static int border_serial;
+  boolean newpalette = border_serial != v_palette_serial;
+  border_serial = v_palette_serial;
+#else
+  const boolean newpalette = false;
+#endif
   if (gamestate == GS_LEVEL && !automapactive && gametic
     && scaledviewwidth != SCREENWIDTH
     && (menuactive || menuactivestate || automapactivestate
-      || inhelpscreensstate || oldgamestate != GS_LEVEL))
+      || inhelpscreensstate || oldgamestate != GS_LEVEL || newpalette))
     R_DrawViewBorder ();
 
   // draw the view directly
@@ -254,6 +265,7 @@ void D_Display (void)
 
   // wipe update
   wipe_EndScreen(0, 0, SCREENWIDTH, SCREENHEIGHT);
+  CGD_Stats.WipeStalePalette = CGD_Stats.PaletteChanges != wipepalettes;
 
   wipestart = I_GetTime () - 1;
 
@@ -272,6 +284,7 @@ void D_Display (void)
     M_Drawer ();       // menu is drawn even on top of wipes
     I_Flip ();        // page flip or blit buffer
   } while (!done);
+  CGD_Stats.WipeStalePalette = 0;
   gamestate = oldgamestate;
   wipegamestate= oldgamestate;
 }

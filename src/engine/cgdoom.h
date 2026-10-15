@@ -134,6 +134,28 @@ extern int CGD_RecordDemoSlot;
 /* Whether we're only playing a demo and leaving */
 extern int CGD_PlayDemoOnly;
 
+/* Rendering features beyond vanilla, as bits of CGD_Features: on by default
+   in the HD build (CGD_FEATURES_DEFAULT), off in the others. None changes
+   game state, so demos stay in sync either way. Set before D_DoomMain (host
+   -features); the names are for the host's option. */
+#define CGD_FEATURE_COUNT 0
+extern int CGD_Features;
+extern const char *const CGD_FeatureNames[];
+#if CGD_HD
+#define CGD_FEATURES_DEFAULT ((1 << CGD_FEATURE_COUNT) - 1)
+#else
+#define CGD_FEATURES_DEFAULT 0
+#endif
+
+/* True-colour build (CGD_TRUECOLOR): 1 builds the light tables from the
+   COLORMAP lump, so that frames equal the 8-bit build's through its palette
+   (a test mode, host -tcexact); 0 (default) scales the palette in RGB
+   (r_data.c R_BuildLightTables). Read when the tables are built. */
+extern int CGD_TrueColorExact;
+/* 8-bit build, test knob (host -palredraw): the status bar is redrawn at
+   every palette change, as in the true-colour build (i_video.c) */
+extern int CGD_PaletteRedraw;
+
 /* Timedemo (vanilla's -timedemo, for every demo of the WAD). Set
    CGD_TimeDemo before D_DoomMain: the WAD's DEMO1..DEMO4 lumps (those
    present) play back to back as fast as the renderer goes, every tic
@@ -253,6 +275,18 @@ typedef struct
       current and peak */
    int RenderArrayBytes;
    int RenderArrayBytesPeak;
+
+   /* For the host's -crc565 flags, the frames where the 8-bit and
+      true-colour builds differ on purpose: sprites drawn with the spectre's
+      fuzz (its true-colour darkening differs), gamma changes (the 8-bit
+      palette also recolours stale pixels, such as the hall-of-mirrors
+      outside a map in noclip), palette changes (I_SetPalette calls) and a
+      wipe whose start screen was drawn with another palette (in 8-bit it
+      takes the new one). */
+   int FuzzSprites;
+   int GammaChanges;
+   int PaletteChanges;
+   int WipeStalePalette;
 
 } CGDoom_Stats;
 

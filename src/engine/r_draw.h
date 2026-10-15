@@ -31,10 +31,14 @@
 /* CGD_SH4: the SH4AL-DSP assembly drawers of src/engine/sh4 are used
    (calculator and simulator builds, both SH; -DCGD_NO_SH4 keeps the C
    drawers there, e.g. for a C-only reference ELF). The host never uses them. */
-#if defined(__sh__) && !defined(CGD_NO_SH4)
+#if defined(__sh__) && !defined(CGD_NO_SH4) && SCREENWIDTH == 320 \
+  && !CGD_TRUECOLOR
 # define CGD_SH4 1
 #endif
 
+
+// status bar height at bottom of screen
+#define SBARHEIGHT			32
 
 extern const lighttable_t*	dc_colormap;
 extern int		dc_x;
