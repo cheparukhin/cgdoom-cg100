@@ -96,6 +96,7 @@ static int  message_counter;
 
 extern int  showMessages;
 extern boolean  automapactive;
+#include "am_map.h"
 
 static boolean  headsupactive = false;
 
@@ -294,7 +295,7 @@ void HU_Drawer(void)
   if (fpscounteractive)
     HUlib_drawSText(&w_fpscounter);
   HUlib_drawIText(&w_chat);
-  if (automapactive)
+  if (AM_FULLMAP)
     HUlib_drawTextLine(&w_title, false);
 
 }

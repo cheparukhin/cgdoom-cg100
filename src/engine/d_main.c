@@ -186,7 +186,9 @@ void D_Display (void)
        (ST_Drawer below sets it for the rest) */
     ST_doPaletteStuff ();
 #endif
-    if (automapactive)
+    /* CGDoom: AM_FULLMAP is automapactive without the overlay (am_map.h),
+       which is drawn after the view */
+    if (AM_FULLMAP)
       AM_Drawer ();
     if (wipe || (viewheight != SCREENHEIGHT && fullscreen) )
       redrawsbar = true;
@@ -196,7 +198,7 @@ void D_Display (void)
        bar is only drawn with the automap, so it is redrawn in full when the
        automap opens (vanilla did this through ST_Responder's AM_MSGENTERED,
        which CGDoom's automap does not send) */
-    if (automapactive && !automapactivestate && viewheight == SCREENHEIGHT)
+    if (AM_FULLMAP && !automapactivestate && viewheight == SCREENHEIGHT)
       redrawsbar = true;
     ST_Drawer ((boolean)(viewheight == SCREENHEIGHT), redrawsbar );
     fullscreen = (boolean)(viewheight == SCREENHEIGHT);
@@ -232,21 +234,24 @@ void D_Display (void)
 #else
   const boolean newpalette = false;
 #endif
-  if (gamestate == GS_LEVEL && !automapactive && gametic
+  if (gamestate == GS_LEVEL && !AM_FULLMAP && gametic
     && scaledviewwidth != SCREENWIDTH
     && (menuactive || menuactivestate || automapactivestate
       || inhelpscreensstate || oldgamestate != GS_LEVEL || newpalette))
     R_DrawViewBorder ();
 
   // draw the view directly
-  if (gamestate == GS_LEVEL && !automapactive && gametic)
+  if (gamestate == GS_LEVEL && !AM_FULLMAP && gametic)
     R_RenderPlayerView (&players[0]);
+
+  if (gamestate == GS_LEVEL && automapoverlay && gametic)
+    AM_Drawer ();
 
   if (gamestate == GS_LEVEL && gametic)
     HU_Drawer ();
 
   menuactivestate = menuactive;
-  automapactivestate = automapactive;
+  automapactivestate = AM_FULLMAP;
   viewactivestate = viewactive;
   inhelpscreensstate = inhelpscreens;
   oldgamestate = gamestate;
@@ -254,7 +259,7 @@ void D_Display (void)
   // draw pause pic
   if (paused)
   {
-    if (automapactive)
+    if (AM_FULLMAP)
       y = 4;
     else
       y = viewwindowy+4;

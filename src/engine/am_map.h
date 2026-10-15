@@ -22,6 +22,10 @@
 #ifndef __AMMAP_H__
 #define __AMMAP_H__
 
+#include "doomtype.h"
+#include "d_event.h"
+extern boolean automapactive;
+
 // Used by ST StatusBar stuff.
 #define AM_MSGHEADER (('a'<<24)+('m'<<16))
 #define AM_MSGENTERED (AM_MSGHEADER | ('e'<<8))
@@ -41,6 +45,12 @@ void AM_Drawer (void);
 // Called to force the automap to quit
 // if the level is completed while it is up.
 void AM_Stop (void);
+
+/* CGDoom: the automap is drawn over the 3D view (CGD_FEAT_AUTOMAP); then
+   AM_Drawer is called after the view, and everything else behaves as
+   without the automap. AM_FULLMAP: the full-screen automap is up. */
+extern boolean automapoverlay;
+#define AM_FULLMAP	(automapactive && !automapoverlay)
 
 
 

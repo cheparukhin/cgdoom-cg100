@@ -153,7 +153,11 @@ extern int CGD_PlayDemoOnly;
                                    (st_stuff.c) */
 #define CGD_FEAT_CROSSHAIR 0x10 /* a small red cross at the centre of the
                                    view (r_main.c) */
-#define CGD_FEATURE_COUNT 5
+#define CGD_FEAT_AUTOMAP  0x20  /* automap: the map key also gives an
+                                   overlay that turns with the player;
+                                   kills, items, secrets and time shown
+                                   (am_map.c) */
+#define CGD_FEATURE_COUNT 6
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
 #if CGD_EXTRAS && CGD_TRUECOLOR

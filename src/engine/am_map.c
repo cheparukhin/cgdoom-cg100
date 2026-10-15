@@ -45,6 +45,10 @@
 #include "dstrings.h"
 
 #include "am_map.h"
+#include "m_swap.h"
+#include "cgdoom.h"
+#include "hu_stuff.h"
+#include "r_main.h"
 
 
 // For use if I do walls with outsides/insides
@@ -118,6 +122,8 @@
 #define FTOM(x) FixedMul(((x)<<16),scale_ftom)
 #define MTOF(x) (FixedMul((x),scale_mtof)>>16)
 // translates between frame-buffer and map coordinates
+// (CGDoom: f_x and f_y stay 0; the window's place on the screen is the fb
+// pointer, fb_x and fb_y)
 #define CXMTOF(x)  (f_x + MTOF((x)-m_x))
 #define CYMTOF(y)  (f_y + (f_h - MTOF((y)-m_y)))
 
@@ -231,6 +237,9 @@ static int f_h;
 
 static int  lightlev;   // used for funky strobing effect
 static pixel_t* fb;    // pseudo-frame buffer
+/* CGDoom: where the window is on the screen (rows of SCREENWIDTH pixels) */
+static int  fb_x, fb_y;
+boolean     automapoverlay = false;
 static int  amclock;
 
 static mpoint_t m_paninc; // how far the window pans each tic (map coords)
@@ -559,6 +568,7 @@ void AM_Stop (void)
 
   AM_unloadPics();
   automapactive = false;
+  automapoverlay = false;
   stopped = true;
 }
 
@@ -631,6 +641,11 @@ boolean AM_Responder ( event_t* ev )
   }
   else if (ev->type == ev_keydown)
   {
+#if CGD_EXTRAS
+    /* CGDoom: over the view, the game gets every key but the map key */
+    if (automapoverlay && ev->data1 != AM_ENDKEY)
+      return false;
+#endif
     rc = true;
     switch(ev->data1)
     {
@@ -656,6 +671,17 @@ boolean AM_Responder ( event_t* ev )
     case AM_ENDKEY:
       if (tdiff>4)
       {
+#if CGD_EXTRAS
+        /* CGDoom: the map key goes from the full map to the overlay
+           (CGD_FEAT_AUTOMAP), then closes it */
+        if ((CGD_Features & CGD_FEAT_AUTOMAP) && !automapoverlay)
+        {
+          automapoverlay = true;
+          viewactive = true;
+          tm = I_GetTime();
+          break;
+        }
+#endif
         viewactive = true;
         AM_Stop ();
         tm= I_GetTime();
@@ -1000,7 +1026,7 @@ AM_drawFline
     return;
   }
 
-#define PUTDOT(xx,yy,cc) fb[(yy)*f_w+(xx)]=V_PIXEL(cc)
+#define PUTDOT(xx,yy,cc) fb[(yy)*SCREENWIDTH+(xx)]=V_PIXEL(cc)
 
   dx = fl->b.x - fl->a.x;
   ax = 2 * (dx<0 ? -dx : dx);
@@ -1064,6 +1090,88 @@ AM_drawMline
 
 
 
+#if CGD_EXTRAS
+//
+// CGDoom: CGD_FEAT_AUTOMAP. The overlay is drawn in the view window and
+// turns with the player (who faces up); the full map fills the screen above
+// the status bar. AM_setWindow sets the window for the frame (the view size
+// may change), keeping the scale and centring on the player again when the
+// size changes.
+//
+static void AM_setWindow (void)
+{
+  int x = 0, y = 0, w = finit_width, h = finit_height;
+
+  if (automapoverlay)
+  {
+    x = viewwindowx;
+    y = viewwindowy;
+    w = scaledviewwidth;
+    h = viewheight;
+  }
+  fb_x = x;
+  fb_y = y;
+  fb = screens[0] + y*SCREENWIDTH + x;
+  if (w != f_w || h != f_h)
+  {
+    f_w = w;
+    f_h = h;
+    m_w = FTOM(f_w);
+    m_h = FTOM(f_h);
+    f_oldloc.x = MAXINT;
+    AM_doFollowPlayer ();
+  }
+}
+
+/* The angle by which the overlay turns the map: the player faces up */
+#define AM_ROTANGLE	(ANG90 - plr->mo->angle)
+
+static void AM_rotate (fixed_t* x, fixed_t* y, angle_t a);
+
+/* A map point turned around the player (the overlay's centre) */
+static void AM_rotatePoint (mpoint_t *pt)
+{
+  fixed_t x = pt->x - plr->mo->x;
+  fixed_t y = pt->y - plr->mo->y;
+
+  AM_rotate (&x, &y, AM_ROTANGLE);
+  pt->x = plr->mo->x + x;
+  pt->y = plr->mo->y + y;
+}
+
+/* Kills, items, secrets and the level's time, in the HUD font, at the
+   bottom of the window: above the level title (HU_Drawer) on the full map */
+static void AM_drawStats (void)
+{
+  extern const patch_t *hu_font[HU_FONTSIZE];
+  char text[64];
+  int t = leveltime / TICRATE;
+  int h = SHORT(hu_font[0]->height) + 1;
+  int x = fb_x + 2;
+  int y = fb_y + f_h - h - (automapoverlay ? 1 : h + 1);
+
+  snprintf (text, sizeof text, "K %d/%d  I %d/%d  S %d/%d  %d:%02d",
+    plr->killcount, totalkills, plr->itemcount, totalitems,
+    plr->secretcount, totalsecret, t / 60, t % 60);
+  for (const char *s = text; *s; s++)
+  {
+    int c = toupper_int (*s) - HU_FONTSTART;
+    int w;
+
+    if (c < 0 || c >= HU_FONTSIZE)
+    {
+      x += 4;
+      continue;
+    }
+    w = SHORT(hu_font[c]->width);
+    if (x + w > fb_x + f_w)
+      break;
+    V_DrawPatch (x, y, FB, hu_font[c]);
+    x += w;
+  }
+}
+#endif
+
 //
 // Draws flat (floor/ceiling tile) aligned grid lines.
 //
@@ -1124,6 +1232,13 @@ void AM_drawWalls(void)
     l.a.y = lines[i].v1->y;
     l.b.x = lines[i].v2->x;
     l.b.y = lines[i].v2->y;
+#if CGD_EXTRAS
+    if (automapoverlay)
+    {
+      AM_rotatePoint (&l.a);
+      AM_rotatePoint (&l.b);
+    }
+#endif
     if (cheating || (lines[i].flags & ML_MAPPED))
     {
       if ((lines[i].flags & LINE_NEVERSEE) && !cheating)
@@ -1164,11 +1279,12 @@ void AM_drawWalls(void)
 }
 
 
+
 //
 // Rotation in 2D.
 // Used to rotate player arrow line character.
 //
-void
+static void
 AM_rotate
 ( fixed_t* x,
  fixed_t* y,
@@ -1246,10 +1362,15 @@ void AM_drawPlayers(void)
 
   if (!netgame)
   {
+    angle_t angle = plr->mo->angle;
+#if CGD_EXTRAS
+    if (automapoverlay)
+      angle = ANG90;
+#endif
     if (cheating)
-      AM_drawLineCharacter (cheat_player_arrow, NUMCHEATPLYRLINES, 0, plr->mo->angle, WHT, plr->mo->x, plr->mo->y);
+      AM_drawLineCharacter (cheat_player_arrow, NUMCHEATPLYRLINES, 0, angle, WHT, plr->mo->x, plr->mo->y);
     else
-      AM_drawLineCharacter (player_arrow, NUMPLYRLINES, 0, plr->mo->angle, WHT, plr->mo->x, plr->mo->y);
+      AM_drawLineCharacter (player_arrow, NUMPLYRLINES, 0, angle, WHT, plr->mo->x, plr->mo->y);
     return;
   }
 
@@ -1269,9 +1390,19 @@ void AM_drawPlayers(void)
     else
       color = their_colors[their_color];
 
-    AM_drawLineCharacter
-      (player_arrow, NUMPLYRLINES, 0, p->mo->angle,
-      color, p->mo->x, p->mo->y);
+    {
+      mpoint_t pt = { p->mo->x, p->mo->y };
+      angle_t angle = p->mo->angle;
+#if CGD_EXTRAS
+      if (automapoverlay)
+      {
+        AM_rotatePoint (&pt);
+        angle += AM_ROTANGLE;
+      }
+#endif
+      AM_drawLineCharacter
+        (player_arrow, NUMPLYRLINES, 0, angle, color, pt.x, pt.y);
+    }
   }
 
 }
@@ -1289,9 +1420,18 @@ AM_drawThings
     t = sectors[i].thinglist;
     while (t)
     {
+      mpoint_t pt = { t->x, t->y };
+      angle_t angle = t->angle;
+#if CGD_EXTRAS
+      if (automapoverlay)
+      {
+        AM_rotatePoint (&pt);
+        angle += AM_ROTANGLE;
+      }
+#endif
       AM_drawLineCharacter
         (thintriangle_guy, NUMTHINTRIANGLEGUYLINES,
-        16<<FRACBITS, t->angle, colors+lightlev, t->x, t->y);
+        16<<FRACBITS, angle, colors+lightlev, pt.x, pt.y);
       t = t->snext;
     }
   }
@@ -1310,10 +1450,15 @@ void AM_drawMarks(void)
       //      h = SHORT(marknums[i]->height);
       w = 5; // because something's wrong with the wad, i guess
       h = 6; // because something's wrong with the wad, i guess
-      fx = CXMTOF(markpoints[i].x);
-      fy = CYMTOF(markpoints[i].y);
+      mpoint_t pt = markpoints[i];
+#if CGD_EXTRAS
+      if (automapoverlay)
+        AM_rotatePoint (&pt);
+#endif
+      fx = CXMTOF(pt.x);
+      fy = CYMTOF(pt.y);
       if (fx >= f_x && fx <= f_w - w && fy >= f_y && fy <= f_h - h)
-        V_DrawPatch(fx, fy, FB, marknums[i]);
+        V_DrawPatch(fb_x + fx, fb_y + fy, FB, marknums[i]);
     }
   }
 
@@ -1321,7 +1466,7 @@ void AM_drawMarks(void)
 
 void AM_drawCrosshair(int color)
 {
-  fb[(f_w*(f_h+1))/2] = V_PIXEL(color); // single point for now
+  fb[(f_h/2)*SCREENWIDTH + f_w/2] = V_PIXEL(color); // single point for now
 
 }
 
@@ -1330,7 +1475,12 @@ void AM_Drawer (void)
   if (!automapactive)
     return;
 
-  AM_clearFB(BACKGROUND);
+#if CGD_EXTRAS
+  AM_setWindow ();
+#endif
+  /* CGDoom: the overlay leaves the view (drawn first) under the map */
+  if (!automapoverlay)
+    AM_clearFB(BACKGROUND);
   if (grid)
     AM_drawGrid(GRIDCOLORS);
   AM_drawWalls();
@@ -1340,7 +1490,11 @@ void AM_Drawer (void)
   AM_drawCrosshair(XHAIRCOLORS);
 
   AM_drawMarks();
+#if CGD_EXTRAS
+  if (CGD_Features & CGD_FEAT_AUTOMAP)
+    AM_drawStats ();
+#endif
 
-  V_MarkRect(f_x, f_y, f_w, f_h);
+  V_MarkRect(fb_x, fb_y, f_w, f_h);
 
 }

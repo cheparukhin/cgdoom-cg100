@@ -38,6 +38,7 @@
 #define noterased viewwindowx
 
 extern boolean automapactive; // in AM_map.c
+#include "am_map.h"
 
 void HUlib_init(void)
 {
@@ -136,7 +137,7 @@ void HUlib_eraseTextLine(hu_textline_t* l)
   // and the text must either need updating or refreshing
   // (because of a recent change back from the automap)
 
-  if (!automapactive &&
+  if (!AM_FULLMAP &&
     viewwindowx && l->needsupdate)
   {
     lh = SHORT(l->f[0]->height) + 1;
