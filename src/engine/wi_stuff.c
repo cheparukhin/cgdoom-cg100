@@ -407,18 +407,10 @@ void WI_unloadData(void);
 // UNUSED static unsigned char *background=0;
 
 
-/* CGDoom: the background picture's lump name (WI_loadData) */
-static char bgname[9];
-
 static void WI_slamBackground(void)
 {
-#if CGD_TRANSIENT_SCREENS
-  /* No screens[1]: the picture is drawn again (v_video.h) */
-  V_DrawFullscreenPatch(0, bgname);
-#else
   memcpy(screens[0], screens[1], SCREENWIDTH * SCREENHEIGHT);
   V_MarkRect (0, 0, SCREENWIDTH, SCREENHEIGHT);
-#endif
 }
 
 // Draws "<Levelname> Finished!"
@@ -991,11 +983,7 @@ static void WI_loadData(void)
   // background
 //  bg = W_CacheLumpNamePatch(name, PU_CACHE);
 //  V_DrawPatch(0, 0, 1, bg);
-  memcpy(bgname, name, sizeof bgname - 1);   /* lump names: 8 chars */
-  bgname[sizeof bgname - 1] = 0;
-#if !CGD_TRANSIENT_SCREENS
   V_DrawFullscreenPatch(1, name);
-#endif
 
   // UNUSED unsigned char *pic = screens[1];
   // if (gamemode == commercial)

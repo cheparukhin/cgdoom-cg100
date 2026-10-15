@@ -39,9 +39,9 @@
 #
 # The calculator build is CMake/fxSDK (CMakeLists.txt), not this Makefile.
 #
-# VARIANT selects the screen format (src/platform/cgd_config.h): empty for
-# the 320x200 8-bit build, "wide" (396x224, 8-bit) or "hd" (396x224, true
-# colour). Each variant builds into build-host-<variant>/ (and
+# VARIANT selects the build (src/platform/cgd_config.h): empty for the
+# 320x200 build, "wide" (396x224) or "hd" (396x224 with the extras). Each
+# variant builds into build-host-<variant>/ (and
 # build-host-asan-<variant>/, and build-sim-<variant>/ for the simulator) and
 # has its goldens in tests/golden-<variant>/.
 
@@ -245,25 +245,16 @@ test-timedemo-asan: host-asan
 
 # Tests of the widescreen and HD builds (they build the variants they need)
 #   test-quicksave  quicksave/quickload actions (tests/quicksave.sh, hd)
-#   test-tc-exact   true colour (hd) against 8-bit (wide), frame by frame
-#                   (tests/tc-exact.sh)
 #   test-variants   the scenarios of the wide and hd builds against their
-#                   goldens, under ASan too, plus test-tc-exact and
-#                   test-quicksave
-.PHONY: test-quicksave test-tc-exact test-variants
+#                   goldens, under ASan too, plus test-quicksave
+.PHONY: test-quicksave test-variants
 test-quicksave:
 	@$(MAKE) --no-print-directory VARIANT=hd host
 	@sh $(ROOT)/tests/quicksave.sh -bin $(ROOT)/build-host-hd/cgdoom-host
 
-test-tc-exact:
-	@$(MAKE) --no-print-directory VARIANT=wide host
-	@$(MAKE) --no-print-directory VARIANT=hd host
-	@sh $(ROOT)/tests/tc-exact.sh -bin8 $(ROOT)/build-host-wide/cgdoom-host \
-	  -bintc $(ROOT)/build-host-hd/cgdoom-host
-
-# (one after the other: each builds build-host-hd, which -j must not race)
+# (one after the other: the parts share build directories, which -j must
+# not build twice at once)
 test-variants:
-	@$(MAKE) --no-print-directory test-tc-exact
 	@$(MAKE) --no-print-directory test-quicksave
 	@$(MAKE) --no-print-directory VARIANT=wide test-host
 	@$(MAKE) --no-print-directory VARIANT=hd test-host

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """modsched - exact modulo-schedule search for the SH-4A drawer loops (design tool, not in the build).
 
-    modsched.py KIND [II] [LAT] [--px P] [--max-ii N] [--node-limit N] [--stage1 OPS] [--stages S] [--war1] [-q]
+    modsched.py KIND [II] [LAT] [--px P] [--max-ii N] [--node-limit N] [--stage1 OPS] [--war1] [-q]
     modsched.py KIND [LAT] --shipped [--war1] [-q]
 
       KIND   span | spanlow | col | collow
@@ -65,32 +65,22 @@ NEG = -10 ** 9
 
 
 # ------------------------------------------------------------------------------------------ models
-def span_model(P, L, low=False, tc=False):
+def span_model(P, L, low=False):
     """R_DrawSpan(Low), one pass = P pixels (texels). Ops of a pixel (registers of the shipped loop):
        a mov Y,rm (r8->r1)   b shld -26,rm   c mov X,rn (r7->r2)   d xtrct rm,rn   e shld -10,rn
        f mov rn,r0   g texel mov.b @(r0,src),r0   h colour mov.b @(r0,cm),rC   i store mov.b rC,@-rD
-       (i2 second store, low detail)   j X -= XS   k Y -= YS
-       True colour (tc): x add r0,r0 (texel * 2) between g and h; h and i are mov.w."""
+       (i2 second store, low detail)   j X -= XS   k Y -= YS"""
     ops, cons = [], []
     px = [chr(65 + i) for i in range(P)]
     for p in px:
         ops += [(p+"a", "MT"), (p+"b", "EX"), (p+"c", "MT"), (p+"d", "EX"), (p+"e", "EX"), (p+"f", "MT"),
                 (p+"g", "LS"), (p+"h", "LS"), (p+"i", "LS"), (p+"j", "EX"), (p+"k", "EX")]
         if low: ops.append((p+"i2", "LS"))
-        if tc: ops.append((p+"x", "EX"))
-        if tc == "mv": ops.append((p+"v", "MT"))
         cons += [(p+"a", p+"b", L["ex_data"], 0), (p+"b", p+"d", L["ex_data"], 0), (p+"c", p+"d", L["ex_data"], 0),
                  (p+"d", p+"e", L["ex_data"], 0), (p+"e", p+"f", L["ex_data"], 0),
-                 (p+"f", p+"g", L["ex_addr"], 0), (p+"h", p+"i", L["ld_store"], 0),
+                 (p+"f", p+"g", L["ex_addr"], 0), (p+"g", p+"h", L["ld_addr"], 0), (p+"h", p+"i", L["ld_store"], 0),
                  (p+"a", p+"k", 0, 0),          # WAR Y: k overwrites what a reads
                  (p+"c", p+"j", 0, 0)]          # WAR X
-        if tc == "mv":
-            cons += [(p+"g", p+"v", L["ld_ex"], 0), (p+"v", p+"x", L["ex_data"], 0), (p+"x", p+"h", L["ex_addr"], 0),
-                     (p+"v", p+"g", 0, 1)]      # WAR texel register (one per pixel of the pass)
-        elif tc:
-            cons += [(p+"g", p+"x", L["ld_ex"], 0), (p+"x", p+"h", L["ex_addr"], 0)]
-        else:
-            cons += [(p+"g", p+"h", L["ld_addr"], 0)]
         if low: cons += [(p+"h", p+"i2", L["ld_store"], 0), (p+"i", p+"i2", L["auto"], 0)]
     last = "i2" if low else "i"
     for n in range(P):
@@ -105,30 +95,20 @@ def span_model(P, L, low=False, tc=False):
     return ops, cons
 
 
-def col_model(P, L, low=False, tc=False):
+def col_model(P, L, low=False):
     """R_DrawColumn(Low), one pass = P pixels (texels). Ops of a pixel:
        m mov frac,rI   s shld -25,rI   a add src,rI   l texel mov.b @rI,r0   c colour mov.b @(r0,cm),rC
        st store   (st2 second store, low detail)   dd dest += 320 (322)   ff frac += step
        Full detail: one frac stepped per pixel, stores mov.b rC,@rD. Low detail: one frac per texel of
-       the pass (stepped by P*step), stores mov.b rC,@-rD (rD = dest+2) then dd.
-       True colour (tc): x add r0,r0 (texel * 2) between l and c; c and the stores are mov.w."""
+       the pass (stepped by P*step), stores mov.b rC,@-rD (rD = dest+2) then dd."""
     ops, cons = [], []
     px = [chr(65 + i) for i in range(P)]
     for p in px:
         ops += [(p+"m", "MT"), (p+"s", "EX"), (p+"a", "EX"), (p+"l", "LS"), (p+"c", "LS"), (p+"st", "LS"),
                 (p+"dd", "EX"), (p+"ff", "EX")]
         if low: ops.append((p+"st2", "LS"))
-        if tc: ops.append((p+"x", "EX"))
-        if tc == "mv":   # the texel is loaded into the index register rI: v and x read it before m rewrites it
-            ops.append((p+"v", "MT"))
-            cons += [(p+"l", p+"v", L["ld_ex"], 0), (p+"v", p+"x", L["ex_data"], 0), (p+"x", p+"c", L["ex_addr"], 0),
-                     (p+"v", p+"m", 0, 1), (p+"x", p+"m", 0, 1)]
-        elif tc:
-            cons += [(p+"l", p+"x", L["ld_ex"], 0), (p+"x", p+"c", L["ex_addr"], 0)]
-        else:
-            cons += [(p+"l", p+"c", L["ld_addr"], 0)]
         cons += [(p+"m", p+"s", L["ex_data"], 0), (p+"s", p+"a", L["ex_data"], 0), (p+"a", p+"l", L["ex_addr"], 0),
-                 (p+"c", p+"st", L["ld_store"], 0), (p+"dd", p+"st", L["ex_addr"], 0),
+                 (p+"l", p+"c", L["ld_addr"], 0), (p+"c", p+"st", L["ld_store"], 0), (p+"dd", p+"st", L["ex_addr"], 0),
                  (p+"m", p+"ff", 0, 0),          # WAR frac
                  (p+"l", p+"m", 0, 1)]           # WAR rI: each pixel keeps its own index register
         if low: cons += [(p+"c", p+"st2", L["ld_store"], 0), (p+"st", p+"st2", L["auto"], 0),
@@ -138,13 +118,12 @@ def col_model(P, L, low=False, tc=False):
         x, y, dist = px[n], px[(n + 1) % P], (1 if n == P - 1 else 0)
         if not low: cons += [(x+"ff", y+"m", L["ex_data"], dist)]   # RAW frac (shared, stepped per pixel)
         cons += [(x+last, y+"dd", L["auto"] if low else 0, dist),  # dest: @-rD update (low) / WAR (full)
-                 (x+"c", y+("v" if tc == "mv" else "l"), 0, dist),   # WAR r0
+                 (x+"c", y+"l", 0, dist),              # WAR r0
                  (x+last, y+"c", 0, dist)]             # WAR colour register
     return ops, cons
 
 
-# The loops in ../r_draw_sh4.S and ../r_draw16_sh4.S as issue times (pixel A's first op at 0;
-# stage-1 ops at row + II).
+# The loops in ../r_draw_sh4.S as issue times (pixel A's first op at 0; stage-1 ops at row + II).
 SHIPPED = {
     "col": (8, dict(Am=0, As=1, Aa=2, Aff=3, Bm=4, Bs=5, Al=6, Ba=6, Bff=7, Add=8, Ac=9, Bl=10, Ast=11,
                     Bdd=12, Bc=13, Bst=15)),
@@ -154,22 +133,10 @@ SHIPPED = {
                       Bd=10, Be=11, Ah=12, Bf=12, Bg=14, Ai=15, Bh=17, Bi=21)),
     "spanlow": (12, dict(Aa=0, Ab=2, Ac=2, Ad=3, Ae=4, Ak=5, Af=6, Aj=7, Ba=7, Ag=8, Bb=8, Bk=9, Bc=10,
                          Bj=10, Bd=11, Be=12, Ah=13, Bf=13, Bg=15, Ai=16, Ai2=17, Bh=18, Bi=21, Bi2=23)),
-    # ../r_draw16_sh4.S (RGB565)
-    "col16m": (10, dict(Am=0, Aff=0, As=1, Aa=2, Bm=3, Al=4, Bs=4, Ba=5, Av=7, Bff=7, Ax=8, Bl=8, Add=9,
-                        Ac=11, Bv=12, Bx=13, Ast=15, Bc=16, Bdd=16, Bst=19)),
-    "collow16": (10, dict(Am=0, As=1, Aa=2, Aff=3, Bm=5, Bs=6, Al=7, Ba=7, Bff=8, Ax=9, Add=10, Ac=11,
-                          Bl=12, Ast=13, Ast2=14, Bx=14, Bdd=15, Bc=16, Bst=18, Bst2=19)),
-    "span16": (13, dict(Aa=0, Ab=3, Ac=3, Ad=4, Ak=5, Ba=6, Bb=7, Ae=8, Af=9, Aj=9, Bc=10, Bj=10, Bd=11,
-                        Ag=11, Bk=12, Ax=13, Be=14, Ah=15, Bf=15, Bg=17, Ai=18, Bx=19, Bh=21, Bi=25)),
-    "spanlow16": (13, dict(Aa=0, Ab=2, Ac=2, Ad=3, Ak=4, Ae=6, Ba=6, Bb=7, Af=8, Aj=8, Bc=9, Bj=9,
-                           Bd=10, Ag=10, Bk=11, Ax=12, Be=13, Ah=14, Bf=14, Bg=16, Ai=17, Bx=18, Ai2=18,
-                           Bh=20, Bi=24, Bi2=25)),
 }
 
 KINDS = {"span": (span_model, False), "spanlow": (span_model, True),
          "col": (col_model, False), "collow": (col_model, True)}
-KINDS.update({k + sfx: (lambda P, L, low, b=b, tc=tc: b(P, L, low, tc), low)
-              for k, (b, low) in list(KINDS.items()) for sfx, tc in (("16", True), ("16m", "mv"))})
 
 
 # ------------------------------------------------------------------------------------------ search
@@ -431,8 +398,6 @@ def main():
     ap.add_argument("--stage1", metavar="OPS", help="two-stage loop with these ops (comma-separated, e.g. "
                     "Be,Bf,Bg) in stage 1 and all others in stage 0 (every alignment of the stage "
                     "boundary is tried): keeps the shipped prologue/epilogue split")
-    ap.add_argument("--stages", type=int, metavar="S", help="at most S pipeline stages: every op within "
-                    "S*II-1 cycles of every other (S=2: a one-pass prologue and epilogue, as shipped)")
     ap.add_argument("--shipped", action="store_true", help="check the loop of ../r_draw_sh4.S (SHIPPED, "
                     "2 pixels/texels per pass) against the model instead of searching")
     ap.add_argument("-q", action="store_true", help="do not print the schedule")
@@ -452,8 +417,6 @@ def main():
         if bad: ap.error("unknown ops: %s" % " ".join(sorted(bad)))
         stage = {o[0]: (1 if o[0] in s1 else 0) for o in ops}
     if a.war1: cons = [(s, d, max(lat, 1), dist) for s, d, lat, dist in cons]
-    if a.stages:   # t[j] - t[i] <= S*II - 1 for every pair: t[i] + II*S >= t[j] + 1
-        cons = cons + [(j, i, 1, a.stages) for i, _ in ops for j, _ in ops if i != j]
     pix = a.px * (2 if low else 1)
     if a.shipped:
         if a.px != 2: ap.error("--shipped: the shipped loops have 2 pixels/texels per pass")

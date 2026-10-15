@@ -221,8 +221,6 @@ root. With the packed shareware WAD they take about 4.1 MB, which may not leave 
 - **The whole screen.** The game draws the calculator's full 396×224 pixels instead of 320×200 with black
   borders. The view is wider, so you see more to the sides. The status bar, menus and pictures keep
   their size, centred.
-- **True colour.** Light and shadow are computed in full colour. Dark areas no longer band and change
-  colour (dark reds turning brown), as they do with DOOM's 256-colour palette.
 - **DOOM's proportions.** DOOM was drawn for 4:3 monitors, where its pixels were taller than wide. The
   view is stretched by 6/5 vertically, so rooms, monsters and weapons have the shapes they were drawn
   with.
@@ -245,11 +243,10 @@ root. With the packed shareware WAD they take about 4.1 MB, which may not leave 
 saved in one loads in the other. CGDoom does not know the two quick keys: when it writes `CGDOOM.CFG`,
 CGDoom HD goes back to their default keys.
 
-**Speed.** CGDoom HD draws 39% more pixels, at two bytes each instead of one, so it is slower than
-CGDoom: in the simulator a frame costs 40–70% more. See-through explosions and fireballs right in front of
-you slow it down the most. Compare the two with the timedemo (Diagnostics → Benchmarks, key **1**).
-*Detail* and *View size* make it faster as they do in CGDoom. It needs about 53 KB more RAM, and by calculation the packed
-shareware WAD still fits in RAM.
+**Speed.** CGDoom HD draws 39% more pixels, so it is slower than CGDoom: in the simulator a frame costs
+23–29% more, and the automap over the view costs more while it is open. Compare the two with the timedemo
+(Diagnostics → Benchmarks, key **1**). *Detail* and *View size* make it faster as they do in CGDoom. It
+needs about 53 KB more RAM, and by calculation the packed shareware WAD still fits in RAM.
 
 ## Saves and files
 

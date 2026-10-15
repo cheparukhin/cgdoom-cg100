@@ -1,35 +1,33 @@
 # src/engine/sh4 — SH4AL-DSP assembly for CGDoom (fx-CG100)
 
 Hand-scheduled column/span drawers, palette expansion for the presenter, a cache-line fill and a
-vanilla-exact `FixedDiv` helper. The drawers exist for both pixel formats of
-`src/platform/cgd_config.h`: 8-bit palette indices (`r_draw_sh4.S`) and RGB565 with `CGD_TRUECOLOR`
-(`r_draw16_sh4.S`), at any `SCREENWIDTH` that is a multiple of 4 below 512 (the 320×200 and 396×224
-screens are built and tested). Every routine is **bit-exact** with its C reference and writes no
-memory the C reference does not write. The randomized test (`make -C src/engine/sh4/test run`) runs
-66,966 cases in each of the four screen-format builds (320×200 and 396×224, 8-bit and RGB565), plus
-6,803 in each `.text` build and 600 in the forced-P1 build of the expansion, with 0 mismatches, 0
-stray writes to static memory, 0 stack-canary hits and 0 callee-saved-register violations, after
-checking that the `.S` files also assemble without `-Wa,--dsp` (raw-opcode form, §8).
+vanilla-exact `FixedDiv` helper. The drawers work at any `SCREENWIDTH` that is a multiple of 4 below
+512 (`src/platform/cgd_config.h`: 320×200, or 396×224 in the widescreen and HD builds). Every routine
+is **bit-exact** with its C reference and writes no memory the C reference does not write. The
+randomized test (`make -C src/engine/sh4/test run`) runs 64,716 cases at each screen size (plus 6,581
+in each `.text` build and 600 in the forced-P1 build) with 0 mismatches, 0 stray writes to static
+memory, 0 stack-canary hits and 0 callee-saved-register violations, after checking that the `.S`
+files also assemble without `-Wa,--dsp` (raw-opcode form, §8).
 
 | file | contents |
 |---|---|
-| `cgd_sh4.h` | Public prototypes, `cgd_sh4_set_colormaps()`, `cgd_sh4_colormaps_changed()`, inline `cgd_pref()`, `cgd_udiv64_32()` and `cgd_fixed_div()` |
-| `r_draw_sh4.S` | The 8 drawers for 8-bit pixels (assembled empty with `CGD_TRUECOLOR`). The hot 4 go to `.ilram`, the rare 4 (fuzz, translated) to `.text` |
-| `r_draw16_sh4.S` | The 8 drawers for RGB565 pixels (assembled empty without `CGD_TRUECOLOR`), same names, sections and interface |
-| `r_draw_sh4_c.c` | Rotated-colormap registration and rebuild, the C fallback paths the asm tail-calls (in the build's pixel format), and `cgd_expand_build_pal32()` |
+| `cgd_sh4.h` | Public prototypes, `cgd_sh4_set_colormaps()`, inline `cgd_pref()`, `cgd_udiv64_32()` and `cgd_fixed_div()` |
+| `r_draw_sh4.S` | The 8 drawers. The hot 4 go to `.ilram`, the rare 4 (fuzz, translated) to `.text` |
+| `r_draw_sh4_c.c` | Rotated-colormap registration, the C fallback paths the asm tail-calls, and `cgd_expand_build_pal32()` |
 | `expand_sh4.S` | `cgd_expand_p8_rgb565[_p32]`, `cgd_fill32`. **Generated** by `test/gen_expand.py`: edit the generator, not this file |
 | `sh4_asm.h` | Section macros (`.ilram` vs `.text`), `ALIGN4`, `FUNC`, and `LDRS`/`LDRE`/`LDRC` (repeat-loop set-up as raw opcodes) |
 | `test/` | Randomized bit-exactness test (`test_sh4.c`, `ref_draw.c`, `abi_call.S`), benchmarks, and the design tools: `pipesim.py` (pipeline model), `listsched.py` (set-up scheduler), `modsched.py` (exact modulo-schedule search), `gen_expand.py` |
 
 Build flags: the target flags, `sh-elf-gcc -m4-nofpu -mb -c file.S`, with or without `-Wa,--dsp`.
-The `.S` files need the C preprocessor, so assemble them with gcc, not raw `as`. They include
-`cgd_config.h` for the screen format, so they take the engine's `-I src/platform` and format defines
-(`CGD_WIDESCREEN`, `CGD_TRUECOLOR`, `CGD_HD`). **Never build these for the host.** The host keeps
-the C drawers.
+The `.S` files need the C preprocessor, so assemble them with gcc, not raw `as`. `r_draw_sh4.S` and
+`r_draw_sh4_c.c` include `cgd_config.h` for `SCREENWIDTH` and `SCREENHEIGHT`, so they take the
+engine's `-I src/platform` and variant defines (`CGD_WIDESCREEN`, `CGD_HD`). **Never build these
+for the host.** The host keeps the C drawers.
 - gas rejects the `ldrs`/`ldre`/`ldrc` mnemonics unless the DSP ISA is enabled ("opcode not valid for
   this cpu variant"). Both game builds assemble the readable mnemonics with the DSP ISA:
   - CMake / fxSDK (`fxsdk build-cg`): the toolchain file passes `-m4-nofpu -mb -Wa,--dsp`, and
-    `CMakeLists.txt` defines `CGD_SH4_DSP_MNEMONICS` for the `.S` files;
+    `CMakeLists.txt` defines `CGD_SH4_DSP_MNEMONICS` for the `.S` files (plus each add-in's variant
+    define);
   - the sim game (`src/sim/cgdoom.mk`, `make sim` / `test-sim` / `test-sim-full` / `perf-sim`):
     `$(CGSIM_CFLAGS) -Wa,--dsp -DCGD_SH4_DSP_MNEMONICS -MMD -MP`, plus `-DCGD_SH4_NO_ILRAM` unless
     `CGSIM_ILRAM=1`; `CGSIM_CFLAGS` carries the root Makefile's `VARIANT` defines. `-MMD -MP` makes a
@@ -37,16 +35,15 @@ the C drawers.
 - Without `CGD_SH4_DSP_MNEMONICS`, `sh4_asm.h` emits the three instructions as raw opcodes
   (`LDRS(label)`, `LDRE(label)`, `LDRC(regno)`), so the files also assemble without
   `-Wa,--dsp` (`test/Makefile`'s drawer builds use this raw-opcode form).
-- `make -C src/engine/sh4/test asmcheck` (part of `run`) assembles every `.S` file in the raw-opcode
-  form without `-Wa,--dsp` and checks that the section bytes and relocations equal those of the
-  mnemonic form (`-DCGD_SH4_DSP_MNEMONICS -Wa,--dsp`, the game builds), in both section layouts and
-  all four screen formats. This also range-checks the displacements, which gas checks only for the
-  mnemonics.
+- `make -C src/engine/sh4/test asmcheck` (part of `run`) assembles both files in the raw-opcode form
+  without `-Wa,--dsp` and checks that the section bytes and relocations equal those of the mnemonic
+  form (`-DCGD_SH4_DSP_MNEMONICS -Wa,--dsp`, the game builds), in both section layouts and at both
+  screen sizes. This also range-checks the displacements, which gas checks only for the mnemonics.
 - Objects built without DSP instructions are not tagged `sh4al-dsp`. `test/pipesim.py`
   disassembles with `-m sh4al-dsp`; do the same when reading the objects with `objdump`.
 - `CGD_SH4` (engine C code: use the `*_SH4` drawers and register the rotated colormaps) is defined by
   `src/engine/r_draw.h` itself under `__sh__` unless `-DCGD_NO_SH4` is given (`CGSIM_SH4=0`, the C-only
-  sim reference), in every screen format. No build passes it on the command line.
+  sim reference). No build passes it on the command line.
 
 ---
 
@@ -55,15 +52,13 @@ the C drawers.
 All drawers are `void f(void)`. They read the vanilla globals exactly like `r_draw.c` does:
 `dc_colormap dc_x dc_yl dc_yh dc_iscale dc_texturemid dc_source dc_translation ds_y ds_x1 ds_x2
 ds_colormap ds_xfrac ds_yfrac ds_xstep ds_ystep ds_source ylookup[] columnofs[] centery viewheight
-colormaps fuzzpos`. The types match the engine: `pixel_t *ylookup[]`, `int columnofs[]` (in pixels),
-`fixed_t == int`, `lighttable_t == pixel_t`, which is `byte`, or `uint16_t` (RGB565) with
-`CGD_TRUECOLOR`. Textures, flats and translation tables are bytes in both formats. A row is
-`SCREENWIDTH` pixels.
+colormaps fuzzpos`. The types match CGDoom: `byte *ylookup[]`, `int columnofs[]`, `fixed_t == int`,
+`lighttable_t == byte`. A row is `SCREENWIDTH` bytes.
 
 | asm | replaces | semantics / side effects |
 |---|---|---|
 | `R_DrawColumn_SH4` | `R_DrawColumn` | `dc_colormap[dc_source[(frac>>16)&127]]`, frac = `texturemid + (yl-centery)*iscale` (32-bit wrap) |
-| `R_DrawFuzzColumn_SH4` | `R_DrawFuzzColumn` | Writes `dc_yl=1` / `dc_yh=viewheight-2` like C. `FUZZDARK(dest[fuzzoffset[fuzzpos]])`, `fuzzpos` advanced (mod 50) exactly like C. `FUZZDARK(p)` is `colormaps[6*256+p]`, or in RGB565 `r_draw.c`'s `FuzzDark`: each channel times 13/16, rounded (`s = (p \| p<<16) & 0x07e0f81f; s = ((13*s + 0x01004008) >> 4) & 0x07e0f81f; p' = s \| s>>16`) |
+| `R_DrawFuzzColumn_SH4` | `R_DrawFuzzColumn` | Writes `dc_yl=1` / `dc_yh=viewheight-2` like C. `colormaps[6*256+dest[fuzzoffset[fuzzpos]]]`, `fuzzpos` advanced (mod 50) exactly like C |
 | `R_DrawTranslatedColumn_SH4` | `R_DrawTranslatedColumn` | `dc_colormap[dc_translation[dc_source[frac>>16]]]`. Arithmetic shift, **no** `&127`, as in vanilla |
 | `R_DrawSpan_SH4` | `R_DrawSpan` | `spot = ((yfrac>>10)&4032) + ((xfrac>>16)&63)`, the exact vanilla math (not Chocolate's packed position). `ds_x2 < ds_x1` returns; the C loop would run 2^32 times |
 | `R_DrawColumnLow_SH4` | `R_DrawColumnLow` | low detail, see below |
@@ -77,10 +72,6 @@ colormaps fuzzpos`. The types match the engine: `pixel_t *ylookup[]`, `int colum
 - **Spans.** `count = ds_x2 - ds_x1` is computed **before** doubling. `ds_x1 <<= 1; ds_x2 <<= 1` are applied to the globals, as both vanilla and Chocolate do. The span draws 2·(count+1) pixels from `columnofs[ds_x1]`.
   - linuxdoom computes the count after doubling and overdraws by 2·(x2−x1)+… pixels.
 - The C versions in `test/ref_draw.c` define these semantics. `r_draw.c` has the same code, so the host build matches (§7.5).
-
-**RGB565 (`r_draw16_sh4.S`).** Same functions, semantics and globals; every pixel and light-table entry
-is 16 bits (stores and colour loads are `mov.w`, rows are `2 * SCREENWIDTH` bytes), and the fuzz
-drawers compute `FUZZDARK` arithmetically, so they read no colormap.
 
 Palette expansion and helpers:
 
@@ -104,7 +95,7 @@ static inline void     cgd_pref(const void *p);
 - The plain entry builds the 1 KiB table on its own stack when `n >= 256`. That costs about **870 modelled cycles** (≈940 under the "gcc" latencies; 64 iterations of a 13-cycle loop, two palette entries of each half per iteration) and **1052 bytes of stack** at its peak. For `n < 256` it uses a simple loop (8–10 c/px; the table pays off from about 120–170 px, so the 256 threshold is conservative).
 - The `_p32` entry uses a caller-maintained table. It costs 12 bytes of stack and has no per-call table cost: use it (§7.6).
   - Whole line loop (16 px, `ocbp`/`movca`/`pref`/`dt`/`bf` included): 45 cycles = **2.81 c/px** (pess and opt; 53 = 3.3 c/px under "gcc").
-  - Plain entry, same loop plus the table: ≈2.83 c/px at n = 64,000 (the presenter's one call per frame) and ≈3.09 at n = 3,200. The table build only matters for calls of a few thousand pixels or fewer; at one 64,000-px call per frame `_p32` saves just the ≈870 cycles of one table build and the 1 KiB of stack.
+  - Plain entry, same loop plus the table: ≈2.83 c/px at n = 64,000 (the presenter's one call per 320×200 frame) and ≈3.09 at n = 3,200. The table build only matters for calls of a few thousand pixels or fewer; at one 64,000-px call per frame `_p32` saves just the ≈870 cycles of one table build and the 1 KiB of stack.
 - `_p32` returns without writing if `n` is not a positive multiple of 16.
 
 **`cgd_fill32(dst, v, size)`.** `dst` must be 32-byte aligned and `size % 32 == 0`. P1 destinations use `movca.l` and the lines stay cached. Other destinations use plain stores.
@@ -122,11 +113,6 @@ static inline void     cgd_pref(const void *p);
   - One 8,704-byte copy of the whole COLORMAP lump is built once by `cgd_sh4_set_colormaps()`. There is no per-call or per-light-level copy.
   - Per call, the drawer checks `swap.b(cm - lump) < nmaps`. That is equivalent to "a 256-byte map inside the registered lump" and costs 3 LS + 4 EX. If the check fails (unregistered table, foreign or misaligned colormap), the drawer tail-calls its C fallback, so output is still exact.
   - 1-pixel columns (below) skip the check: for one texel the `extu.b` is cheaper than the check, so they index `dc_colormap` directly and need no registered lump.
-- **RGB565 rotated colormap.**
-  - `rot[k*256+j] = colormaps[k*256 + (j^0x80)]` with 2-byte entries: 34 × 512 = 17,408 bytes. The light tables are rebuilt from the palette at every palette change (`R_BuildLightTables`: damage and bonus flashes, gamma), which then calls `cgd_sh4_colormaps_changed()` to rebuild the copy (two 256-byte `memcpy` per map).
-  - The drawers double the sign-extended texel (`add r0,r0`) and index `rot + (map - colormaps) + 256` bytes.
-  - The check is `rotr(swap.b(cm - tables)) < nmaps` (`nmaps <= 128`): `swap.b` is below 256 only for an offset below 65536 with a zero low byte, and the rotate turns an odd result (half a map in) into a value above 2^31. So it accepts exactly the offsets `512k`, `k < nmaps`, for one more EX than the 8-bit check.
-  - The 1-pixel paths index `dc_colormap` with the zero-extended, doubled texel.
 - **COLEXTRABITS.** `frac9 = frac<<9` and `step9 = iscale<<9`, so `(frac>>16)&127 == frac9>>>25` in one `shld` with no mask. This is exact modulo 2^32.
 - **Exact span index in 3 EX + 2 MT.**
   - `X = xfrac<<10`, `Y = yfrac<<10`.
@@ -134,9 +120,11 @@ static inline void     cgd_pref(const void *p);
   - `rn >>>= 10` gives `ytexel*64 + xtexel`, because the fraction garbage falls out.
   - Vanilla C needs 5 EX for this, plus 2 adds.
 - **Right-to-left spans with pre-decrement stores.** The span starts at `x + count*xstep` and `y + count*ystep`, found by `mul.l` (exact modulo 2^32), and steps backwards. Each store is a `mov.b rC,@-rD`, so there is no pointer increment.
-- **Low-detail columns.** Two `mov.b rC,@-rD` stores from `dest+2`, then `rD += SCREENWIDTH + 2` (RGB565: two `mov.w` from `dest+4`, then `rD += 2*SCREENWIDTH + 4`). This adds no EX op per pixel compared with full detail. It needs `columnofs[x+1] == columnofs[x]+1`, which `R_InitBuffer` always gives; the drawer checks it and falls back to C otherwise.
-- **Width.** The row step is built from `SCREENWIDTH` (`mov #SCREENWIDTH/4` + `shll2` for 8-bit pixels, a `.word` for RGB565), and the fuzz offset table holds ±`SCREENWIDTH` (RGB565: the offset plus one row, below) in `(SCREENHEIGHT + 98) / 50` copies of `fuzzoffset[]`, so full-height fuzz columns stay in the asm.
-- **DSP zero-overhead repeat loops** (`ldrs`/`ldre`/`ldrc`). There is no `dt`/`bf` in the hot loops. The loop count is limited to RC (12 bits): counts above 7936 go to C, and they never occur on these screens.
+- **Low-detail columns.** Two `mov.b rC,@-rD` stores from `dest+2`, then `rD += SCREENWIDTH + 2`. This adds no EX op per pixel compared with full detail. It needs `columnofs[x+1] == columnofs[x]+1`, which `R_InitBuffer` always gives; the drawer checks it and falls back to C otherwise.
+- **Width.** `SCREENWIDTH` and `SCREENHEIGHT` come from `cgd_config.h` at assembly time. Only immediates and data change with them, so the schedules and per-call models of §3 hold at both screen sizes.
+  - The row step is `mov #SCREENWIDTH/4` + `shll2`. The immediate is signed 8-bit, so `SCREENWIDTH` must be a multiple of 4 below 512 (an `#error` checks it). Low-detail columns load `SCREENWIDTH + 2` from a `.word`.
+  - The fuzz offset table holds ±`SCREENWIDTH` in `FUZZ_COPIES = (SCREENHEIGHT + 98) / 50` copies of `fuzzoffset[]` (5 at 200 rows, 6 at 224): enough for `fuzzpos` ≤ 49 plus a full-height column, so fuzz counts up to `SCREENHEIGHT − 1` stay in the asm. That limit is a `mov #imm` + `extu.b`, so `SCREENHEIGHT` is at most 256 (also an `#error`).
+- **DSP zero-overhead repeat loops** (`ldrs`/`ldre`/`ldrc`). There is no `dt`/`bf` in the hot loops. The loop count is limited to RC (12 bits): counts above 7936 go to C, and they never occur at these screen sizes.
 - **2-stage software pipelining.** Each iteration does two pixels: stage 0 of pair *k*, stage 1 of pair *k−1*.
   - A prologue runs stage 0 of pair 0, and an epilogue runs stage 1 of the last pair.
   - For an odd pixel count, the last pair's second pixel is computed but not stored.
@@ -144,13 +132,12 @@ static inline void     cgd_pref(const void *p);
     - Nothing is ever written outside the C version's pixels. The test checks this for all static memory and the expansion's stack (§8).
   - Columns of 2 pixels (low detail: 2 texels) run prologue plus epilogue only, with one taken branch from the set-up to the epilogue (a delayed conditional branch, `bt/s` or `bf/s`).
 - **1-pixel columns.** `R_DrawColumn_SH4` and `R_DrawColumnLow_SH4` load `dc_yl`/`dc_yh` (and `dc_iscale`, `centery`) first and branch on `dc_yl == dc_yh` before saving anything. The 1-pixel path is straight-line code in r0–r7 (nothing saved, no colormap check, no repeat loop): `frac = dc_texturemid + (dc_yl − centery)·dc_iscale`, texel, `extu.b`, colour from `dc_colormap`, one store (low detail: two stores, to `columnofs[x]` and `columnofs[x+1]`, so no contiguity check either). In sprite-heavy scenes half of all column calls are 1 pixel (§3).
-- **Translated drawers share one body** that stores every texel through r4 and r8, both stepped by a row. In low detail r8 is the second column. In full detail r8 = r4, so the second store rewrites the same pixel with the same value, and no other memory is touched.
-- **RGB565 fuzz.** `FUZZDARK` is 14 ops on one temporary (12 EX). The pixel is loaded sign-extended; `shll16` then `xtrct` build `p | p<<16` from exactly its 16 bits, `13s` is `((2s + s) << 2) + s` (the fields cannot overflow into each other: 13·63 + 8 < 2^10 for green, 13·31 + 8 < 2^9 for red and blue), and `swap.w` + `or` bring green back into the low half, which `mov.w` stores. The table holds each offset plus one row and the dest pointer stays a row behind until the pixel's load has issued, so the next row's load address never waits on the pointer step.
+- **Translated drawers share one body** that stores every texel through r4 and r8, both stepped by `SCREENWIDTH`. In low detail r8 is the second column. In full detail r8 = r4, so the second store rewrites the same byte with the same value, and no other memory is touched.
 - **Set-up code** is ordered by `test/listsched.py`, a list scheduler using the same pipeline model.
   - The frac→`mul.l`→prologue chain goes first.
   - The checks branch to C (after popping saved registers) before any store.
   - The column and low-column set-up (with the 1-pixel dispatch) is ordered under the 4-byte pairing rule (`--pairing aligned`, the default), with the dispatch branch marked `/* barrier: r1 r2 ... */`: such a branch is scheduled as early as possible, keeps everything before it, and lets nothing that writes the listed registers move above it. The 1-pixel blocks are hand-scheduled.
-  - The 8-bit span set-up blocks were ordered with `--pairing any` and a group model that treats `mul.l`, `sts` and `ldrs`/`ldre` as CO, so they are not optimal under the model above; re-ordering them may save up to about 4 cycles per call. The RGB565 set-up blocks (all four) are ordered under the current model and pairing rule.
+  - The span set-up blocks were ordered with `--pairing any` and a group model that treats `mul.l`, `sts` and `ldrs`/`ldre` as CO, so they are not optimal under the model above; re-ordering them may save up to about 4 cycles per call.
 
 ## 3. Pipeline model and loop schedules
 
@@ -262,51 +249,14 @@ Every colour load is 3 cycles ahead of its first store (the "gcc" store-data lat
 
 The schedule is in `gen_expand.py`: 5 LS + 3 EX + 2 MT per 2 pixels, and `xtrct` merges two entries of the duplicated table. Per 16-pixel line the overhead is `ocbp`/`movca`/`pref`/`add`/`dt`/`bf`, and the modelled whole line loop is 45 cycles, **2.81 c/px** (53 cycles, 3.31 c/px under "gcc"). The plain entry adds the stack table build, about 870 cycles per call (§1).
 
-### RGB565 loops (`r_draw16_sh4.S`)
-
-Doubling the texel adds one EX op per pixel to every loop (`x`, `add r0,r0`, between the texel load
-and the colour load), and lengthens the r0 chain. The schedules come from `modsched.py` kinds `col16m`,
-`collow16`, `span16` and `spanlow16` (the 8-bit models plus `x`), with two stages, so the prologue and
-epilogue stay one pass each (`--stages 2`, or the 8-bit stage split for the spans). Cycles per pixel:
-
-| loop | 8-bit pess / opt / gcc | RGB565 pess / opt / gcc | RGB565 loop |
-|---|---|---|---|
-| R_DrawColumn | 4.0 / 4.0 / 5.0 | **5.0 / 5.0 / 5.0** | 20 instructions per 2 px, 10 cycles |
-| R_DrawColumnLow | 2.25 / 2.25 / 2.5 | **2.5 / 2.5 / 3.0** | 20 per 2 texels, 10 cycles |
-| R_DrawSpan | 5.5 / 5.5 / 5.5 | **6.5 / 6.5 / 7.5** | 24 and 2 nops per 2 px, 13 cycles |
-| R_DrawSpanLow | 3.0 / 3.0 / 3.0 | **3.25 / 3.25 / 3.75** | 26 per 2 texels, 13 cycles |
-
-- **Column.** 5 EX per pixel (index shift, texel address, doubling, frac step, dest step), so 10
-  cycles per 2 px is the floor. Doubling in place on r0 would keep r0 busy 5 cycles per pixel under
-  "pess" (6 under "max": l → x → c, and the next texel load cannot share c's cycle), so each texel
-  is loaded into its own index register and doubled into r0 (`mov rI,r0` + `add rI,r0`): 20
-  instructions fill the 10 cycles, and `modsched.py col16m max --stages 2` finds II = 10, so the
-  loop runs stall-free under all three models.
-- **Low-detail column.** 5 EX per texel, II = 10 under "pess" and "opt". The in-place doubling makes
-  "max" need 12 (r0 is busy 6 cycles per texel), but the `col16m` form would need 22 instructions
-  (II ≥ 11 under every model), so the shipped loop doubles in place: 10 / 10 / 12.
-- **Span.** 12 instructions per pixel, 6 of them EX. II = 12 is infeasible under "pess" for any number
-  of stages (`modsched.py span16 pess`): r0 is busy 6 cycles per pixel (f → g → x → h, 2 cycles each),
-  and the two rows that pair `h` with the next `f` (LS + MT) leave 10 rows for 12 EX ops. The shipped
-  loop keeps the 8-bit stage split plus `x` (`--stage1 Be,Bf,Bg,Bx,Ax,Ah,Bh,Ai,Bi`, so the prologue is
-  the 8-bit one) and runs at 13 under "pess" and "opt" and 15 under "gcc". A schedule for "gcc" alone
-  reaches 12 but costs 16 under "pess"; "max" needs 14.
-- **Low-detail span.** 26 instructions per 2 texels make 13 the resource floor, met under "pess" and
-  "opt" (15 under "gcc"; "max" needs 14).
-- `modsched.py KIND LAT --shipped` checks these loops too (table `SHIPPED`): all four meet "pess" and
-  "opt", `col16m` also "gcc"; the others violate "gcc" exactly at its 3-cycle load-use edges.
-
 ### Rare drawers
 
 | loop | pess | opt | gcc |
 |---|---|---|---|
 | translated | 16 c/px | 12 c/px | 16 c/px |
 | fuzz | 10 c/px | 7 c/px | 11 c/px |
-| translated, RGB565 | 18 c/px | 14 c/px | 18 c/px |
-| fuzz, RGB565 (low detail: per pixel) | 17 c/px | 17 c/px | 18 c/px |
 
-These are simple loops in `.text`. Fuzz rows must stay strictly ordered, because `dest[-SCREENWIDTH]`
-must see the row just written; in RGB565 the `FUZZDARK` chain (12 EX after the load) sets the pace.
+These are simple loops in `.text`. Fuzz rows must stay strictly ordered, because `dest[-SCREENWIDTH]` must see the row just written.
 
 ### Per-call model
 
@@ -322,25 +272,12 @@ These figures come from `pipesim.py --call` (set-up + K iterations + epilogue + 
 | C R_DrawSpan | 39 + **22n** | 34 + 19n / 40 + 23n |
 | R_DrawSpanLow | 87 (1–2 texels), 591 (85 texels = 170 px) | 83, 587 / 93, 597 |
 | C R_DrawSpanLow | 38 + **37** per texel | 35 + 31 / 40 + 42 |
-| RGB565 R_DrawColumn | **33** (n=1), 56 (n=2), 69 (3–4), 499 (n=90), 889 (n=168); 49 + 5n for even n ≥ 4 | 30, 54, 47 + 5n / 35, 61, 54 + 5n |
-| RGB565 C R_DrawColumn | 43 + **15n** (58 at n=1) | 34 + 12n / 45 + 16n |
-| RGB565 R_DrawColumnLow | **34** (1 texel), 64 (2), 79 (3–4), 509 (90 texels = 180 px) | 33, 62, 76, 506 / 38, 71, 87, 603 |
-| RGB565 R_DrawSpan | 74 (n=1–2), 165 (n≈16), 1179 (n≈171), 2141 (n=320) | 72, 1177 / 79, 1354 |
-| RGB565 C R_DrawSpan | 44 + **23n** | 37 + 20n / 44 + 25n |
-| RGB565 R_DrawSpanLow | 79 (1–2 texels), 626 (85 texels = 170 px) | 79, 625 / 85, 715 |
-| RGB565 C R_DrawColumnLow, C R_DrawSpanLow | 48 + **17**, 38 + **37** per texel | 42 + 14, 36 + 31 / 52 + 18, 40 + 42 |
 | expand `_p32` / plain (64,000 px, one frame) | 2.81 / ≈2.83 c/px | 2.81 / 3.31, ≈3.33 (gcc) |
 | asm `n < 256` byte loop (expand) | 10 c/px | 8 / 11 |
 
-The RGB565 drawers cost about as much per call to set up as the 8-bit ones (within a few cycles: one
-more EX op for the colormap check and one for the byte offset of `columnofs`; the 1-pixel paths cost
-one cycle more for the doubling). Per pixel they are 3.0× (columns), 3.4× (low-detail columns), 3.5×
-(spans) and 5.7× (low-detail spans) faster than GCC's RGB565 loops under "pess" (GCC's RGB565 column
-and span loops cost one cycle per pixel more than its 8-bit ones).
-
 The paths that skip the loop (1-pixel columns, n = 2) go through taken branches, which `--call` does not model (it assumes fall-through), so their figures come from `pipesim.py --path`, which charges each taken branch. The 1-pixel dispatch (`cmp/eq` + not-taken `bt`) is absorbed by the set-up schedule: it adds nothing to the multi-pixel paths in the model. Through the general path a 1-pixel column would cost about as much as n = 2 (57 cycles under "pess" instead of 32).
 
-**The speed-up depends on the column-length mix.** Columns cost about 52 cycles of set-up per call (32 in all for a 1-pixel column), so short columns are dominated by it. The table below weights the per-call model of the 8-bit drawers by column-length histograms of the 320×200 host build's `R_DrawColumn` calls (full detail, `freedoom1.wad`, the `tests/scenarios.txt` scenarios):
+**The speed-up depends on the column-length mix.** Columns cost about 52 cycles of set-up per call (32 in all for a 1-pixel column), so short columns are dominated by it. The table below weights the per-call model by column-length histograms of the 320×200 host build's `R_DrawColumn` calls (full detail, `freedoom1.wad`, the `tests/scenarios.txt` scenarios):
 
 | scene | calls | mean px | calls ≤ 8 px | asm c/px (pess) | C c/px (pess / opt) | speed-up pess / opt / gcc |
 |---|---|---|---|---|---|---|
@@ -370,7 +307,7 @@ The asm is faster than C at every column length: a 1-pixel column costs 32 cycle
 
 ## 4. Measured (GDB SH simulator, sim64 counters)
 
-Measured with `make -C src/engine/sh4/test bench`. These are **simulated instructions per output pixel, call overhead included**. The simulator's "cycles" are SH-1-style (1 per instruction + 2 per taken branch). Neither number captures dual issue: use §3 for timing. At 320×200, 8-bit pixels (the 396×224 8-bit build gives the same figures within 2%, the longer columns and spans slightly lower):
+Measured with `make -C src/engine/sh4/test bench`. These are **simulated instructions per output pixel, call overhead included**. The simulator's "cycles" are SH-1-style (1 per instruction + 2 per taken branch). Neither number captures dual issue: use §3 for timing. At 320×200 (the 396×224 build gives the same figures within 2%, the longer columns and spans slightly lower):
 
 | kernel | C -O2 insts/px | asm insts/px | ratio |
 |---|---|---|---|
@@ -385,18 +322,6 @@ Measured with `make -C src/engine/sh4/test bench`. These are **simulated instruc
 | R_DrawSpanLow, len 20..320 | 15.77 | **6.56** | 2.40× |
 | expand, 64,000 px (plain / p32) | 8.00 (byte loop) | 5.34 / 5.31 | |
 
-At 396×224 with RGB565 pixels:
-
-| kernel | C -O2 insts/px | asm insts/px | ratio |
-|---|---|---|---|
-| R_DrawColumn, len 10..192 | 15.32 | **10.72** | 1.43× |
-| R_DrawColumn, len 1 / 2 / 3 / 8 / 32 / 192 | 47.0 / 31.0 / 25.7 / 19.0 / 16.0 / 15.2 | **44.0** / 42.0 / 35.7 / 18.5 / 12.1 / 10.4 | |
-| R_DrawColumnLow, len 10..192 | 8.70 | **5.42** | 1.60× |
-| R_DrawTranslatedColumn | 17.33 | 12.65 | 1.37× |
-| R_DrawFuzzColumn | 33.35 | 19.82 | 1.68× |
-| R_DrawSpan, len 20..396 | 23.18 | **13.41** | 1.73× |
-| R_DrawSpanLow, len 20..396 | 16.73 | **6.99** | 2.39× |
-
 The asm executes more instructions per call: set-up is about 70–90 instructions (≈42 in all for a 1-pixel column), against 32–40 for C. It executes far fewer per pixel, and those dual-issue. The instruction ratio therefore understates the real gain: compare 8 asm instructions in 4 cycles per pixel with 14 C instructions in 11–14 cycles.
 
 ## 5. Sizes and sections
@@ -405,16 +330,13 @@ The asm executes more instructions per call: set-up is about 70–90 instruction
 |---|---|---|
 | `.ilram` | **1352** | R_DrawColumn 328, R_DrawColumnLow 364, R_DrawSpan 316, R_DrawSpanLow 344 (literal pools included) |
 | `.text` | 504 + 1016 | translated + fuzz (both variants); `expand_sh4.o` (`_p32` 768, plain entry 164, fill32 82) |
-| `.rodata` | 500 | the 5×50 fuzz offset table (6×50, 600 bytes, at 224 rows) |
+| `.rodata` | 500 | the 5×50 fuzz offset table (600, 6×50, at 224 rows) |
 | `.data` / `.bss` | 0 | none |
-| RGB565 `.ilram` | **1424** | R_DrawColumn 348, R_DrawColumnLow 384, R_DrawSpan 336, R_DrawSpanLow 356 |
-| RGB565 `.text`, `.rodata` | 588, 600 | translated + fuzz; the 6×50 fuzz table at 224 rows (500 at 200) |
 
-The 8-bit and RGB565 drawers are never linked together: each file assembles empty in the other
-format. The RGB565 light tables' rotated copy (17,408 bytes) comes from the zone (§7).
+The code is the same size at both screen sizes; only the fuzz table grows with `SCREENHEIGHT`.
 
 - gint's linker script collects exactly `*(.ilram)` into the 4 KiB IL memory at `0xE5200000`.
-  - gint itself uses about 180 B, so the drawers use about 33% of it (35% in RGB565).
+  - gint itself uses about 180 B, so the drawers use about 33% of it.
   - gint copies it at start-up and again after every world switch. That is fine for code.
 - `-DCGD_SH4_NO_ILRAM` puts the hot drawers in `.text` instead, for A/B timing on hardware.
 - `-DCGD_SH4_EXPAND_ILRAM` also moves the expansion into ILRAM, for a total of 2.3 KiB. This is not recommended unless measurements show I-cache misses in the presenter.
@@ -431,45 +353,40 @@ format. The RGB565 light tables' rotated copy (17,408 bytes) comes from the zone
    - Do not call any of these from DMA or timer callbacks. The expansion routines contain no repeat loops.
    - Also required: `SR.DSP = 1`, which gint sets at start-up.
 2. **Alignment.**
-   - All accesses are natural-size and aligned: byte texture accesses, colormap and framebuffer accesses of the pixel size (RGB565: 2 bytes, which `lighttable_t` and `pixel_t` pointers always are); 4-byte globals, `ylookup`/`columnofs`, literal pools and stack. 8-bit colormaps, textures, flats and the source frame may have any alignment.
+   - All accesses are natural-size and aligned: byte texture, colormap and framebuffer accesses; 4-byte globals, `ylookup`/`columnofs`, literal pools and stack. Colormaps, textures, flats and the source frame may have any alignment.
    - The expansion needs a 4-byte-aligned `pal32` (or a 2-byte-aligned `pal` for the plain entry) and a 32-byte-aligned `dst`.
 3. **Preconditions** are the same as for the C code.
    - `dc_source` has 128 readable bytes. `ds_source` has 4096 bytes. The translated drawer reads `dc_source[frac>>16]` unmasked, exactly like C.
    - For an odd pixel count, the drawers also read the texel of the phantom last pixel, which lies within those bounds.
-   - Counts above 7936, or above `SCREENHEIGHT - 1` for fuzz (199 at 320×200), go to the C path.
+   - Counts above 7936, or above `SCREENHEIGHT − 1` for fuzz (199 at 320×200, 223 at 396×224), go to the C path.
    - `fuzzpos` must be in [0,50); otherwise the C path is used.
 4. **Stack.**
-   - Drawers: up to 20 bytes (r8–r12; the RGB565 fuzz drawers 16: r8–r10 and the fallback address). The 1-pixel column paths use none (r0–r7 only).
+   - Drawers: up to 20 bytes (r8–r12). The 1-pixel column paths use none (r0–r7 only).
    - `_p32`: 12 bytes.
    - The plain expansion entry: 1052 bytes at its peak (1 KiB table, `pr`, 6 saved registers) when `n >= 256`.
-5. **`cgd_sh4_set_colormaps()` must be called.** Without it every drawer takes its C fallback, which is slightly slower than plain C because of the extra check. (1-pixel columns and the RGB565 fuzz drawers are the exceptions: they never need the registered tables.) Call it again if the tables move. **`cgd_sh4_colormaps_changed()` must follow every change of their contents**, or the drawers read the old copy: the RGB565 light tables change at every palette change, and `R_BuildLightTables` calls it; the 8-bit COLORMAP lump never changes.
+5. **`cgd_sh4_set_colormaps()` must be called.** Without it every drawer takes its C fallback, which is slightly slower than plain C because of the extra check. (1-pixel columns are the exception: they never need the registered lump.) Call it again if the COLORMAP data moves or changes; vanilla never changes it.
 
 ## 7. Integration (r_draw.c / r_main.c / r_data.c / gint layer)
 
 How the routines are wired into the engine and the gint layer.
 
 1. **Build.**
-   - `r_draw_sh4.S`, `r_draw16_sh4.S`, `expand_sh4.S` and `r_draw_sh4_c.c` are built for the
-     **calculator** (CMake globs them) and the **sim** (`src/sim/cgdoom.mk`) only, never for the host;
-     flags at the top of this file. One of the two drawer files assembles empty in each format.
+   - `r_draw_sh4.S`, `expand_sh4.S` and `r_draw_sh4_c.c` are built for the **calculator** (CMake globs
+     them) and the **sim** (`src/sim/cgdoom.mk`) only, never for the host; flags at the top of this file.
    - `CGD_SH4` is defined by `src/engine/r_draw.h` under `__sh__` (and not `CGD_NO_SH4`); the engine files
      that need the prototypes `#include "sh4/cgd_sh4.h"` under it.
 2. **`r_data.c`, `R_InitColormaps`**, after `colormaps = …`, registers one 32-byte-aligned `PU_STATIC`
-   rotated copy of the light tables (the COLORMAP lump, or the RGB565 tables built from it):
+   rotated copy of the whole lump:
    ```c
    #ifdef CGD_SH4
-     { int n = W_LumpLength(W_GetNumForName("COLORMAP")) / 256;   /* 34, at most CGD_SH4_MAXMAPS */
-       lighttable_t *rot = Z_Malloc(n * 256 * sizeof(lighttable_t) + 31, PU_STATIC, 0);
-       rot = (lighttable_t *)(((uintptr_t)rot + 31) & ~31);
+     { int lump = W_GetNumForName("COLORMAP"), n = W_LumpLength(lump) / 256;   /* 34 */
+       uint8_t *rot = Z_Malloc(n * 256 + 31, PU_STATIC, 0);
+       rot = (uint8_t *)(((uintptr_t)rot + 31) & ~31);
        cgd_sh4_set_colormaps(colormaps, n, rot); }
    #endif
    ```
-   With `CGD_TRUECOLOR`, `R_BuildLightTables` (first called from `R_InitColormaps` through
-   `I_SetPalette`, before the registration, when `cgd_sh4_colormaps_changed()` does nothing; then at
-   every palette change) ends with `cgd_sh4_colormaps_changed()`, which rebuilds the copy.
 3. **`r_main.c`.** Vanilla's `transcolfunc` and `spanfunc` pointers are back next to `colfunc`, and
-   `R_ExecuteSetViewSize` is the one place that picks the drawers. Both pixel formats use the same
-   names, so the block is the same for every screen format:
+   `R_ExecuteSetViewSize` is the one place that picks the drawers:
    ```c
    #ifdef CGD_SH4
      if (!detailshift) { colfunc = basecolfunc = R_DrawColumn_SH4;   fuzzcolfunc = R_DrawFuzzColumn_SH4;
@@ -495,15 +412,16 @@ How the routines are wired into the engine and the gint layer.
    prefix, so host and sim CRCs agree in low detail. The full-detail C drawers are the reference.
 6. **Presenter (gint).**
    - `src/gint/video.c` keeps `static uint32_t g_pal32[256]`, rebuilt with `cgd_expand_build_pal32()` in
-     `PL_SetPalette`. `present_dma()` makes one `cgd_expand_p8_rgb565_p32(g_fb16, fb, g_pal32, 64000)`
-     call per frame into the 32-byte-aligned RGB565 frame in P1 SDRAM, then `synco()` and the DMA to the
-     LCD. The strong versions (`cgd_expand_p8_rgb565_p32` in `expand_sh4.o`, `cgd_expand_build_pal32` in
-     `r_draw_sh4_c.c`) replace the weak C ones in `video.c`.
+     `PL_SetPalette`. `present_dma()` makes one `cgd_expand_p8_rgb565_p32(g_fb16, fb, g_pal32, FB_PIXELS)`
+     call per frame (`SCREENWIDTH × SCREENHEIGHT`: 64,000 or 88,704 pixels) into the 32-byte-aligned
+     RGB565 frame in P1 SDRAM, then `synco()` and the DMA to the LCD. The strong versions
+     (`cgd_expand_p8_rgb565_p32` in `expand_sh4.o`, `cgd_expand_build_pal32` in `r_draw_sh4_c.c`)
+     replace the weak C ones in `video.c`.
    - The CPU fallback `present_cpu()` (no frame buffer, or an unaligned source frame) looks up `g_pal32`
      per pixel and writes the LCD data register directly; it does not call the expansion routines.
    - The persistent table keeps the plain entry's per-call table build (about 870 cycles and 1 KiB of
      stack) out of the frame.
-   - For P1 destinations the routine purges each line with `ocbp`, so the data is in RAM when it returns. `present_dma()` therefore calls only `synco()` after the expansion, to order the write-backs before the DMA starts; an `ocbwb` loop over the frame (4000 lines that are no longer cached) would cost roughly 12–20k cycles, 0.1–0.17 ms per frame, for nothing. A replacement expander must purge (or write back) every line itself.
+   - For P1 destinations the routine purges each line with `ocbp`, so the data is in RAM when it returns. `present_dma()` therefore calls only `synco()` after the expansion, to order the write-backs before the DMA starts; an `ocbwb` loop over the frame (4000 lines at 320×200, no longer cached) would cost roughly 12–20k cycles, 0.1–0.17 ms per frame, for nothing. A replacement expander must purge (or write back) every line itself.
 7. **Helpers not used by the engine or the gint layer.** All but `cgd_pref` are covered by the test (§8):
    - `cgd_fixed_div`, a vanilla-exact `FixedDiv` (with `cgd_udiv64_32`). The engine's `FixedDiv` in
      `m_fixed.c` has its own inline-asm division, checked by the root `make test-fixed-sim`.
@@ -514,33 +432,32 @@ How the routines are wired into the engine and the gint layer.
 ## 8. Tests and tools
 
 ```sh
-make -C src/engine/sh4/test run     # asmcheck, then randomized bit-exactness (N=3000/drawer) in every
-                                    # screen format: 320x200 8-bit (ILRAM build, .text build, forced-P1
-                                    # build of the expansion: movca.l/ocbp paths), then 396x224 8-bit,
-                                    # 320x200 RGB565 and 396x224 RGB565 (ILRAM and .text builds);
+make -C src/engine/sh4/test run     # asmcheck, then randomized bit-exactness (N=3000/drawer) at 320x200
+                                    # (ILRAM build, .text build, forced-P1 build of the expansion:
+                                    # movca.l/ocbp paths), then at 396x224 (ILRAM and .text builds);
                                     # exit 0 = PASS
 make -C src/engine/sh4/test asmcheck  # the raw-opcode .S build (no -Wa,--dsp) matches the --dsp
-                                    # mnemonic build of the game builds byte for byte
-make -C src/engine/sh4/test bench   # simulated instruction counts C vs asm, 320x200 8-bit, 396x224 8-bit
-                                    # and RGB565 (builds sim64 if needed)
-make -C src/engine/sh4/test pipe    # pipeline-model cycles of every inner loop (pess, opt, gcc), 8-bit
-                                    # and RGB565; PIPE_FLAGS="--pairing manual" for the manual's rule
-make -C src/engine/sh4/test sched   # modsched.py: the shipped loops meet the model (pess, opt; the
-                                    # spans and col16m also gcc), and the minimum II of each kernel
-                                    # under "max" (python only)
-make -C src/engine/sh4/test sizes   # section/symbol sizes, 8-bit and RGB565
-make -C src/engine/sh4/test TV=hd run-tv   # one screen format only (TV= wide, tc, hd; empty: 320x200 8-bit)
+                                    # mnemonic build of the game builds byte for byte, at both sizes
+make -C src/engine/sh4/test bench   # simulated instruction counts C vs asm at both sizes (builds sim64
+                                    # if needed)
+make -C src/engine/sh4/test pipe    # pipeline-model cycles of every inner loop (pess, opt, gcc);
+                                    # PIPE_FLAGS="--pairing manual" for the manual's pairing rule
+make -C src/engine/sh4/test sched   # modsched.py: the shipped loops meet the model (pess, opt; spans also
+                                    # gcc), and the minimum II of each kernel under "max" (python only)
+make -C src/engine/sh4/test sizes   # section/symbol sizes at both sizes
+make -C src/engine/sh4/test TV=wide run   # one size: asmcheck, then 396x224 only (likewise bench, sizes,
+                                          # pipe); run-tv, bench-tv, sizes-tv without TV: 320x200 only
 N=20000 make -C src/engine/sh4/test run
 ```
 
-**Screen formats.** The drawers are assembled for one format, so the test is built once per format
-(`TV`, objects in `build-sim/sh4test/<TV>/`) with the format's defines, and `test_globals.h` takes
-`SCREENWIDTH`, `SCREENHEIGHT` and `pixel_t` from `cgd_config.h`, as the engine does. `ref_draw.c` is
-the reference in both pixel formats (the RGB565 spectre through `FUZZDARK`).
+**Screen sizes.** The drawers are assembled for one size, so the test is built once per size (`TV`:
+empty for 320×200, `wide` for 396×224, which the widescreen and HD builds share; objects in
+`build-sim/sh4test/` and `build-sim/sh4test/wide/`) with that size's define, and `test_globals.h`
+takes `SCREENWIDTH` and `SCREENHEIGHT` from `cgd_config.h`, as the engine does.
 
 **Cases covered:**
-- The views of `R_ExecuteSetViewSize` for the screen, with window offsets: 320×200, 320×168,
-  224×112 and 96×48 at 320×200; 396×224, 396×192, 272×128 and 112×56 at 396×224.
+- The views of `R_ExecuteSetViewSize` for the screen, with window offsets: 320×200, 320×168, 224×112
+  and 96×48 at 320×200; 396×224, 396×192, 272×128 and 112×56 at 396×224.
 - Every x position and row.
 - Counts from −5 to the full height, with short counts (0–4) weighted.
 - **1-pixel passes:** `dc_yl == dc_yh` only, for `R_DrawColumn` and `R_DrawColumnLow`, with every colormap kind below, with non-contiguous `columnofs` (low detail) and with nothing registered; stray-write check after every call.
@@ -550,38 +467,34 @@ the reference in both pixel formats (the RGB565 spectre through `FUZZDARK`).
   - registered maps;
   - unregistered tables;
   - misaligned pointers inside the lump;
-  - pointers half a map in (an RGB565 check without the rotate would take them);
   - just before or after the lump;
   - nothing registered.
 - Non-contiguous `columnofs`, which exercises the low-detail C path.
 - `fuzzpos` 0..49, with `dc_yl = 0` and `dc_yh = viewheight-1` edges.
 - Global side effects, compared after every case.
-- Framebuffer guards of 4096 pixels on both sides.
+- Framebuffer guards of 4 KiB on both sides.
 - Expansion sizes 16..6400 at 8 source alignments. The first cases use fixed sizes: 3,200, 6,400 (the test buffer's maximum), and 16, 240, 256, 272 around the plain entry's table threshold, for both entries.
 - `fill32` sizes 0..6400.
 - 30,000 `FixedDiv` operands, plus `a == INT_MIN` against fixed boundary divisors (±1, ±32767..±32769, ±40000, ±65535..±65537, ±131072, INT_MAX, INT_MIN) and 300 random `|b| <= 65600`.
-- A **long pass**: full-height columns on the full screen (`dc_yl = 0`, `dc_yh = SCREENHEIGHT - 1`) and full-width spans for every drawer, `N/100 + 8` cases each.
-- A **palette change**: new random light tables, `cgd_sh4_colormaps_changed()`, then `N/8` cases of each column and span drawer (and fuzz). Without the rebuild the first cases fail.
-- The **fuzz drawers' C fallbacks** called directly, `N/8` cases each: the RGB565 fuzz drawers read no colormap, so only counts or `fuzzpos` values the engine never produces reach them.
+- A **long pass**: full-height columns on the full screen (`dc_yl = 0`, `dc_yh = SCREENHEIGHT − 1`) and full-width spans for every drawer, `N/100 + 8` cases each.
+- The **fuzz drawers' C fallbacks** called directly, `N/8` cases each: in the passes above only negative counts reach them.
 
 **Checks:**
 - After every case, the touched area plus a margin is compared.
 - Every 16 cases, and at the end, the whole framebuffer is compared, guards included.
-- **Stray writes:** every 128th case, every case of the long pass, every 1-pixel case and every 8th expansion case snapshot all static memory, i.e. `[0x1000, __bss_end)`: `.text`, `.rodata`, `.data` and `.bss` (≈830 KB at 320×200 8-bit). They then check after the asm call that only the asm's own output buffer and the globals the drawer may write (`dc_yl`, `dc_yh`, `fuzzpos`, `ds_x1`, `ds_x2`) changed. This catches writes the framebuffer guards cannot see: a translated drawer whose second store pointer walks a row per pixel through `.bss` fails from the first sampled translated case.
+- **Stray writes:** every 128th case, every case of the long pass, every 1-pixel case and every 8th expansion case snapshot all static memory, i.e. `[0x1000, __bss_end)`: `.text`, `.rodata`, `.data` and `.bss` (≈830 KB at 320×200). They then check after the asm call that only the asm's own output buffer and the globals the drawer may write (`dc_yl`, `dc_yh`, `fuzzpos`, `ds_x1`, `ds_x2`) changed. This catches writes the framebuffer guards cannot see: a translated drawer whose second store pointer walks a row per pixel through `.bss` fails from the first sampled translated case.
 - **Expansion stack canary:** 32 words in the caller's frame, directly above the plain entry's 1 KiB stack table, are checked after every expansion call. A 4-byte overrun past the table makes every plain-entry case fail with "stack canary".
 - **Calling convention:** every asm drawer call goes through `test/abi_call.S`, which loads r8–r14 with values derived from a random word and checks them, and r15, after the call. This matters for the 1-pixel paths, which save no registers: `mov #0,r9` in the 1-pixel path makes every 1-pixel case fail with "callee-saved register clobbered".
 - **Assembler flags** (`asmcheck`): see the top of this file. Restoring the plain `ldrs`/`ldre`/`ldrc` mnemonics makes it fail with gas's "opcode not valid for this cpu variant"; a wrong displacement in the `LDRE` macro makes it fail with a byte diff.
-- **Other injected bugs the comparison catches:** a wrong mask or a missing `extu.b` in the 1-pixel column path; a dropped second store in the 1-pixel low-detail path; a swapped write-after-read pair in the R_DrawSpanLow loop (fails from case 2 at N=300); a `>> 16` instead of `>> 15` second guard in `cgd_fixed_div` (7 of the fixed `INT_MIN` divisors and about half of the random ones fail).
-- **Injected bugs, RGB565 and width** (each fails at N=300): a dropped store or a missing step in each of the four loops; the dropped second store of the low-detail translated drawer; the stored phantom pixel of an odd count (column and span epilogues); a wrong low-detail row step; `ds_x1` not doubled; a missing `extu.b` in either 1-pixel path; a missing rounding add, a wrong rounding constant or a missing green fold in `FUZZDARK`, and a wrong rounding constant in the C fallback's; the colormap check without its `rotr` (each of the five drawers that check: the half-map pointers); `cgd_sh4_colormaps_changed()` doing nothing (both formats); and, at 396×224 8-bit, a 320 row step in the column or low-column loop, or ±320 in the fuzz table.
+- **Other injected bugs the comparison catches:** a wrong mask or a missing `extu.b` in the 1-pixel column path; a dropped second store in the 1-pixel low-detail path; a swapped write-after-read pair in the R_DrawSpanLow loop (fails from case 2 at N=300); a `>> 16` instead of `>> 15` second guard in `cgd_fixed_div` (7 of the fixed `INT_MIN` divisors and about half of the random ones fail); at 396×224, a row step built from 320 instead of `SCREENWIDTH` in the column or low-column loop, or ±320 in the fuzz table.
 
 Design tools in `test/`:
 - **`pipesim.py`:** loop, straight-line and per-call models over the linked ELF. `--path A:B C:D …` models one call through taken branches, e.g. `pipesim.py ELF - - --path _R_DrawColumn_SH4:cgd_col_disp cgd_col_one:cgd_col_one_end` for the 1-pixel column, or `_R_DrawColumn_SH4:cgd_col_n2 cgd_col_end:cgd_col_ret` for n = 2.
 - **`listsched.py`:** reorders set-up blocks under the model. It applies the 4-byte pairing rule by default and supports dispatch branches marked `/* barrier: regs */` (§2).
 - **`modsched.py`:** exact modulo-schedule search. See its docstring for the model. In short:
-  - `modsched.py KIND [II] [pess|opt|gcc|max] [--px P]`, KIND = `col collow span spanlow` and their RGB565 forms `col16 collow16 span16 spanlow16` (texel doubled in r0, `x`) and `col16m collow16m span16m spanlow16m` (texel loaded into the index register, then `mov` + `add` into r0, as the shipped RGB565 column loop). Without II it starts at max(ResMII, RecMII), proves every smaller II infeasible (a positive dependence cycle, or exhaustive search) and prints the first feasible schedule (rows, stages). `max` is the elementwise maximum of the three latency tables, so its schedules run stall-free under all three.
-  - `--stages S` limits the pipeline to S stages (every op within S·II − 1 cycles of every other): `--stages 2` keeps a one-pass prologue and epilogue, as in all the shipped loops.
+  - `modsched.py KIND [II] [pess|opt|gcc|max] [--px P]`, KIND = `col collow span spanlow`. Without II it starts at max(ResMII, RecMII), proves every smaller II infeasible (a positive dependence cycle, or exhaustive search) and prints the first feasible schedule (rows, stages). `max` is the elementwise maximum of the three latency tables, so its schedules run stall-free under all three.
   - Anti-dependences (write-after-read) have latency 0 and may share a cycle with the reader first, as the pairing rule allows (`--war1` gives them latency 1, which forbids such pairs and puts R_DrawSpan at II = 12, §3).
-  - `--px P` unrolls the model to P pixels (texels) per pass; `--stage1 OPS` pins a two-stage split so that an existing prologue/epilogue can stay (every alignment of the stage boundary is tried, including splits with a stage-1 op ahead of op 0, so "infeasible" is a proof for the split); `--shipped` checks the loops of `r_draw_sh4.S` and `r_draw16_sh4.S` (table `SHIPPED`, hand-transcribed issue times, not derived from the code: update it whenever a loop changes) instead of searching.
+  - `--px P` unrolls the model to P pixels (texels) per pass; `--stage1 OPS` pins a two-stage split so that an existing prologue/epilogue can stay (every alignment of the stage boundary is tried, including splits with a stage-1 op ahead of op 0, so "infeasible" is a proof for the split); `--shipped` checks the loops of `r_draw_sh4.S` (table `SHIPPED`, hand-transcribed issue times, not derived from the code: update it whenever a loop changes) instead of searching.
   - The printed body starts at the earliest op (or the `--stage1` window), so the listed order and the stage numbers agree, and the listing can be typed in as written.
   - Search: longest-path closure for exact time windows, most-constrained-first assignment with window propagation, resource-aware bounds tightening, a slot-matching bound, and an unrolling shortcut for feasibility. Each 2-pixel kernel solves in milliseconds under every table. Minimum II under "max" (c/px) for P = 1 / 2 / 3 / 4 pixels or texels per pass: span 6 / 11 / 17 / 22 (6.0 / 5.5 / 5.67 / 5.5); spanlow 6 / 12 / 18 / 24 (3.0 throughout); col 5 / 8 / 12 / 16 (5.0 / 4.0 / 4.0 / 4.0); collow 5 / 10 / 15 / 20 (2.5 throughout). No unrolling beats the shipped P = 2 under any single table either (under "pess" collow is 9 / 14 / 18 for P = 2 / 3 / 4, i.e. 2.25 / 2.33 / 2.25 c/px). All of these, P = 1–4 under every table, take about 16 s in total; the slowest proof is collow under "gcc" at P = 4 (II 18 and 19 infeasible, ≈9 s).
 - **`gen_expand.py`:** generates `expand_sh4.S`.
@@ -596,8 +509,6 @@ Design tools in `test/`:
 - **Owning the `dc_*`/`ds_*` globals in one asm block.** The engine would declare them `extern`. One base literal plus `@(disp,Rn)` loads would replace 10 literal loads per call.
 - **R_DrawColumn under "gcc" latencies:** 10 → 8 cycles per 2 px is possible with a three-stage pipeline (`modsched.py col max`, §3). Only worth it if hardware timing shows 3-cycle loads.
 - **R_DrawColumnLow under "gcc" latencies:** 10 → 9 cycles per 4 px with a second colour register (r12: one more push/pop, B's stage-1 ops and the epilogue use it), keeping the two-stage split (§3). Same condition.
-- **RGB565 spans under "gcc" latencies:** the shipped loops are "pess"-optimal (13 cycles per 2 px or 2 texels) and stall to 15 under "gcc"; a "gcc" schedule reaches 12 for the span but costs 16 under "pess" (§3). Only worth it if hardware shows 3-cycle loads.
-- Not worth doing: an RGB565 low-detail table of doubled colours (`mov.l` stores of two pixels). The low-detail column stays EX-bound at 5 EX per texel (the `x4` index replaces the doubling), and the low-detail span would save one store per texel (13 → 12 cycles per 2 texels) for another 34 KB table rebuilt at every palette change, plus a 4-byte alignment check.
 - Not worth doing: `mov.w` stores of doubled colours for low detail. A 16-bit doubled-colormap lookup needs the texel scaled by 2 in `r0`, which costs one more EX op per texel. The low-detail loops are already EX-bound (column: 8 EX + 8 LS in 9 cycles). Saving one LS per texel while adding one EX gives no better than 9–10 cycles per 4 px for the column, and II ≥ 12 for SpanLow (12 EX), the same as the byte version. It only helps with pre-doubled texture bytes. So with these loops a doubled colormap does not let one set of operations cover two pixels.
 - **Two-line iterations of the expansion**, which halve the 4–5 cycle per-line overhead.
 - **Hardware validation of the latency model.**

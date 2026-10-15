@@ -6,7 +6,6 @@
 
 #include "platform.h"
 #include "host.h"
-#include "cgdoom.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -164,12 +163,8 @@ int PL_GetZones(void **base, int *size, int max)
 // Video
 //---
 
-#define FB_PIXELS (SCREENWIDTH * SCREENHEIGHT)
-
-#if !CGD_TRUECOLOR
 static uint16_t palette[256];
-#endif
-static const pl_pixel_t *last_fb = NULL;
+static const uint8_t *last_fb = NULL;
 
 /* CRC-32 (IEEE 802.3, reflected), table-driven */
 static uint32_t crc_table[256];
@@ -192,21 +187,9 @@ static uint32_t crc32_update(uint32_t crc, const uint8_t *p, size_t n)
     return ~crc;
 }
 
-#if !CGD_TRUECOLOR
 void PL_SetPalette(const uint16_t pal565[256])
 {
     memcpy(palette, pal565, sizeof palette);
-}
-#endif
-
-/* RGB565 of the pixel at index i of the frame */
-static uint16_t pixel565(const pl_pixel_t *fb, int i)
-{
-#if CGD_TRUECOLOR
-    return fb[i];
-#else
-    return palette[fb[i]];
-#endif
 }
 
 void PL_VideoReset(void)
@@ -232,7 +215,7 @@ int Host_WriteScreenshot(const char *path)
     uint8_t row[SCREENWIDTH * 3];
     for(int y = 0; y < SCREENHEIGHT; y++) {
         for(int x = 0; x < SCREENWIDTH; x++)
-            expand565(pixel565(last_fb, SCREENWIDTH * y + x), row + 3 * x);
+            expand565(palette[last_fb[SCREENWIDTH * y + x]], row + 3 * x);
         fwrite(row, 1, sizeof row, fp);
     }
     fclose(fp);
@@ -255,26 +238,9 @@ void Host_Finish(void)
         fflush(host.crc_file);
 }
 
-/* CRC of the frame as big-endian RGB565 (both pixel formats agree on it) */
-static uint32_t crc565(const pl_pixel_t *fb)
-{
-    uint32_t crc = 0;
-    uint8_t buf[2 * SCREENWIDTH];
-    for(int y = 0; y < SCREENHEIGHT; y++) {
-        for(int x = 0; x < SCREENWIDTH; x++) {
-            uint16_t c = pixel565(fb, y * SCREENWIDTH + x);
-            buf[2*x] = c >> 8;
-            buf[2*x+1] = c & 0xff;
-        }
-        crc = crc32_update(crc, buf, sizeof buf);
-    }
-    return crc;
-}
-
-void PL_FinishUpdate(const pl_pixel_t *fb)
+void PL_FinishUpdate(const uint8_t *fb)
 {
     static int crc_ready = 0;
-    static int fuzz_seen = 0;
 #ifndef PL_SIM
     static uint32_t last_us = 0;
 #endif
@@ -286,31 +252,16 @@ void PL_FinishUpdate(const pl_pixel_t *fb)
     last_fb = fb;
 
     if(host.crc_file) {
-#if CGD_TRUECOLOR
-        /* The frame (big-endian RGB565, as in the SH sim); no palette */
-        uint32_t c_fb = crc565(fb), c_pal = 0;
-#else
         /* Palette as big-endian bytes so host and SH sim CRCs agree */
         uint8_t palbytes[512];
         for(int i = 0; i < 256; i++) {
             palbytes[2*i] = palette[i] >> 8;
             palbytes[2*i+1] = palette[i] & 0xff;
         }
-        uint32_t c_fb = crc32_update(0, fb, FB_PIXELS);
+        uint32_t c_fb = crc32_update(0, fb, SCREENWIDTH * SCREENHEIGHT);
         uint32_t c_pal = crc32_update(0, palbytes, sizeof palbytes);
-#endif
         fprintf(host.crc_file, "%d %d %08x %08x\n", host_frames, host_tics,
             (unsigned)c_fb, (unsigned)c_pal);
-    }
-    /* The frame as RGB565, flagged F when it differs between the 8-bit and
-       true-colour builds on purpose (CGD_Stats: spectre fuzz in the frame,
-       any frame after a gamma change, a wipe across a palette change) */
-    if(host.crc565_file) {
-        int flag = CGD_Stats.FuzzSprites != fuzz_seen
-            || CGD_Stats.GammaChanges || CGD_Stats.WipeStalePalette;
-        fuzz_seen = CGD_Stats.FuzzSprites;
-        fprintf(host.crc565_file, "%d %d %08x%s\n", host_frames, host_tics,
-            (unsigned)crc565(fb), flag ? " F" : "");
     }
 
     if(host.shot_prefix && host.shot_every > 0

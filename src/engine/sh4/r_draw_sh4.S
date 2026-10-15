@@ -1,5 +1,4 @@
-/* r_draw_sh4.S - SH4AL-DSP (SH-4A, big-endian) column and span drawers for CGDoom, 8-bit pixels
-   (palette indices; the RGB565 drawers of CGD_TRUECOLOR are in r_draw16_sh4.S).
+/* r_draw_sh4.S - SH4AL-DSP (SH-4A, big-endian) column and span drawers for CGDoom.
 
    Drop-in replacements for the vanilla r_draw.c drawers: void(void), reading the same engine
    globals, bit-exact output (see test/ref_draw.c and test/test_sh4.c). Design notes, pipeline
@@ -25,7 +24,6 @@
 #include "sh4_asm.h"
 #include "cgd_config.h"
 
-#if !CGD_TRUECOLOR
 
 /* Row step: SCREENWIDTH bytes, built as mov #ROWQ + shll2 (320 = 80 << 2, 396 = 99 << 2) */
 #define ROWQ		(SCREENWIDTH / 4)
@@ -1133,5 +1131,4 @@ cgd_sh4_fuzztab:
 	.short	-FO,FO,FO,FO,FO,-FO,FO,FO,-FO,FO
 	.endr
 
-#endif /* !CGD_TRUECOLOR */
 

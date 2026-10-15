@@ -46,91 +46,7 @@
 
 // Each screen is [SCREENWIDTH*SCREENHEIGHT]; 
 
-pixel_t* screens[SCREEN_COUNT]; 
-
-#if CGD_TRUECOLOR
-uint16_t v_palette[256];
-int v_palette_serial;
-#endif
-#if CGD_TRUECOLOR
-void V_GetTint (vtint_t *t, const byte *base, const byte *pal)
-{
-  for (int c = 0; c < 3; c++)
-  {
-    int range = base[12+c] - base[c];
-    t->scale[c] = range > 0 ? ((pal[12+c] - pal[c]) * 256 + range/2) / range
-      : 256;
-    t->offset[c] = pal[c] - ((base[c] * t->scale[c] + 128) >> 8);
-  }
-}
-
-uint16_t V_TintedRGB565 (const vtint_t *t, const byte *gamma, int r, int g,
-  int b)
-{
-  int v[3] = { r, g, b };
-
-  for (int c = 0; c < 3; c++)
-  {
-    v[c] = ((v[c] * t->scale[c] + 128) >> 8) + t->offset[c];
-    v[c] = gamma[v[c] < 0 ? 0 : v[c] > 255 ? 255 : v[c]];
-  }
-  return (uint16_t)((((v[0]*31 + 127) / 255) << 11)
-    | (((v[1]*63 + 127) / 255) << 5) | ((v[2]*31 + 127) / 255));
-}
-#endif
-
-#if CGD_EXTRAS && CGD_TRUECOLOR
-const uint16_t *v_patchpal = v_palette;
-uint16_t v_crpalette[CR_COUNT][256];
-
-/* The recoloured palettes (v_video.h). The status bar's digits (STTNUM*,
-   STTPRCNT, STTMINUS) use the red ramp 176-191 and the dark reds 44, 45 and
-   47 (their gray shadow is 109): those entries become green, gold, blue or
-   gray, from the base palette (brightness = red, whiteness = the larger of
-   green and blue), then take the current tint, so that the numbers flash
-   with the rest of the bar. The other entries are v_palette's. */
-static boolean V_IsDigitRed (int c)
-{
-  return (c >= 176 && c <= 191) || c == 44 || c == 45 || c == 47;
-}
-
-void V_BuildColorPalettes (const byte *base, const vtint_t *tint,
-  const byte *gamma)
-{
-  for (int c = 0; c < 256; c++)
-  {
-    int r = base[3*c], w = base[3*c+1] > base[3*c+2] ? base[3*c+1]
-      : base[3*c+2];
-
-    for (int k = 0; k < CR_COUNT; k++)
-    {
-      if (!V_IsDigitRed (c))
-      {
-        v_crpalette[k][c] = v_palette[c];
-        continue;
-      }
-      switch (k)
-      {
-      case CR_GREEN:
-        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, w, r, w);
-        break;
-      case CR_GOLD:
-        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, r,
-          (r*13 + w*3) / 16, w);
-        break;
-      case CR_BLUE:     /* a light blue: navy was darker than the bar */
-        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, w + (r - w)/4,
-          w + (r - w)/2, r);
-        break;
-      case CR_GRAY:     /* light: a dark gray vanished on the gray bar */
-        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, (r*7 + w)/8,
-          (r*7 + w)/8, (r*7 + w)/8);
-        break;
-      }
-    }
-  }
-}
-#endif
+byte* screens[SCREEN_COUNT]; 
 
 int    dirtybox[4]; 
 
@@ -235,22 +151,10 @@ void V_MarkRect( int x,int y,int width,int height )
 } 
 
 
-/* CGDoom: fills count pixels with c */
-void V_FillPixels (pixel_t *dest, int count, pixel_t c)
-{
-#if CGD_TRUECOLOR
-  while (count-- > 0)
-    *dest++ = c;
-#else
-  memset (dest, c, count);
-#endif
-}
-
 /* CGDoom: one row of V_CopyRect. The status-bar widgets copy
    rows of a few tens of bytes every frame, which fxlibc's memcpy does byte
    by byte below 64 bytes. Source and destination have the same x and
-   SCREENWIDTH-pixel rows, so they are usually equally aligned: copy words.
-   n is in bytes. */
+   SCREENWIDTH-byte rows, so they are usually equally aligned: copy words. */
 static inline void V_CopyRow (byte *dest, const byte *src, int n)
 {
   if (n >= 64 || (((uintptr_t)dest ^ (uintptr_t)src) & 3))
@@ -271,8 +175,8 @@ static inline void V_CopyRow (byte *dest, const byte *src, int n)
 // 
 void V_CopyRect(int srcx,int srcy,int srcscrn,int width,int height,int destx,int desty,int destscrn ) 
 { 
-  pixel_t* src;
-  pixel_t* dest; 
+  byte* src;
+  byte* dest; 
 
 #ifdef RANGECHECK 
   if (srcx<0  ||srcx+width >SCREENWIDTH  || srcy<0 || srcy+height>SCREENHEIGHT  ||destx<0||destx+width >SCREENWIDTH
@@ -290,29 +194,93 @@ void V_CopyRect(int srcx,int srcy,int srcscrn,int width,int height,int destx,int
   dest = screens[destscrn]+SCREENWIDTH*desty+destx; 
   for ( ; height>0 ; height--) 
   { 
-    V_CopyRow ((byte *)dest, (const byte *)src, width * PIXELBYTES);
+    V_CopyRow (dest, src, width);
     src += SCREENWIDTH; 
     dest += SCREENWIDTH; 
   } 
 } 
 
-static void CopyColumn(pixel_t *pTarget,const byte *pSource,int iLength)
+static void CopyColumn(byte *pTarget,const byte *pSource,int iLength)
 {
-#if CGD_EXTRAS && CGD_TRUECOLOR
-  const uint16_t *pal = v_patchpal;
-#endif
   while(iLength) 
   { 
-#if CGD_EXTRAS && CGD_TRUECOLOR
-    pTarget[0] = pal[pSource[0]];
-#else
-    pTarget[0] = V_PIXEL(pSource[0]);
-#endif
+    pTarget[0] = pSource[0];
     pSource++; 
     pTarget += SCREENWIDTH; 
     iLength--;
   } 
 }
+
+#if CGD_EXTRAS
+/* CGDoom: the translation V_DrawPatch draws through (v_video.h) */
+const byte *v_patchmap;
+byte v_crmap[CR_COUNT][256];
+const byte v_blackmap[256];
+
+static void CopyColumnMapped(byte *pTarget,const byte *pSource,int iLength,
+  const byte *map)
+{
+  while(iLength--)
+  {
+    *pTarget = map[*pSource++];
+    pTarget += SCREENWIDTH;
+  }
+}
+
+/* The status-bar digits' reds: the red ramp and three darker reds */
+static boolean V_IsDigitRed (int c)
+{
+  return (c >= 176 && c <= 191) || c == 44 || c == 45 || c == 47;
+}
+
+/* The palette entry nearest to (r, g, b) */
+static int V_NearestColor (const byte *pal, int r, int g, int b)
+{
+  int best = 0, bestdist = 0x7fffffff;
+
+  for (int c = 0; c < 256; c++)
+  {
+    int dr = pal[3*c] - r, dg = pal[3*c+1] - g, db = pal[3*c+2] - b;
+    int dist = dr*dr + dg*dg + db*db;
+    if (dist < bestdist)
+    {
+      bestdist = dist;
+      best = c;
+    }
+  }
+  return best;
+}
+
+void V_BuildColorMaps (const byte *pal)
+{
+  for (int k = 0; k < CR_COUNT; k++)
+    for (int c = 0; c < 256; c++)
+    {
+      int r = pal[3*c], w = pal[3*c+1] > pal[3*c+2] ? pal[3*c+1] : pal[3*c+2];
+
+      v_crmap[k][c] = c;
+      if (!V_IsDigitRed (c))
+        continue;
+      switch (k)
+      {
+      case CR_GREEN:    /* a little light: the palette's darker greens are olive */
+        v_crmap[k][c] = V_NearestColor (pal, w + (r - w)/4, r, w + (r - w)/4);
+        break;
+      case CR_GOLD:
+        v_crmap[k][c] = V_NearestColor (pal, r, (r*13 + w*3)/16, w);
+        break;
+      case CR_BLUE:     /* a little light, but still a palette blue in every
+                           shade (lighter ones fall on grays) */
+        v_crmap[k][c] = V_NearestColor (pal, w + (r - w)/6, w + (r - w)/4, r);
+        break;
+      case CR_GRAY:     /* light: a dark gray vanished on the gray bar */
+        v_crmap[k][c] = V_NearestColor (pal, (r*7 + w)/8, (r*7 + w)/8,
+          (r*7 + w)/8);
+        break;
+      }
+    }
+}
+#endif
 
 //
 // V_DrawPatch
@@ -322,7 +290,7 @@ void V_DrawPatch(int x,int y,int scrn,const patch_t* patch)
 { 
   int  col; 
   //const column_t* column; 
-  pixel_t* desttop;
+  byte* desttop;
   int  w = SHORT(patch->width); 
   int h = SHORT(patch->height);
   if(w == 0)
@@ -358,10 +326,15 @@ void V_DrawPatch(int x,int y,int scrn,const patch_t* patch)
     while (pData[0] != 0xff ) 
     { 
       const byte * pSource = pData+3; 
-      pixel_t* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
+      byte* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
       int count = pData[1]; 
       pData += count + 4 ; 
 
+#if CGD_EXTRAS
+      if (v_patchmap)
+        CopyColumnMapped(dest,pSource,count,v_patchmap);
+      else
+#endif
       CopyColumn(dest,pSource,count);
     } 
   }    
@@ -377,20 +350,20 @@ void V_DrawPatch(int x,int y,int scrn,const patch_t* patch)
 void V_DrawFullscreenPatch(int scrn, const char *lumpname)
 {
 #if SCREENWIDTH != ORIGWIDTH || SCREENHEIGHT != ORIGHEIGHT
-  pixel_t *p = screens[scrn];
-  pixel_t black = V_PIXEL(0);
+  byte *p = screens[scrn];
+  byte black = 0;
   int y;
 
-  V_FillPixels (p, HEIGHTDELTA*SCREENWIDTH, black);
+  memset (p, black, HEIGHTDELTA*SCREENWIDTH);
   for (y = 0; y < ORIGHEIGHT; y++)
   {
-    pixel_t *row = p + (HEIGHTDELTA + y)*SCREENWIDTH;
-    V_FillPixels (row, WIDESCREENDELTA, black);
-    V_FillPixels (row + WIDESCREENDELTA + ORIGWIDTH,
-      SCREENWIDTH - WIDESCREENDELTA - ORIGWIDTH, black);
+    byte *row = p + (HEIGHTDELTA + y)*SCREENWIDTH;
+    memset (row, black, WIDESCREENDELTA);
+    memset (row + WIDESCREENDELTA + ORIGWIDTH, black,
+      SCREENWIDTH - WIDESCREENDELTA - ORIGWIDTH);
   }
-  V_FillPixels (p + (HEIGHTDELTA + ORIGHEIGHT)*SCREENWIDTH,
-    (SCREENHEIGHT - HEIGHTDELTA - ORIGHEIGHT)*SCREENWIDTH, black);
+  memset (p + (HEIGHTDELTA + ORIGHEIGHT)*SCREENWIDTH, black,
+    (SCREENHEIGHT - HEIGHTDELTA - ORIGHEIGHT)*SCREENWIDTH);
   if (!scrn)
     V_MarkRect (0, 0, SCREENWIDTH, SCREENHEIGHT);
 #endif
@@ -407,7 +380,7 @@ void V_DrawPatchFlipped(int x,int y,int scrn,const patch_t* patch)
 { 
   int  col; 
   //const column_t* column; 
-  pixel_t* desttop;
+  byte* desttop;
   int  w = SHORT(patch->width); 
   int h = SHORT(patch->height);
 
@@ -439,7 +412,7 @@ void V_DrawPatchFlipped(int x,int y,int scrn,const patch_t* patch)
     while (pData[0] != 0xff ) 
     { 
       const byte * pSource = pData+3; 
-      pixel_t* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
+      byte* dest = desttop + ((int)pData[0])*SCREENWIDTH; 
       int count = pData[1]; 
       pData += count + 4 ; 
 
@@ -454,9 +427,9 @@ void V_DrawPatchFlipped(int x,int y,int scrn,const patch_t* patch)
 // V_DrawBlock
 // Draw a linear block of pixels into the view buffer.
 //
-void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const pixel_t*  src ) 
+void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const byte*  src ) 
 { 
-  pixel_t* dest; 
+  byte* dest; 
 
 #ifdef RANGECHECK 
   if (x<0 ||x+width >SCREENWIDTH || y<0 || y+height>SCREENHEIGHT || (unsigned)scrn>=SCREEN_COUNT )
@@ -472,7 +445,7 @@ void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const pix
 
   while (height--) 
   { 
-    memcpy (dest, src, width * sizeof(pixel_t)); 
+    memcpy (dest, src, width); 
     src += width; 
     dest += SCREENWIDTH; 
   } 
@@ -484,9 +457,9 @@ void V_DrawBlock ( int  x, int  y, int  scrn, int  width, int  height, const pix
 // V_GetBlock
 // Gets a linear block of pixels from the view buffer.
 //
-void V_GetBlock( int  x, int  y, int  scrn, int  width, int  height, pixel_t*  dest ) 
+void V_GetBlock( int  x, int  y, int  scrn, int  width, int  height, byte*  dest ) 
 { 
-  pixel_t* src; 
+  byte* src; 
 
 #ifdef RANGECHECK 
   if (x<0 ||x+width >SCREENWIDTH || y<0 || y+height>SCREENHEIGHT  || (unsigned)scrn>=SCREEN_COUNT )
@@ -500,7 +473,7 @@ void V_GetBlock( int  x, int  y, int  scrn, int  width, int  height, pixel_t*  d
 
   while (height--) 
   { 
-    memcpy (dest, src, width * sizeof(pixel_t)); 
+    memcpy (dest, src, width); 
     src += SCREENWIDTH; 
     dest += width; 
   } 
@@ -514,16 +487,11 @@ void V_Init (void)
 { 
   /* screens[0] is the main screen */
   screens[0] = I_ScreenBase(0);
-#if CGD_TRANSIENT_SCREENS
-  /* No intermission screen; the wipe allocates screens[2] and [3] */
-  screens[1] = screens[2] = screens[3] = NULL;
-#else
   /* screens[1] is used for the level end sequence (intermission) */
   screens[1] = I_ScreenBase(1);
   /* screens[2] and screens[3] are used for wipe effects */
   screens[2] = I_ScreenBase(2);
   screens[3] = I_ScreenBase(3);
-#endif
   /* screens[4] is used for the status bar (allocated by st_stuff.c) */
   screens[4] = NULL;
 }
@@ -532,5 +500,5 @@ void V_Init (void)
    area above the status bar) */
 void V_Clear (void)
 {
-  V_FillPixels(screens[0], SCREENWIDTH*(SCREENHEIGHT-32), V_PIXEL(0));
+  memset(screens[0], 0, SCREENWIDTH*(SCREENHEIGHT-32));
 }

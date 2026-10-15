@@ -48,54 +48,22 @@
 
 #define SCREEN_COUNT	5
 /* CGDoom: SCREENWIDTH x SCREENHEIGHT pixels each (screens[4]: the status
-   bar, SCREENWIDTH x ST_HEIGHT). With CGD_TRANSIENT_SCREENS, screens[1] is
-   NULL and screens[2] and [3] exist only during a wipe (f_wipe.c). */
-extern	pixel_t*	screens[SCREEN_COUNT];
+   bar, SCREENWIDTH x ST_HEIGHT) */
+extern	byte*	screens[SCREEN_COUNT];
 
-/* CGDoom: the builds with larger screens (widescreen or true colour) save
-   their memory: the intermission redraws its background every frame instead
-   of keeping it in screens[1], and the wipe allocates its two screens for
-   its duration (it is skipped when they do not fit). */
-#define CGD_TRANSIENT_SCREENS	(CGD_WIDESCREEN || CGD_TRUECOLOR)
-
-/* CGDoom: the pixel of palette index c. 2D art (patches, the automap,
-   fills) is drawn through it: in the true-colour build, v_palette holds
-   the RGB565 colours of the current palette (I_SetPalette). */
-#if CGD_TRUECOLOR
-extern	uint16_t	v_palette[256];
-/* Counts the palette changes (I_SetPalette): what a true-colour screen keeps
-   from earlier frames must be redrawn when it changes */
-extern	int	v_palette_serial;
-/* The current palette as a tint of the base palette (PLAYPAL 0): every
-   palette of PLAYPAL (damage, bonus, radiation suit) blends the base toward
-   a colour, i.e. channel c is base*scale[c]/256 + offset[c], read from
-   the palettes' black and white (indices 0 and 4). True colour lights a
-   colour first, then tints it, as the 8-bit palette tints the lit index. */
-typedef struct vtint_s { int scale[3], offset[3]; } vtint_t;
-void V_GetTint (vtint_t *t, const byte *base, const byte *pal);
-/* The RGB565 of an 8-bit-per-channel colour, tinted, then gamma-corrected
-   (rounded to the nearest RGB565 value) */
-uint16_t V_TintedRGB565 (const vtint_t *t, const byte *gamma, int r, int g,
-  int b);
-#define V_PIXEL(c)	(v_palette[(byte)(c)])
-#else
-#define V_PIXEL(c)	((pixel_t)(c))
-#endif
-
-#if CGD_EXTRAS && CGD_TRUECOLOR
-/* The colours V_DrawPatch draws with: v_palette, or for a moment one of
-   v_crpalette's recoloured palettes (status-bar numbers, CGD_FEAT_COLORNUMS):
-   the saturated reds of the palette turned into the colour CR_*, the other
-   colours kept. Rebuilt with v_palette. */
+#if CGD_EXTRAS
+/* CGDoom: the translation V_DrawPatch draws through, NULL for none: one of
+   v_crmap's (status-bar numbers, CGD_FEAT_COLORNUMS: the digits' reds
+   turned into the colour CR_*, the other entries kept) or v_blackmap
+   (every entry black: shadows). V_BuildColorMaps builds v_crmap from the
+   palette (PLAYPAL 0); the flashes and gamma then tint them as everything
+   else. */
 enum { CR_GREEN, CR_GOLD, CR_BLUE, CR_GRAY, CR_COUNT };
-extern	const uint16_t	*v_patchpal;
-extern	uint16_t	v_crpalette[CR_COUNT][256];
-void V_BuildColorPalettes (const byte *base, const vtint_t *tint,
-  const byte *gamma);
+extern	const byte	*v_patchmap;
+extern	byte	v_crmap[CR_COUNT][256];
+extern	const byte	v_blackmap[256];
+void V_BuildColorMaps (const byte *pal);
 #endif
-
-/* CGDoom: fills count pixels with c */
-void V_FillPixels (pixel_t *dest, int count, pixel_t c);
 
 extern  int	dirtybox[4];
 
@@ -133,10 +101,10 @@ void V_DrawFullscreenPatch(int scrn, const char *lumpname);
 	V_DrawPatch((x) + WIDESCREENDELTA, (y) + HEIGHTDELTA, scrn, patch)
 
 // Draw a linear block of pixels into the view buffer.
-void V_DrawBlock( int x, int y,int scrn,int width,int height,const pixel_t* src );
+void V_DrawBlock( int x, int y,int scrn,int width,int height,const byte* src );
 
 // Reads a linear block of pixels into the view buffer.
-void V_GetBlock(int x,int y,int scrn,int width,int height,pixel_t* dest );
+void V_GetBlock(int x,int y,int scrn,int width,int height,byte* dest );
 
 
 void

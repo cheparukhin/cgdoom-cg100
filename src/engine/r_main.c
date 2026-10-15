@@ -653,8 +653,7 @@ void R_ExecuteSetViewSize (void)
      where vanilla kept the full-detail ones), see r_draw.c.
      SH4 builds (CGD_SH4, r_draw.h: __sh__ and not CGD_NO_SH4) use the
      bit-exact *_SH4 assembly versions of src/engine/sh4 (README.md §7),
-     assembled for the build's pixel format (8-bit or RGB565, any width);
-     they need cgd_sh4_set_colormaps() (R_InitColormaps), else they fall
+     assembled for the build's screen width; they need cgd_sh4_set_colormaps() (R_InitColormaps), else they fall
      back to C. */
 #ifdef CGD_SH4
   if (!detailshift)
@@ -873,7 +872,7 @@ static void R_DrawCrosshair (void)
   };
   int cx = viewwindowx + scaledviewwidth/2;
   int cy = viewwindowy + viewheight/2;
-  pixel_t yellow = V_PIXEL(231);
+  byte yellow = 231;
 
   for (int i = 0; i < 8; i++)
     screens[0][(cy + arm[i][1])*SCREENWIDTH + cx + arm[i][0]] = yellow;

@@ -28,8 +28,6 @@
 #include "i_system.h"
 #include "v_video.h"
 #include "d_main.h"
-#include "r_data.h"
-#include "w_wad.h"
 
 #include "doomdef.h"
 
@@ -42,7 +40,6 @@ static boolean gPaletteSet = false;
 
 void I_SetPalette(const byte* pal)
 {
-  CGD_Stats.PaletteChanges++;
   /* If pal=NULL, just regenerate the current palette to account for changes
      in the gamma level */
   if (pal == NULL)
@@ -72,38 +69,7 @@ void I_SetPalette(const byte* pal)
     gPaletteData[i] = (r << 11) | (g << 5) | b;
   }
 
-#if CGD_TRUECOLOR
-  /* CGDoom: true colour applies the palette while drawing: 2D art through
-     v_palette, the 3D view through the light tables. What is not redrawn
-     every frame is redrawn now: the status bar (st_firsttime) and the view
-     border (D_Display, v_palette_serial). */
-  {
-    extern boolean st_firsttime;
-    const byte *base = (const byte *)W_CacheLumpNameConst ("PLAYPAL",
-      PU_CACHE);
-    vtint_t tint;
-
-    memcpy(v_palette, gPaletteData, sizeof v_palette);
-    V_GetTint(&tint, base, pal);
-#if CGD_EXTRAS
-    V_BuildColorPalettes(base, &tint, gamma);
-#endif
-    R_BuildLightTables(base, &tint, gamma);
-    st_firsttime = true;
-    v_palette_serial++;
-  }
-#else
-  /* CGDoom test knob (host -palredraw): redraw the status bar at every
-     palette change, as the true-colour build must, so that the two builds'
-     frames can be compared (tests/tc-exact.sh). The status bar's
-     incremental drawing does not always leave what a full redraw draws. */
-  if (CGD_PaletteRedraw)
-  {
-    extern boolean st_firsttime;
-    st_firsttime = true;
-  }
   PL_SetPalette(gPaletteData);
-#endif
 }
 
 void I_Flip (void)
@@ -133,7 +99,7 @@ void I_ReinitAfterError(void)
 //
 // I_ReadScreen
 //
-void I_ReadScreen (pixel_t* scr)
+void I_ReadScreen (byte* scr)
 {
-  memcpy(scr, screens[0], SCREENWIDTH*SCREENHEIGHT*sizeof(pixel_t));
+  memcpy(scr, screens[0], SCREENWIDTH*SCREENHEIGHT);
 }

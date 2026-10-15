@@ -315,9 +315,7 @@ typedef post_t	column_t;
 //  precalculating 24bpp lightmap/colormap LUT.
 //  from darkening PLAYPAL to all black.
 // Could even us emore than 32 levels.
-/* CGDoom: one entry of a light table (colormap): a palette index, or an
-   RGB565 colour in the true-colour build */
-typedef pixel_t	lighttable_t;	
+typedef byte	lighttable_t;	
 
 
 

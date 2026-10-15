@@ -435,12 +435,12 @@ void ST_refreshBackground(void)
       const byte *flat = (const byte *)W_CacheLumpNameConst (
         gamemode == commercial ? "GRNROCK" : "FLOOR7_2", PU_CACHE);
       const patch_t *edge;
-      pixel_t *dest = screens[BG];
+      byte *dest = screens[BG];
       int x, y;
 
       for (y = 0; y < ST_HEIGHT; y++)
         for (x = 0; x < SCREENWIDTH; x++)
-          *dest++ = V_PIXEL(flat[((y + ST_Y) & 63)*64 + (x & 63)]);
+          *dest++ = flat[((y + ST_Y) & 63)*64 + (x & 63)];
       /* (only now: this lookup may purge the flat) */
       edge = W_CacheLumpNamePatch ("BRDR_B", PU_CACHE);
       for (x = 0; x < ST_BARX; x += 8)
@@ -531,7 +531,6 @@ void CGD_CycleGamma(void)
 {
   extern int usegamma;
   usegamma = (usegamma + 1) % 5;
-  CGD_Stats.GammaChanges++;
   I_SetPalette(NULL);
 
   extern char gammamsg[5][26];
@@ -865,81 +864,79 @@ void ST_doPaletteStuff(void)
   }
 }
 
-#if CGD_EXTRAS && CGD_TRUECOLOR
+
+#if CGD_EXTRAS
 //
 // CGDoom: the colours of the ready ammo, health and armour numbers
-// (CGD_FEAT_COLORNUMS, as Crispy Doom's coloured HUD): v_palette (the
-// numbers' own red) or a v_crpalette
+// (CGD_FEAT_COLORNUMS, as Crispy Doom's coloured HUD): NULL (the numbers'
+// own red) or one of v_crmap's translations
 //
-static const uint16_t *ST_AmmoColor (void)
+static const byte *ST_AmmoColor (void)
 {
   ammotype_t type = weaponinfo[plyr->readyweapon].ammo;
   int ammo, full;
 
   if (type == am_noammo)
-    return v_palette;
+    return NULL;
   ammo = plyr->ammo[type];
   full = maxammo[type];
   if (ammo < full/4)
-    return v_palette;
+    return NULL;
   if (ammo < full/2)
-    return v_crpalette[CR_GOLD];
+    return v_crmap[CR_GOLD];
   if (ammo <= full)
-    return v_crpalette[CR_GREEN];
-  return v_crpalette[CR_BLUE];
+    return v_crmap[CR_GREEN];
+  return v_crmap[CR_BLUE];
 }
 
-static const uint16_t *ST_HealthColor (void)
+static const byte *ST_HealthColor (void)
 {
   if ((plyr->cheats & CF_GODMODE) || plyr->powers[pw_invulnerability])
-    return v_crpalette[CR_GRAY];
+    return v_crmap[CR_GRAY];
   if (plyr->health < 25)
-    return v_palette;
+    return NULL;
   if (plyr->health < 50)
-    return v_crpalette[CR_GOLD];
+    return v_crmap[CR_GOLD];
   if (plyr->health <= 100)
-    return v_crpalette[CR_GREEN];
-  return v_crpalette[CR_BLUE];
+    return v_crmap[CR_GREEN];
+  return v_crmap[CR_BLUE];
 }
 
-static const uint16_t *ST_ArmorColor (void)
+static const byte *ST_ArmorColor (void)
 {
   if ((plyr->cheats & CF_GODMODE) || plyr->powers[pw_invulnerability])
-    return v_crpalette[CR_GRAY];
+    return v_crmap[CR_GRAY];
   if (plyr->armortype >= 2)
-    return v_crpalette[CR_BLUE];
+    return v_crmap[CR_BLUE];
   if (plyr->armortype == 1)
-    return v_crpalette[CR_GREEN];
-  return v_palette;
+    return v_crmap[CR_GREEN];
+  return NULL;
 }
 
 /* A number in its colour; redrawn when only the colour changed */
 static void ST_UpdateColored (st_number_t *num, st_percent_t *per,
-  const uint16_t *pal, const uint16_t **oldpal, boolean refresh)
+  const byte *map, const byte **oldmap, boolean refresh)
 {
   if (!(CGD_Features & CGD_FEAT_COLORNUMS))
-    pal = v_palette;
-  if (pal != *oldpal)
+    map = NULL;
+  if (map != *oldmap)
     refresh = true;
-  *oldpal = pal;
-  v_patchpal = pal;
+  *oldmap = map;
+  v_patchmap = map;
   if (per)
     STlib_updatePercent(per, refresh);
   else
     STlib_updateNum(num, refresh);
-  v_patchpal = v_palette;
+  v_patchmap = NULL;
 }
-#endif
 
-#if CGD_EXTRAS
 //
 // CGDoom: the full-screen HUD (CGD_FEAT_FULLHUD, as Crispy Doom's): at the
 // largest view size, where the status bar is hidden, the ready ammo and
 // health are drawn over the view at the bottom left, the armour and keys
 // at the bottom right. No background: the view under them is drawn again
-// every frame. In true colour each patch has a black shadow, so that it
-// stays readable on any wall (and in a red flash); colours as on the bar
-// (CGD_FEAT_COLORNUMS).
+// every frame. Each patch has a black shadow, so that it stays readable on
+// any wall; colours as on the bar (CGD_FEAT_COLORNUMS).
 //
 
 #define HUD_Y     (SCREENHEIGHT - 21)   /* the numbers' top, 5 px up */
@@ -948,14 +945,11 @@ static void ST_UpdateColored (st_number_t *num, st_percent_t *per,
 /* A patch with its shadow */
 static void ST_HudPatch (int x, int y, const patch_t *patch)
 {
-#if CGD_TRUECOLOR
-  static const uint16_t black[256];
-  const uint16_t *pal = v_patchpal;
+  const byte *map = v_patchmap;
 
-  v_patchpal = black;
+  v_patchmap = v_blackmap;
   V_DrawPatch (x + 1, y + 1, FG, patch);
-  v_patchpal = pal;
-#endif
+  v_patchmap = map;
   V_DrawPatch (x, y, FG, patch);
 }
 
@@ -987,29 +981,18 @@ void ST_DrawFullscreenHUD (void)
   int healthx = ammox + 18 + 3*w;
   int keyx = SCREENWIDTH - 2 - 3*HUD_KEYW + 2;
   int armorx = keyx - 5 - SHORT(tallpercent->width);
-
-#if CGD_TRUECOLOR
   boolean colored = (CGD_Features & CGD_FEAT_COLORNUMS) != 0;
-  if (colored)
-    v_patchpal = ST_AmmoColor ();
-#endif
+
+  v_patchmap = colored ? ST_AmmoColor () : NULL;
   if (type != am_noammo)
     ST_HudNum (ammox, HUD_Y, plyr->ammo[type]);
-#if CGD_TRUECOLOR
-  if (colored)
-    v_patchpal = ST_HealthColor ();
-#endif
+  v_patchmap = colored ? ST_HealthColor () : NULL;
   ST_HudNum (healthx, HUD_Y, plyr->health);
   ST_HudPatch (healthx, HUD_Y, tallpercent);
-#if CGD_TRUECOLOR
-  if (colored)
-    v_patchpal = ST_ArmorColor ();
-#endif
+  v_patchmap = colored ? ST_ArmorColor () : NULL;
   ST_HudNum (armorx, HUD_Y, plyr->armorpoints);
   ST_HudPatch (armorx, HUD_Y, tallpercent);
-#if CGD_TRUECOLOR
-  v_patchpal = v_palette;
-#endif
+  v_patchmap = NULL;
 
   if (keyboxes_0 >= 0)
     ST_HudPatch (keyx, HUD_Y + 5, keys[keyboxes_0]);
@@ -1030,8 +1013,8 @@ void ST_drawWidgets(boolean refresh)
   // used by w_frags widget
   //st_fragson = deathmatch && st_statusbaron; 
 
-#if CGD_EXTRAS && CGD_TRUECOLOR
-  static const uint16_t *oldready, *oldhealth, *oldarmor;
+#if CGD_EXTRAS
+  static const byte *oldready, *oldhealth, *oldarmor;
   ST_UpdateColored(&w_ready, NULL, ST_AmmoColor(), &oldready, refresh);
 #else
   STlib_updateNum(&w_ready, refresh);
@@ -1043,7 +1026,7 @@ void ST_drawWidgets(boolean refresh)
     STlib_updateNum(&w_maxammo[i], refresh);
   }
 
-#if CGD_EXTRAS && CGD_TRUECOLOR
+#if CGD_EXTRAS
   ST_UpdateColored(NULL, &w_health, ST_HealthColor(), &oldhealth, refresh);
   ST_UpdateColored(NULL, &w_armor, ST_ArmorColor(), &oldarmor, refresh);
 #else
@@ -1361,5 +1344,8 @@ void ST_Init (void)
 {
   veryfirsttime = 0;
   ST_loadData();
+#if CGD_EXTRAS
+  V_BuildColorMaps ((const byte *)W_CacheLumpNameConst ("PLAYPAL", PU_CACHE));
+#endif
   screens[4] = I_ScreenBase(4);
 }

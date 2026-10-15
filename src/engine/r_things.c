@@ -472,7 +472,6 @@ static void R_DrawVisSprite( vissprite_t* vis)
   {
     // NULL colormap = shadow draw
     colfunc = fuzzcolfunc;
-    CGD_Stats.FuzzSprites++;
   }
   else if (vis->mobjflags & MF_TRANSLATION)
   {

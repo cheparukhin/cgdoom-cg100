@@ -51,18 +51,12 @@ int PL_GetZones(void **base, int *size, int max);
 
 /* ---- Video ------------------------------------------------------------------ */
 
-/* The engine renders SCREENWIDTH x SCREENHEIGHT pixels (cgd_config.h) into
-   screens[0] (cached RAM, 32-byte aligned, rows of SCREENWIDTH pixels):
-   8-bit palette indices, or RGB565 in the true-colour build (CGD_TRUECOLOR),
-   where the engine applies the palette itself. */
+/* The engine renders SCREENWIDTH x SCREENHEIGHT 8-bit pixels (cgd_config.h:
+   320x200, or 396x224 in the widescreen builds) into screens[0] (cached RAM,
+   32-byte aligned, rows of SCREENWIDTH pixels). */
 #include "cgd_config.h"
-#if CGD_TRUECOLOR
-typedef uint16_t pl_pixel_t;
-#else
-typedef uint8_t pl_pixel_t;
 void PL_SetPalette(const uint16_t pal565[256]);  /* gamma already applied */
-#endif
-void PL_FinishUpdate(const pl_pixel_t *fb);      /* present fb (may return
+void PL_FinishUpdate(const uint8_t *fb);         /* present fb (may return
                                                     before the transfer ends) */
 void PL_VideoReset(void);                        /* redraw borders etc. after
                                                     errors / file I/O */

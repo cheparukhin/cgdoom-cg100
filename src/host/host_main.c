@@ -77,19 +77,8 @@ static void usage(void)
 "  -tics N               quit after N game tics\n"
 "  -input SPEC           builtin:<name> or a script file (see host_input.c)\n"
 "  -crc FILE             write per-frame CRC32 lines ('-' = stdout)\n"
-"  -crc565 FILE          write per-frame CRC32 lines of the frame as RGB565\n"
-"                        ('-' = stdout)\n"
-"                        (equal in the 8-bit and true-colour builds; ' F'\n"
-"                        marks frames that differ on purpose: spectre fuzz,\n"
-"                        after a gamma change, a wipe across a palette\n"
-"                        change)\n"
-"  -tcexact              true-colour build: light tables from COLORMAP, so\n"
-"                        frames equal the 8-bit build's (CGD_TrueColorExact)\n"
 "  -features LIST        rendering features (CGD_Features): all, none, or\n"
 "                        names separated by commas (default: the build's)\n"
-"  -palredraw            8-bit build: redraw the status bar at every palette\n"
-"                        change, as the true-colour build does\n"
-"                        (CGD_PaletteRedraw; for -tcexact comparisons)\n"
 "  -shot PREFIX          write PPM screenshots PREFIX#####.ppm\n"
 "  -shotevery N          ... every N frames (default: last frame only)\n"
 "  -fragment N           PL_WadMap fails across N-byte blocks (copy path)\n"
@@ -365,7 +354,6 @@ int main(int argc, char **argv)
     const char *iwad = NULL;
     const char *input = "builtin:none";
     const char *crc_path = NULL;
-    const char *crc565_path = NULL;
     char *demo = NULL;
     char *demo_file = NULL;
     const char *wadname = NULL;
@@ -410,12 +398,6 @@ int main(int argc, char **argv)
             input = argv[++i];
         else if(!strcmp(a, "-crc") && next)
             crc_path = argv[++i];
-        else if(!strcmp(a, "-crc565") && next)
-            crc565_path = argv[++i];
-        else if(!strcmp(a, "-tcexact"))
-            CGD_TrueColorExact = 1;
-        else if(!strcmp(a, "-palredraw"))
-            CGD_PaletteRedraw = 1;
         else if(!strcmp(a, "-features") && next) {
             if(parse_features(argv[++i]) < 0)
                 return 1;
@@ -538,14 +520,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if(crc565_path) {
-        host.crc565_file = !strcmp(crc565_path, "-") ? stdout
-            : fopen(crc565_path, "w");
-        if(!host.crc565_file) {
-            fprintf(stderr, "cannot open %s\n", crc565_path);
-            return 1;
-        }
-    }
     if(crc_path) {
         host.crc_file = !strcmp(crc_path, "-") ? stdout : fopen(crc_path, "w");
         if(!host.crc_file) {
@@ -624,7 +598,5 @@ int main(int argc, char **argv)
         CGD_FlushDelayedWrites();
     if(host.crc_file && host.crc_file != stdout)
         fclose(host.crc_file);
-    if(host.crc565_file && host.crc565_file != stdout)
-        fclose(host.crc565_file);
     return 0;
 }

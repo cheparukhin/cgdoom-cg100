@@ -236,7 +236,7 @@ static int  f_w;
 static int f_h;
 
 static int  lightlev;   // used for funky strobing effect
-static pixel_t* fb;    // pseudo-frame buffer
+static byte* fb;    // pseudo-frame buffer
 /* CGDoom: where the window is on the screen (rows of SCREENWIDTH pixels) */
 static int  fb_x, fb_y;
 boolean     automapoverlay = false;
@@ -860,7 +860,7 @@ void AM_Ticker (void)
 //
 void AM_clearFB(int color)
 {
-  V_FillPixels(fb, f_w*f_h, V_PIXEL(color));
+  memset(fb, color, f_w*f_h);
 }
 
 
@@ -1026,7 +1026,7 @@ AM_drawFline
     return;
   }
 
-#define PUTDOT(xx,yy,cc) fb[(yy)*SCREENWIDTH+(xx)]=V_PIXEL(cc)
+#define PUTDOT(xx,yy,cc) fb[(yy)*SCREENWIDTH+(xx)]=cc
 
   dx = fl->b.x - fl->a.x;
   ax = 2 * (dx<0 ? -dx : dx);
@@ -1188,8 +1188,8 @@ static void AM_drawText (int x, int y, const char *s)
 /* Kills, items, secrets and the level's time, in the HUD font, in words
    when they fit the window (the font's S and 5 look alike), else shorter.
    On the full map: at the bottom, above the level title (HU_Drawer). Over
-   the view: at the top, under the HUD message line, with a black shadow
-   (true colour), away from the weapon. */
+   the view: at the top, under the HUD message line, with a black shadow,
+   away from the weapon. */
 static void AM_drawStats (void)
 {
   extern const patch_t *hu_font[HU_FONTSIZE];
@@ -1222,14 +1222,9 @@ static void AM_drawStats (void)
   y = fb_y + 1;
   if (y < HU_MSGY + h + 1)
     y = HU_MSGY + h + 1;
-#if CGD_TRUECOLOR
-  {
-    static const uint16_t black[256];
-    v_patchpal = black;
-    AM_drawText (x + 1, y + 1, text[i]);
-    v_patchpal = v_palette;
-  }
-#endif
+  v_patchmap = v_blackmap;
+  AM_drawText (x + 1, y + 1, text[i]);
+  v_patchmap = NULL;
   AM_drawText (x, y, text[i]);
 }
 #endif
@@ -1531,7 +1526,7 @@ void AM_drawMarks(void)
 
 void AM_drawCrosshair(int color)
 {
-  fb[(f_h/2)*SCREENWIDTH + f_w/2] = V_PIXEL(color); // single point for now
+  fb[(f_h/2)*SCREENWIDTH + f_w/2] = color; // single point for now
 
 }
 

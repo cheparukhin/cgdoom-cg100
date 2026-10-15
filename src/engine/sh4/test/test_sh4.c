@@ -25,10 +25,9 @@
    passes draw only such columns (every colormap kind, unregistered table, non-contiguous
    columnofs) with the stray-write check after every call.
 
-   Screen format: the test is built once per format of src/platform/cgd_config.h (Makefile
-   TV=...: 320x200 or 396x224, 8-bit or RGB565 pixels), against the drawers assembled for it.
-   The views follow R_ExecuteSetViewSize's sizes for that screen. A "palette change" pass
-   rewrites the registered light tables, calls cgd_sh4_colormaps_changed() and draws again. */
+   Screen size: the test is built once per size of src/platform/cgd_config.h (Makefile TV=...:
+   320x200 or 396x224), against the drawers assembled for it. The views follow
+   R_ExecuteSetViewSize's sizes for that screen. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,25 +48,25 @@ int ds_y, ds_x1, ds_x2;
 const lighttable_t *ds_colormap;
 fixed_t ds_xfrac, ds_yfrac, ds_xstep, ds_ystep;
 const byte *ds_source;
-pixel_t *ylookup[MAXHEIGHT];
+byte *ylookup[MAXHEIGHT];
 int columnofs[MAXWIDTH];
 int centery, viewheight;
 const lighttable_t *colormaps;
 int fuzzpos;
 
 /* ---- memory ---- */
-#define GUARD 4096                       /* pixels */
+#define GUARD 4096
 #define FBSIZE (SCREENWIDTH * SCREENHEIGHT)
-static pixel_t fbA_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
-static pixel_t fbB_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
+static uint8_t fbA_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
+static uint8_t fbB_mem[GUARD + FBSIZE + GUARD] __attribute__((aligned(32)));
 #define FBA (fbA_mem + GUARD)
 #define FBB (fbB_mem + GUARD)
 
 #define NMAPS 34
-static lighttable_t lumpbuf[(NMAPS + 2) * 256 + 64] __attribute__((aligned(32)));
-static lighttable_t *lump;               /* registered light tables (deliberately misaligned) */
-static lighttable_t rot[NMAPS * 256] __attribute__((aligned(32)));
-static lighttable_t othercm[8 * 256 + 64];   /* an unregistered colormap area */
+static uint8_t lumpbuf[(NMAPS + 2) * 256 + 64] __attribute__((aligned(32)));
+static uint8_t *lump;                    /* registered COLORMAP lump (deliberately misaligned) */
+static uint8_t rot[NMAPS * 256] __attribute__((aligned(32)));
+static uint8_t othercm[8 * 256 + 64];    /* an unregistered colormap area */
 static uint8_t texbuf[1 << 16];          /* column textures */
 static uint8_t bigbuf[1 << 18];          /* translated columns: indices +-2^17 around the middle */
 static uint8_t flatbuf[4 * 4096 + 64];
@@ -111,7 +110,7 @@ static void set_view(const struct view *v)
 			int t = columnofs[i]; columnofs[i] = columnofs[i + 1]; columnofs[i + 1] = t;
 		}
 }
-static void set_ylookup(pixel_t *fb)
+static void set_ylookup(uint8_t *fb)
 {
 	for(int i = 0; i < cur_view->height; i++)
 		ylookup[i] = fb + (i + cur_view->wy) * SCREENWIDTH;
@@ -145,7 +144,7 @@ static int cmp_full(void)
 {
 	const uint32_t *a = (const uint32_t *)fbA_mem, *b = (const uint32_t *)fbB_mem;
 	for(unsigned i = 0; i < sizeof fbA_mem / 4; i++)
-		if(a[i] != b[i]) return (int)(i * 4 / sizeof(pixel_t)) - GUARD;
+		if(a[i] != b[i]) return (int)(i * 4) - GUARD;
 	return INT32_MIN;
 }
 static void resync(void) { memcpy(fbB_mem, fbA_mem, sizeof fbA_mem); }
@@ -230,13 +229,12 @@ static void call_asm(drawfn f, const char *name, long n)
 }
 
 /* ---- random parameter generation ---- */
-static const lighttable_t *pick_colormap(int allow_bad)
+static const uint8_t *pick_colormap(int allow_bad)
 {
 	int r = rndn(100);
 	if(!allow_bad || r < 85) return lump + 256 * rndn(NMAPS);
 	if(r < 90) return othercm + rndn(7 * 256);                      /* unregistered */
-	if(r < 93) return lump + 256 * rndn(NMAPS) + 1 + rndn(255);      /* misaligned in lump */
-	if(r < 95) return lump + 256 * rndn(NMAPS) + 128;                /* half a map in */
+	if(r < 95) return lump + 256 * rndn(NMAPS) + 1 + rndn(255);      /* misaligned in lump */
 	if(r < 98) return lump + 256 * NMAPS;                           /* just past the end */
 	return lump - 256;                                              /* just before */
 }
@@ -465,21 +463,16 @@ static void test_div(int N)
 	}
 }
 
-static void fill_maps(void)
-{
-	for(unsigned i = 0; i < sizeof lumpbuf / sizeof *lumpbuf; i++) lumpbuf[i] = (lighttable_t)rnd();
-}
-
 static void init_data(void)
 {
-	lump = lumpbuf + 256 + 7;    /* registered tables at an odd entry, one map of slack before */
-	fill_maps();
-	for(unsigned i = 0; i < sizeof othercm / sizeof *othercm; i++) othercm[i] = (lighttable_t)rnd();
+	lump = lumpbuf + 256 + 7;    /* registered lump at an odd address, one map of slack before */
+	for(unsigned i = 0; i < sizeof lumpbuf; i++) lumpbuf[i] = (uint8_t)rnd();
+	for(unsigned i = 0; i < sizeof othercm; i++) othercm[i] = (uint8_t)rnd();
 	for(unsigned i = 0; i < sizeof texbuf; i++) texbuf[i] = (uint8_t)rnd();
 	for(unsigned i = 0; i < sizeof bigbuf; i++) bigbuf[i] = (uint8_t)rnd();
 	for(unsigned i = 0; i < sizeof flatbuf; i++) flatbuf[i] = (uint8_t)rnd();
 	for(unsigned i = 0; i < sizeof transbuf; i++) transbuf[i] = (uint8_t)rnd();
-	for(unsigned i = 0; i < sizeof fbA_mem / sizeof *fbA_mem; i++) fbA_mem[i] = (pixel_t)rnd();
+	for(unsigned i = 0; i < sizeof fbA_mem; i++) fbA_mem[i] = (uint8_t)rnd();
 	resync();
 	colormaps = lump;
 	cgd_sh4_set_colormaps(lump, NMAPS, rot);
@@ -488,8 +481,8 @@ static void init_data(void)
 
 /*==== benchmarks =================================================================================*/
 
-struct colcase { int x, yl, yh, iscale, mid; const lighttable_t *cm; const uint8_t *src; };
-struct spancase { int y, x1, x2, xf, yf, xs, ys; const lighttable_t *cm; const uint8_t *src; };
+struct colcase { int x, yl, yh, iscale, mid; const uint8_t *cm, *src; };
+struct spancase { int y, x1, x2, xf, yf, xs, ys; const uint8_t *cm, *src; };
 #define BENCH_H (SCREENHEIGHT - SBARHEIGHT)     /* views[1] */
 #define NB 400
 static struct colcase cc[NB];
@@ -579,9 +572,9 @@ static void bench(void)
 	set_view(&views[1]);
 	set_ylookup(FBA);
 	colormaps = lump;
-	printf("benchmarks (%dx%d, %d-bit pixels): per output pixel, call overhead included (sim64\n"
-	       "counters; 'cyc' is the simulator's SH-1-style cycle model, NOT SH-4A timing - see README\n"
-	       "for pipeline estimates)\n", SCREENWIDTH, SCREENHEIGHT, 8 * (int)sizeof(pixel_t));
+	printf("benchmarks (%dx%d): per output pixel, call overhead included (sim64 counters; 'cyc' is\n"
+	       "the simulator's SH-1-style cycle model, NOT SH-4A timing - see README for pipeline\n"
+	       "estimates)\n", SCREENWIDTH, SCREENHEIGHT);
 	static const int lens[][2] = { {10, BENCH_H}, {1, 1}, {2, 2}, {3, 3}, {8, 8}, {32, 32}, {100, 100}, {BENCH_H, BENCH_H} };
 	for(unsigned k = 0; k < sizeof lens / sizeof *lens; k++) {
 		gen_cols(lens[k][0], lens[k][1], 0);
@@ -721,24 +714,15 @@ int main(int argc, char **argv)
 	test_columns("R_DrawColumnLow(1px,unreg)", ref_R_DrawColumnLow, R_DrawColumnLow_SH4, 1, 0, N / 8);
 	one_px = 0;
 	cgd_sh4_set_colormaps(lump, NMAPS, rot);
-	/* a palette change: new light tables, the rotated copy rebuilt in place */
-	fill_maps();
-	cgd_sh4_colormaps_changed();
-	test_columns("R_DrawColumn(newpal)", ref_R_DrawColumn, R_DrawColumn_SH4, 0, 0, N / 8);
-	test_columns("R_DrawColumnLow(newpal)", ref_R_DrawColumnLow, R_DrawColumnLow_SH4, 1, 0, N / 8);
-	test_columns("R_DrawTranslatedColumn(newpal)", ref_R_DrawTranslatedColumn, R_DrawTranslatedColumn_SH4, 0, 1, N / 8);
-	test_fuzz("R_DrawFuzzColumn(newpal)", ref_R_DrawFuzzColumn, R_DrawFuzzColumn_SH4, 0, N / 8);
-	test_spans("R_DrawSpan(newpal)", ref_R_DrawSpan, R_DrawSpan_SH4, 0, N / 8);
-	test_spans("R_DrawSpanLow(newpal)", ref_R_DrawSpanLow, R_DrawSpanLow_SH4, 1, N / 8);
-	/* the fuzz drawers' C fallbacks, called directly: the RGB565 fuzz drawers read no colormap,
-	   so only counts or fuzzpos values the engine never produces would reach them */
+	/* the fuzz drawers' C fallbacks, called directly: only counts the engine never produces
+	   would reach them */
 	test_fuzz("cgd_sh4_slow_fuzz", ref_R_DrawFuzzColumn, cgd_sh4_slow_fuzz, 0, N / 8);
 	test_fuzz("cgd_sh4_slow_fuzz_low", ref_R_DrawFuzzColumnLow, cgd_sh4_slow_fuzz_low, 1, N / 8);
 	test_expand(N / 10 + 20);
 	test_fill(N / 10 + 20);
 	test_div(N * 10);
 
-	printf("%dx%d %d-bit: %ld cases, %d failures: %s\n", SCREENWIDTH, SCREENHEIGHT,
-		8 * (int)sizeof(pixel_t), cases, failures, failures ? "FAIL" : "PASS");
+	printf("%dx%d: %ld cases, %d failures: %s\n", SCREENWIDTH, SCREENHEIGHT,
+		cases, failures, failures ? "FAIL" : "PASS");
 	return failures > 255 ? 255 : failures;
 }

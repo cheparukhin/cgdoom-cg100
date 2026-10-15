@@ -2,15 +2,14 @@
 
    Shared by the engine, the platforms and the SH4 assembly, so it holds only
    #defines. The switches come from -D (Makefile VARIANT=wide|hd; one add-in
-   per format in CMakeLists.txt):
+   per build in CMakeLists.txt):
 
    - CGD_WIDESCREEN=1: the engine renders the panel's 396x224 instead of
      320x200 (the 3D view widens; 2D art keeps its 320x200 layout, centred).
-   - CGD_TRUECOLOR=1: the engine renders RGB565 pixels instead of 8-bit
-     palette indices, with its light tables in RGB565.
-   - CGD_HD=1: both (the "HD" build), with the features of CGD_EXTRAS.
+   - CGD_HD=1: widescreen, with the features of CGD_EXTRAS (the "HD" build).
 
-   The default (all 0) is the 320x200 8-bit build. */
+   The default (all 0) is the 320x200 build. Pixels are 8-bit palette
+   indices in every build. */
 
 #ifndef CGD_CONFIG_H
 #define CGD_CONFIG_H
@@ -20,9 +19,6 @@
 #endif
 #ifndef CGD_WIDESCREEN
 #define CGD_WIDESCREEN CGD_HD
-#endif
-#ifndef CGD_TRUECOLOR
-#define CGD_TRUECOLOR CGD_HD
 #endif
 
 #if CGD_WIDESCREEN
@@ -37,13 +33,6 @@
    cgdoom.h CGD_Features), compiled in the HD build */
 #ifndef CGD_EXTRAS
 #define CGD_EXTRAS CGD_HD
-#endif
-
-/* Bytes per pixel of the engine's screens */
-#if CGD_TRUECOLOR
-#define PIXELBYTES    2
-#else
-#define PIXELBYTES    1
 #endif
 
 #endif /* CGD_CONFIG_H */

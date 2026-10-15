@@ -70,8 +70,8 @@ from the launcher. More fixes are in the [troubleshooting table](docs/USER-GUIDE
 
 - **CGDoom HD (experimental, not yet tried on a calculator):** a second add-in, `CGDoomHD.g3a`, built
   with the same command as `CGDoom.g3a` (see [Building from source](#building-from-source)). It uses the
-  whole 396×224 screen with a wider view, true-colour lighting and DOOM's original proportions, and adds
-  a crosshair, a full-screen HUD, an automap overlay and quicksave/quickload. The
+  whole 396×224 screen with a wider view and DOOM's original proportions, and adds coloured status-bar
+  numbers, a crosshair, a full-screen HUD, an automap overlay and quicksave/quickload. The
   [user guide](docs/USER-GUIDE.md#cgdoom-hd) has the details.
 - **Without the release zip:** `python3 tools/wadtool.py fetch-wad DOOM1.WAD` downloads the shareware WAD
   and packs it. Only shareware-sized WADs fit in the calculator's 4.5 MB of storage (see [WAD files](docs/USER-GUIDE.md#wad-files)).

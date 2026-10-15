@@ -49,8 +49,6 @@
 #include "cgdoom.h"
 
 #include "r_data.h"
-#include "v_video.h"
-#include "i_video.h"
 
 //
 // Graphics.
@@ -172,10 +170,6 @@ fixed_t*			spriteoffset;
 fixed_t*			spritetopoffset;
 
 const lighttable_t		*colormaps;
-#if CGD_TRUECOLOR
-const byte			*colormaps8;
-static int			colormaps_n;	/* maps in the lump */
-#endif
 
 
 //
@@ -426,7 +420,6 @@ void R_InitTextures (void)
 
   int*			patchlookup;
 
-  int				totalwidth;
   int				nummappatches;
   int				offset;
   int				maxoff;
@@ -487,8 +480,6 @@ void R_InitTextures (void)
   texturecompositesize = (int*)Z_Malloc(numtextures*sizeof(void *), PU_STATIC, 0);
   texturewidthmask = (int*)Z_Malloc(numtextures*sizeof(void *), PU_STATIC, 0);
   textureheight = (fixed_t*)Z_Malloc(numtextures*sizeof(void *), PU_STATIC, 0);
-
-  totalwidth = 0;
 
   /*//	Really complex printing shit...
   temp1 = W_GetNumForName ("S_START");  // P_???????
@@ -552,7 +543,6 @@ void R_InitTextures (void)
     texturewidthmask[i] = j-1;
     textureheight[i] = texture->height<<FRACBITS;
 
-    totalwidth += texture->width;
   }
 
   Z_Free (maptex1);
@@ -641,44 +631,24 @@ void R_InitColormaps (void)
   colormaps = (lighttable_t *)( ((int)colormaps + 255)&~0xff); 
   W_ReadLump (lump,colormaps); 
 */
-#if CGD_TRUECOLOR
-  /* CGDoom: the RGB565 tables, one per map of the lump, built from the
-     palette by R_BuildLightTables (first here, then at every I_SetPalette) */
-  {
-    void *p;
-
-    colormaps8 = (const byte *)W_CacheLumpNameConst ("COLORMAP", PU_STATIC);
-    colormaps_n = W_LumpLength (W_GetNumForName ("COLORMAP")) / 256;
-    if (colormaps_n < NUMCOLORMAPS + 1)
-      I_Error ("R_InitColormaps: COLORMAP has %d maps", colormaps_n);
-    p = Z_Malloc (colormaps_n * 256 * sizeof(lighttable_t) + 31, PU_STATIC,
-      NULL);
-    colormaps = (lighttable_t *)(((uintptr_t)p + 31) & ~(uintptr_t)31);
-    I_SetPalette ((const byte *)W_CacheLumpNameConst ("PLAYPAL", PU_CACHE));
-  }
-#else
   colormaps = (lighttable_t *)W_CacheLumpNameConst ("COLORMAP", PU_STATIC);
-#endif
 
 #ifdef CGD_SH4
-  /* The SH4 drawers index a "rotated" copy of the light tables with the
+  /* The SH4 drawers index a "rotated" copy of the whole lump with the
      sign-extended texel (src/engine/sh4/README.md §2, §7.2): one copy of
-     nmaps*256 entries (34 maps: 8704 bytes, or 17408 for the RGB565 tables),
-     32-byte aligned, kept for the session. The RGB565 copy follows the
-     tables: R_BuildLightTables rebuilds it (cgd_sh4_colormaps_changed) at
-     every palette change. Colormap pointers outside the registered tables
-     (none in vanilla) make the drawers fall back to C. */
+     nmaps*256 bytes (34 maps = 8704 for DOOM), 32-byte aligned, kept for the
+     session like the lump itself. Colormap pointers outside the registered
+     lump (none in vanilla) make the drawers fall back to C. */
   {
     int nmaps = W_LumpLength (W_GetNumForName ("COLORMAP")) / 256;
-    lighttable_t *rot = NULL;
+    byte *rot = NULL;
 
     if (nmaps > 0)
     {
-      if (nmaps > CGD_SH4_MAXMAPS)
-        nmaps = CGD_SH4_MAXMAPS;
-      rot = (lighttable_t *)Z_Malloc (nmaps * 256 * sizeof(lighttable_t) + 31,
-        PU_STATIC, NULL);
-      rot = (lighttable_t *)(((uintptr_t)rot + 31) & ~(uintptr_t)31);
+      if (nmaps > 256)
+        nmaps = 256;
+      rot = (byte *)Z_Malloc (nmaps * 256 + 31, PU_STATIC, NULL);
+      rot = (byte *)(((uintptr_t)rot + 31) & ~(uintptr_t)31);
     }
     cgd_sh4_set_colormaps (colormaps, nmaps, rot);
   }
@@ -686,51 +656,6 @@ void R_InitColormaps (void)
 }
 
 
-
-#if CGD_TRUECOLOR
-//
-// R_BuildLightTables
-// CGDoom: the RGB565 light tables. Map k < NUMCOLORMAPS (light level k, 0 =
-// brightest) is the base palette with each channel scaled by (32-k)/32,
-// then tinted by the current palette (damage, bonus, radiation suit: after
-// the light, so that a flash shows in dark places too, as in the 8-bit
-// build), then gamma-corrected, rounded to the nearest RGB565: the light
-// falls off in RGB, with none of COLORMAP's snapping to the palette's few
-// dark shades. The other maps (the invulnerability map 32) are COLORMAP's,
-// through the palette.
-// CGD_TrueColorExact uses COLORMAP for every map: then a frame is the 8-bit
-// build's frame through its palette, except under spectres (r_draw.c
-// FUZZDARK), which the tests compare.
-//
-void R_BuildLightTables (const byte *base, const vtint_t *tint,
-  const byte *gamma)
-{
-  lighttable_t *t = (lighttable_t *)colormaps;
-  int k, c;
-
-  for (k = 0; k < colormaps_n; k++, t += 256)
-  {
-    if (k >= NUMCOLORMAPS || CGD_TrueColorExact)
-    {
-      const byte *m = colormaps8 + k*256;
-      for (c = 0; c < 256; c++)
-        t[c] = v_palette[m[c]];
-      continue;
-    }
-    for (c = 0; c < 256; c++)
-    {
-      int l = NUMCOLORMAPS - k, half = NUMCOLORMAPS / 2;
-      t[c] = V_TintedRGB565 (tint, gamma,
-        (base[3*c] * l + half) / NUMCOLORMAPS,
-        (base[3*c+1] * l + half) / NUMCOLORMAPS,
-        (base[3*c+2] * l + half) / NUMCOLORMAPS);
-    }
-  }
-#ifdef CGD_SH4
-  cgd_sh4_colormaps_changed ();
-#endif
-}
-#endif
 
 //
 // R_InitData

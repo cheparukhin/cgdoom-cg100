@@ -250,7 +250,7 @@ extern const patch_t *hu_font[HU_FONTSIZE];
 void F_TextWrite (void)
 {
   const byte* src;
-  pixel_t* dest;
+  byte* dest;
 
   int  x,y,w;
   int  count;
@@ -261,15 +261,15 @@ void F_TextWrite (void)
 
   // erase the entire screen to a tiled background
   src = (const byte*)W_CacheLumpNameConst( finaleflat , PU_CACHE);
-  dest = screens[0];
+  dest = (byte*)screens[0];
 
   /* CGDoom: any screen width (vanilla's 64-pixel copies need a multiple of
-     64), through the palette in true colour */
+     64) */
   for (y=0 ; y<SCREENHEIGHT ; y++)
   {
     const byte *row = src+((y&63)<<6);
     for (x=0 ; x<SCREENWIDTH ; x++)
-      *dest++ = V_PIXEL(row[x&63]);
+      *dest++ = row[x&63];
   }
 
   V_MarkRect (0, 0, SCREENWIDTH, SCREENHEIGHT);
@@ -560,8 +560,8 @@ void F_DrawPatchCol( int  x,const patch_t* patch, int  col )
 {
   column_t* column;
   byte* source;
-  pixel_t* dest;
-  pixel_t* desttop;
+  byte* dest;
+  byte* desttop;
   int  count;
 
   column = (column_t *)((byte *)patch + INTFromBytes((const byte*)&(patch->columnofsLE[col])));
@@ -577,7 +577,7 @@ void F_DrawPatchCol( int  x,const patch_t* patch, int  col )
 
     while (count--)
     {
-      *dest = V_PIXEL(*source++);
+      *dest = *source++;
       dest += SCREENWIDTH;
     }
     column = (column_t *)(  (byte *)column + column->length + 4 );
@@ -618,9 +618,9 @@ void F_BunnyScroll (void)
     scrolled = 640 - SCREENWIDTH;
   if (scrolled < 0)
     scrolled = 0;
-  V_FillPixels (screens[0], HEIGHTDELTA*SCREENWIDTH, V_PIXEL(0));
-  V_FillPixels (screens[0] + (HEIGHTDELTA+ORIGHEIGHT)*SCREENWIDTH,
-    (SCREENHEIGHT-HEIGHTDELTA-ORIGHEIGHT)*SCREENWIDTH, V_PIXEL(0));
+  memset (screens[0], 0, HEIGHTDELTA*SCREENWIDTH);
+  memset (screens[0] + (HEIGHTDELTA+ORIGHEIGHT)*SCREENWIDTH, 0,
+    (SCREENHEIGHT-HEIGHTDELTA-ORIGHEIGHT)*SCREENWIDTH);
 #endif
 
   for ( x=0 ; x<SCREENWIDTH ; x++)

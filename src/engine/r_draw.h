@@ -30,8 +30,7 @@
 
 /* CGD_SH4: the SH4AL-DSP assembly drawers of src/engine/sh4 are used
    (calculator and simulator builds, both SH; -DCGD_NO_SH4 keeps the C
-   drawers there, e.g. for a C-only reference ELF), in every screen format
-   (r_draw_sh4.S for 8-bit pixels, r_draw16_sh4.S for CGD_TRUECOLOR). The
+   drawers there, e.g. for a C-only reference ELF), at any screen width. The
    host never uses them. */
 #if defined(__sh__) && !defined(CGD_NO_SH4)
 # define CGD_SH4 1

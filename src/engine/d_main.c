@@ -139,7 +139,6 @@ void D_Display (void)
   boolean     done;
   boolean     wipe;
   boolean     redrawsbar;
-  int         wipepalettes = 0;   /* CGDoom: CGD_Stats at the wipe's start */
 
   redrawsbar = false;
 
@@ -152,12 +151,11 @@ void D_Display (void)
   }
 
   // save the current screen if about to wipe
-  /* CGDoom: no wipe in a timedemo (vanilla timed its wipes too), or
-     without memory for it (wipe_StartScreen) */
-  if (gamestate != wipegamestate && !timingdemo && wipe_StartScreen())
+  /* CGDoom: no wipe in a timedemo (vanilla timed its wipes too) */
+  if (gamestate != wipegamestate && !timingdemo)
   {
     wipe = true;
-    wipepalettes = CGD_Stats.PaletteChanges;
+    wipe_StartScreen();
   }
   else
   {
@@ -168,24 +166,12 @@ void D_Display (void)
   if (gamestate == GS_LEVEL && gametic)
     HU_Erase();
 
-  /* CGDoom: the palette of a new non-level state (vanilla set it after
-     drawing, which the 8-bit palette recolours at presentation, but a
-     true-colour frame keeps the colours it was drawn with: the wipe would
-     melt into a tinted intermission) */
-  if (gamestate != oldgamestate && gamestate != GS_LEVEL)
-    I_SetPalette ((byte *)W_CacheLumpNameConst ("PLAYPAL", PU_CACHE));
-
   // do buffered drawing
   switch (gamestate)
   {
   case GS_LEVEL:
     if (!gametic)
       break;
-#if CGD_TRUECOLOR
-    /* CGDoom: the damage/bonus palette before the automap is drawn
-       (ST_Drawer below sets it for the rest) */
-    ST_doPaletteStuff ();
-#endif
     /* CGDoom: AM_FULLMAP is automapactive without the overlay (am_map.h),
        which is drawn after the view */
     if (AM_FULLMAP)
@@ -225,19 +211,10 @@ void D_Display (void)
      size (oldgamestate is reset by R_ExecuteSetViewSize above). Vanilla did
      this after HU_Drawer; doing it before keeps the HUD messages that are
      drawn in the border. */
-  /* (CGDoom true colour: also after a palette change, which recolours
-     everything only in the 8-bit build) */
-#if CGD_TRUECOLOR
-  static int border_serial;
-  boolean newpalette = border_serial != v_palette_serial;
-  border_serial = v_palette_serial;
-#else
-  const boolean newpalette = false;
-#endif
   if (gamestate == GS_LEVEL && !AM_FULLMAP && gametic
     && scaledviewwidth != SCREENWIDTH
     && (menuactive || menuactivestate || automapactivestate
-      || inhelpscreensstate || oldgamestate != GS_LEVEL || newpalette))
+      || inhelpscreensstate || oldgamestate != GS_LEVEL))
     R_DrawViewBorder ();
 
   // draw the view directly
@@ -255,6 +232,10 @@ void D_Display (void)
 
   if (gamestate == GS_LEVEL && gametic)
     HU_Drawer ();
+
+  // clean up border stuff
+  if (gamestate != oldgamestate && gamestate != GS_LEVEL)
+    I_SetPalette ((byte *)W_CacheLumpNameConst ("PLAYPAL", PU_CACHE));
 
   menuactivestate = menuactive;
   automapactivestate = AM_FULLMAP;
@@ -286,7 +267,6 @@ void D_Display (void)
 
   // wipe update
   wipe_EndScreen(0, 0, SCREENWIDTH, SCREENHEIGHT);
-  CGD_Stats.WipeStalePalette = CGD_Stats.PaletteChanges != wipepalettes;
 
   wipestart = I_GetTime () - 1;
 
@@ -305,7 +285,6 @@ void D_Display (void)
     M_Drawer ();       // menu is drawn even on top of wipes
     I_Flip ();        // page flip or blit buffer
   } while (!done);
-  CGD_Stats.WipeStalePalette = 0;
   gamestate = oldgamestate;
   wipegamestate= oldgamestate;
 }

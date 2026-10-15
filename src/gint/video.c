@@ -1,29 +1,27 @@
 /* CGDoom gint platform: video (PL_SetPalette / PL_FinishUpdate /
    PL_VideoReset).
 
-   The engine's frame is SCREENWIDTH x SCREENHEIGHT (cgd_config.h): 320x200
-   in the default build, centered on the 396x224 panel (window x 38-357,
-   y 12-211, borders black), or the whole panel in the widescreen builds. Its
-   pixels are 8-bit palette indices, or RGB565 in the true-colour build. The
-   window is always set with gint's r61524_start_frame(), which supports both
-   the classic R61524 and the new 2025 controllers; r61524_win_set() is never
-   used because its register numbers are commands on the new controller.
+   The engine's frame is SCREENWIDTH x SCREENHEIGHT 8-bit pixels
+   (cgd_config.h): 320x200 in the default build, centered on the 396x224
+   panel (window x 38-357, y 12-211, borders black), or the whole panel in
+   the widescreen builds. The window is always set with gint's
+   r61524_start_frame(), which supports both the classic R61524 and the new
+   2025 controllers; r61524_win_set() is never used because its register
+   numbers are commands on the new controller.
 
-   Display path: build a 32-byte aligned RGB565 copy of the frame in cached
-   SDRAM (8-bit: the palette expansion cgd_expand_p8_rgb565_p32, replaceable;
-   true colour: a copy), each line allocated with movca.l and purged with
-   ocbp, so only a synco is needed before the DMA; then
+   Display path: expand into a 32-byte aligned RGB565 frame in cached SDRAM
+   (cgd_expand_p8_rgb565_p32, replaceable; each line is allocated with
+   movca.l and purged with ocbp, so only a synco is needed before the DMA),
    r61524_start_frame(), then dma_transfer_async(channel 0, DMA_32B, one
    block per 32 bytes, -> 0xb4000000 fixed) and return immediately: the
    bus-bound transfer (~8 ms for 320x200 by estimate, ~11 ms for 396x224)
-   overlaps the next frame, which the engine draws into its own buffer. The
-   next call waits for it first. Channel 0 is gint's display channel, so
-   gint's dupdate() also waits for it. This is the path the fx-CG100 runs on
-   (first hardware run, new display, OS 02.20).
+   overlaps the next frame. The next call waits for it first. Channel 0 is
+   gint's display channel, so gint's dupdate() also waits for it. This is
+   the path the fx-CG100 runs on (first hardware run, new display, OS 02.20).
    Fallback, without the frame buffer (gvid_init() failed) or for an
-   unaligned frame: CPU writes to the LCD data register (palette lookups in
-   8-bit, CGDoom's approach), ~8 ms of CPU per 320x200 frame.
-   In 8-bit both read the palette from one persistent 1 KiB pal32 table
+   unaligned frame: CPU writes of palette lookups to the LCD data register
+   (CGDoom's approach), ~8 ms of CPU per 320x200 frame.
+   Both read the palette from one persistent 1 KiB pal32 table
    (cgd_expand_build_pal32 layout), rebuilt by PL_SetPalette(). The
    expansion runs in the foreground; the _p32 routine (asm and weak C) has
    no DSP repeat loops and uses no DSP/MAC registers, so it would also be
@@ -54,12 +52,10 @@
 _Static_assert(FB_PIXELS % 16 == 0, "expansion works on 16 pixels");
 _Static_assert(FB_W <= LCD_W && FB_H <= LCD_H, "the frame fits the panel");
 
-#if !CGD_TRUECOLOR
 /* Palette as the expansion's pal32 table (cgd_expand_build_pal32 layout:
    g_pal32[k] = pal[k ^ 0x80] * 0x00010001), rebuilt by PL_SetPalette();
    1 KiB, replaces the 512-byte RGB565 copy (net +512 bytes of .bss) */
 static uint32_t g_pal32[256] __attribute__((aligned(32)));
-#endif
 static void *g_fb16_alloc = NULL;
 static uint16_t *g_fb16 = NULL;
 static bool g_window_narrow = false;
@@ -67,39 +63,6 @@ static bool g_borders_dirty = true;
 
 /* RGB565 of palette index b */
 #define PAL565(t, b)  ((uint16_t)(t)[(b) ^ 0x80])
-
-#if CGD_TRUECOLOR
-//---
-// True colour: the RGB565 frame is copied for the DMA (the engine draws the
-// next frame into its buffer while the DMA sends this one)
-//---
-
-/* dst and src 32-byte aligned, npixels % 16 == 0. P1 dst: movca.l and
-   ocbp per line, as the expansion below (data in RAM on return). */
-static void copy_rgb565(uint16_t *dst, uint16_t const *src, int npixels)
-{
-	uint32_t const *s = (uint32_t const *)src;
-	uint32_t *d = (uint32_t *)dst;
-
-	for(int i = 0; i < npixels; i += 16, s += 8, d += 8) {
-		uint32_t w0 = s[0], w1 = s[1], w2 = s[2], w3 = s[3];
-		uint32_t w4 = s[4], w5 = s[5], w6 = s[6], w7 = s[7];
-#ifdef __sh__
-		/* The source line after next, while this one is copied */
-		__asm__ volatile("pref @%0" :: "r"(s + 16));
-		__asm__ volatile("movca.l %1, @%0" :: "r"(d), "z"(w0)
-			: "memory");
-#else
-		d[0] = w0;
-#endif
-		d[1] = w1; d[2] = w2; d[3] = w3;
-		d[4] = w4; d[5] = w5; d[6] = w6; d[7] = w7;
-#ifdef __sh__
-		__asm__ volatile("ocbp @%0" :: "r"(d) : "memory");
-#endif
-	}
-}
-#else
 
 //---
 // Default 8-bit -> RGB565 expansion (weak; see cgd_gint.h for the contract).
@@ -171,7 +134,6 @@ void cgd_expand_p8_rgb565_p32(uint16_t *dst, uint8_t const *src,
 		}
 	}
 }
-#endif /* CGD_TRUECOLOR */
 
 //---
 // Helpers
@@ -213,16 +175,13 @@ static void start_window(void)
 // Presentation paths
 //---
 
-static void present_cpu(pl_pixel_t const *fb)
+static void present_cpu(uint8_t const *fb)
 {
 	dma_transfer_wait(0);
 	if(g_borders_dirty)
 		clear_borders();
 	start_window();
 
-#if CGD_TRUECOLOR
-	cpu_push16(fb, FB_PIXELS);
-#else
 	/* No expansion buffer here: each pixel is looked up in the same pal32
 	   table and written to the LCD data register */
 	uint32_t const *pal32 = g_pal32;
@@ -240,25 +199,20 @@ static void present_cpu(pl_pixel_t const *fb)
 		for(int i = 0; i < FB_PIXELS; i++)
 			*LCD_DATA = PAL565(pal32, fb[i]);
 	}
-#endif
 }
 
-static void present_dma(pl_pixel_t const *fb)
+static void present_dma(uint8_t const *fb)
 {
 	/* Previous frame done? (normally long done: rendering takes longer) */
 	dma_transfer_wait(0);
 	if(g_borders_dirty)
 		clear_borders();
 
-	/* g_fb16 is P1 (gvid_init): the expansion (or the copy) allocates
-	   every line with movca.l and purges it with ocbp, so the frame is
-	   already in SDRAM (no per-line ocbwb is needed). Only drain the stores
-	   before the DMA starts. */
-#if CGD_TRUECOLOR
-	copy_rgb565(g_fb16, fb, FB_PIXELS);
-#else
+	/* g_fb16 is P1 (gvid_init): the expansion allocates every line with
+	   movca.l and purges it with ocbp, so the frame is already in SDRAM
+	   (no per-line ocbwb is needed). Only drain the stores before the DMA
+	   starts. */
 	cgd_expand_p8_rgb565_p32(g_fb16, fb, g_pal32, FB_PIXELS);
-#endif
 	synco();
 
 	start_window();
@@ -318,7 +272,7 @@ void gvid_clear_lcd(void)
 	g_borders_dirty = false;
 }
 
-void gvid_push_test(pl_pixel_t const *fb)
+void gvid_push_test(uint8_t const *fb)
 {
 	PL_FinishUpdate(fb);
 	dma_transfer_wait(0);
@@ -328,7 +282,6 @@ void gvid_push_test(pl_pixel_t const *fb)
 // PL_* API
 //---
 
-#if !CGD_TRUECOLOR
 void PL_SetPalette(const uint16_t pal565[256])
 {
 	/* Persistent table: built here once
@@ -339,15 +292,13 @@ void PL_SetPalette(const uint16_t pal565[256])
 	if(pal565)
 		cgd_expand_build_pal32(g_pal32, pal565);
 }
-#endif
 
-void PL_FinishUpdate(const pl_pixel_t *fb)
+void PL_FinishUpdate(const uint8_t *fb)
 {
 	if(!fb)
 		return;
 
-	/* The engine's screens are 32-byte aligned (i_system.c) */
-	if(g_fb16 && ((uintptr_t)fb & (CGD_TRUECOLOR ? 31 : 3)) == 0)
+	if(g_fb16 && ((uintptr_t)fb & 3) == 0)
 		present_dma(fb);
 	else
 		present_cpu(fb);

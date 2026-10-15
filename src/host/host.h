@@ -19,8 +19,6 @@ typedef struct {
     int zone_count;
     int max_tics;           /* quit after this many game tics (0 = no limit) */
     FILE *crc_file;         /* per-frame CRC output (NULL = none) */
-    FILE *crc565_file;      /* per-frame CRC of the RGB565 frame (NULL =
-                               none) */
     const char *shot_prefix;/* PPM screenshots (NULL = none) */
     int shot_every;         /* every N frames (0 = last frame only) */
     /* Virtual clock: each presented frame advances it by
