@@ -207,8 +207,11 @@ fx-CG100 ([PLATFORM.md](PLATFORM.md)), so quitting means returning from `main()`
   - A packed doom1.wad (3318 KiB image) should fit in RAM. That is a calculation only; only the timedemo's
     result screen shows the WAD mode a game used. Diagnostics → Memory shows the largest free block,
     against which the image size plus 768 KiB + 1 MiB can be compared.
-- **Savegames** are built in a 176 KiB buffer (`SAVEGAMESIZE`). Shareware levels fit; a few larger levels
-  of other IWADs do not (§8).
+- **Savegames** are built in a 176 KiB buffer (`SAVEGAMESIZE`), malloc'd for the duration of the save
+  (the zone is the fallback). In the zone it needed 176 KiB in one piece, which the delayed copies of
+  earlier saves (`PU_STATIC`, kept until exit) and the levels loaded around them could break up, and
+  `Z_Malloc` then ended the game. Shareware levels fit in the buffer; a few larger levels of other IWADs do
+  not (§8).
 
 ### 2.5 UTLB protection
 
@@ -251,7 +254,7 @@ the WAD back-ends are in `src/gint`, and `src/host` runs the same engine headles
 - Full-screen pictures (title, help, finale) were read from flash fragment by fragment, with a post
   offset that shifted their lower part by a row. They are now cached and drawn with `V_DrawPatch`.
 - The aligned-lump test checked 2-byte alignment where 4 bytes are needed.
-- Savegames were built in the screen buffer; they now have their own 176 KiB zone buffer.
+- Savegames were built in the screen buffer; they now have their own 176 KiB buffer (§2.4).
 
 **Vanilla parity.** CGDoom's arithmetic and parts of its game logic differed from linuxdoom-1.10, so
 id's demos desynced. The engine now matches linuxdoom tic by tic on DEMO1-3 of the shareware DOOM v1.9
@@ -516,7 +519,7 @@ Hardware runs are manual, so automated correctness rests on three things:
 | `make test-host` | The 35 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
 | `make VARIANT=wide test-host`, `make VARIANT=hd test-host` | The same scenarios in the widescreen and HD builds against `tests/golden-wide` and `tests/golden-hd` (the HD build with all its extras on) |
 | `make test-tc-exact` | `tests/tc-exact.sh`: every scenario in the 396x224 8-bit build (with `-palredraw`, its status bar redrawn at each palette change) and in the HD build (`-tcexact -features none`); their frames as RGB565 (`-crc565`) must be equal, except the frames that differ on purpose and are flagged F: spectre fuzz, the frames after a gamma change, and wipes across a palette change (the 8-bit palette also recolours pixels drawn earlier) |
-| `make test-quicksave` | `tests/quicksave.sh`, HD build: the quicksave and quickload actions (bound in a `CGDOOM.CFG`, which the host reads from `-data`): slot pick, confirmed overwrite, confirmed load, cancelled load |
+| `make test-quicksave` | `tests/quicksave.sh`, HD build: the quicksave and quickload actions (bound in a `CGDOOM.CFG`, which the host reads from `-data`): slot pick, confirmed overwrite, confirmed load, cancelled load; then 40 save/load rounds over two level exits in a zone too small for the old in-zone save buffer |
 | `make test-variants` | Both variants' scenarios against their goldens, also under ASan/UBSan, plus `test-tc-exact` and `test-quicksave` |
 | `make test-asan` | The same 35 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys, skill-load and timedemo tests |
 | `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly, also with the Doom menu opened while recording), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load`, `test-timedemo` |

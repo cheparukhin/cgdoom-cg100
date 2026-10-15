@@ -1165,8 +1165,14 @@ void G_DoSaveGame (void)
 
     /* CGDoom: dedicated buffer (was screens[0]); the archive stops at its
        end (save_overflow) instead of writing past it. The header always
-       fits. */
-    save_p = savebuffer = Z_Malloc (SAVEGAMESIZE, PU_STATIC, 0);
+       fits. The buffer is malloc'd for the duration of the save, the zone
+       being only the fallback: after level changes and loads, the delayed
+       copies of earlier saves (PU_STATIC) can split the zone so that it no
+       longer has SAVEGAMESIZE contiguous bytes, and Z_Malloc's failure
+       ended the game. */
+    byte *heapbuf = malloc (SAVEGAMESIZE);
+    save_p = savebuffer = heapbuf ? heapbuf
+      : Z_Malloc (SAVEGAMESIZE, PU_STATIC, 0);
     save_end = savebuffer + SAVEGAMESIZE;
     save_overflow = false;
 
@@ -1229,7 +1235,10 @@ void G_DoSaveGame (void)
       I_ReinitAfterError();
     }
 
-    Z_Free (savebuffer);
+    if (heapbuf)
+      free (heapbuf);
+    else
+      Z_Free (savebuffer);
     savebuffer = NULL;
 
     gameaction = ga_nothing;

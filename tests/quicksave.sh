@@ -9,7 +9,15 @@
 # quicksave asks before overwriting it (EXE confirms); 100 tics later a
 # quickload asks too and goes back to the second save, so the level ends
 # 100 tics short of its unloaded run (GAMELOG end leveltime=). A quickload
-# answered with the menu key (escape) changes nothing. Exit status 0 = PASS.
+# answered with the menu key (escape) changes nothing.
+#
+# Then 40 quicksave/quickload rounds over two level exits in an 1850 KiB
+# zone, which the same play without saves also needs: every save has its
+# 176 KiB archive buffer, and the delayed copies of earlier saves stay in
+# the zone (PU_STATIC) across the loads. With the buffer in the zone, the
+# zone soon had no 176 KiB left in one piece and Z_Malloc ended the game
+# (it took over 1900 KiB); it is malloc'd now (g_game.c G_DoSaveGame).
+# Exit status 0 = PASS.
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BIN=
@@ -69,4 +77,26 @@ d=$(head -c 24 "$OUT"/loaded/*_0.DSG | tr '\000' '\n' | head -n 1)
 diff=$((kept - loaded))
 [ $diff -ge 100 ] && [ $diff -le 110 ] ||
     fail "leveltime $kept without the load, $loaded with it (expected ~100 less)"
-echo "PASS quicksave (slot picked, overwrite and load confirmed, escape cancels)"
+
+dir=$OUT/cycles
+rm -rf "$dir"; mkdir -p "$dir" || exit 2
+printf 'Version=1\nKeymap.QuickSave=TAN\nKeymap.QuickLoad=COS\n' \
+    > "$dir/CGDOOM.CFG"
+{
+    printf '20\n1 fwd\n5\n1 k:TAN\n3\n1 enter\n3\n1 enter\n'
+    i=0
+    while [ $i -lt 40 ]; do
+        printf '25 fwd run fire\n5 left\n1 k:TAN\n3\n1 enter\n'
+        printf '20 fwd fire\n1 k:COS\n3\n1 enter\n'
+        i=$((i + 1))
+    done
+    printf '5000\n'
+} > "$dir/input.txt"
+"$BIN" -iwad "$WAD" -warp 1 1 -skill 2 -tics 2700 -input "$dir/input.txt" \
+    -data "$dir" -zone 1850 -exitat 700,1500 -gamelog > "$dir/run.log" 2>&1 ||
+    fail "cycles: run failed in an 1850 KiB zone (see $dir/run.log)"
+# Each round opens two prompts (GAMELOG idle=2: menu active)
+prompts=$(grep -c '^GAMELOG idle .*idle=2$' "$dir/run.log")
+[ "$prompts" -ge 60 ] || fail "cycles: only $prompts prompts (see $dir/run.log)"
+
+echo "PASS quicksave (slot picked, overwrite and load confirmed, escape cancels, 40 save/load rounds in a small zone)"
