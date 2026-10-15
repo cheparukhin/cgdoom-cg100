@@ -893,7 +893,9 @@ void R_SetupFrame (player_t* player)
 // R_DrawCrosshair
 // CGDoom: CGD_FEAT_CROSSHAIR. Four arms of two pixels around an open centre,
 // at the centre of the view (where a shot goes when autoaim finds nothing
-// above or below), in the palette's brightest red. Drawn over the weapon.
+// above or below), in the palette's pure yellow: much brighter than red,
+// which vanishes on demons, blood, red walls, the pain tint and the
+// pistol's flash. Drawn over the weapon.
 //
 static void R_DrawCrosshair (void)
 {
@@ -902,10 +904,10 @@ static void R_DrawCrosshair (void)
   };
   int cx = viewwindowx + scaledviewwidth/2;
   int cy = viewwindowy + viewheight/2;
-  pixel_t red = V_PIXEL(176);
+  pixel_t yellow = V_PIXEL(231);
 
   for (int i = 0; i < 8; i++)
-    screens[0][(cy + arm[i][1])*SCREENWIDTH + cx + arm[i][0]] = red;
+    screens[0][(cy + arm[i][1])*SCREENWIDTH + cx + arm[i][0]] = yellow;
 }
 #endif
 

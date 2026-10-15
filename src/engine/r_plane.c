@@ -551,6 +551,12 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
       //  by INVUL inverse mapping.
       dc_colormap = colormaps;
       dc_texturemid = skytexturemid;
+      /* CGDoom: a view taller than vanilla's (the full-screen view of the
+         widescreen builds without the aspect-ratio correction) would show
+         the sky texture wrapped at the top: the top row starts at the
+         texture's top instead. Vanilla's views never reach it. */
+      if (dc_texturemid < centery*dc_iscale)
+        dc_texturemid = centery*dc_iscale;
       for (x=pl->minx ; x <= pl->maxx ; x++)
       {
         dc_yl = pl->top[x];

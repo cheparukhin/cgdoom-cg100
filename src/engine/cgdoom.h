@@ -151,8 +151,8 @@ extern int CGD_PlayDemoOnly;
 #define CGD_FEAT_COLORNUMS 0x08 /* status-bar health, armour and ammo
                                    coloured by level; true colour only
                                    (st_stuff.c) */
-#define CGD_FEAT_CROSSHAIR 0x10 /* a small red cross at the centre of the
-                                   view (r_main.c) */
+#define CGD_FEAT_CROSSHAIR 0x10 /* a small yellow cross at the centre of
+                                   the view (r_main.c) */
 #define CGD_FEAT_AUTOMAP  0x20  /* automap: the map key also gives an
                                    overlay that turns with the player;
                                    kills, items, secrets and time shown
