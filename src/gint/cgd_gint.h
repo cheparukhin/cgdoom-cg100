@@ -552,8 +552,9 @@ int gclk_current(void);
 /* hints.c: one recovery line for common fatal errors (NULL: none) */
 char const *gfatal_hint(char const *msg);
 
-/* wads: the launcher's WAD list (the Storage page can probe one) */
-void gdiag_screen(gfs_entry_t const *wads, int count);
+/* wads: the launcher's WAD list (the Storage page can probe one). Returns
+   the index of the WAD to run a timedemo with (Benchmarks page), or -1. */
+int gdiag_screen(gfs_entry_t const *wads, int count);
 
 //---
 // stack.S

@@ -9,7 +9,8 @@
    (an fxlink text channel would need the USB driver and a connected host).
 
    Pages (LEFT/RIGHT): System, Memory, Storage/WAD (with a read-only
-   block-map probe of a WAD), Benchmarks, Log. */
+   block-map probe of a WAD), Benchmarks (which also starts a timedemo),
+   Log. */
 
 #include "cgd_gint.h"
 
@@ -339,6 +340,12 @@ static void page_bench(void)
 {
 	LINE("EXE/OK: run at the OS clock and at %s",
 		gclk_name(GCLK_F4));
+	if(g_wad_count > 0) {
+		LINE("1: timedemo of %s (Storage page's WAD): its",
+			g_wads[g_wad_sel].name);
+		LINE("   demos at %s, uncapped; CGDoom exits after",
+			gclk_name(GCLK_F4));
+	}
 	for(int k = 0; k < 2; k++) {
 		bench_t const *b = &g_bench[k];
 		if(!b->done)
@@ -365,7 +372,7 @@ static void page_log(void)
 	}
 }
 
-void gdiag_screen(gfs_entry_t const *wads, int count)
+int gdiag_screen(gfs_entry_t const *wads, int count)
 {
 	g_wads = wads;
 	g_wad_count = count;
@@ -406,9 +413,12 @@ void gdiag_screen(gfs_entry_t const *wads, int count)
 		}
 		else if(k == GK_OK && page == 2)
 			probe_wad();
+		else if(k == GK_DIGIT0 + 1 && page == 3 && count > 0)
+			return g_wad_sel;
 		else if((k == GK_UP || k == GK_DOWN) && page == 2 && count > 0)
 			g_wad_sel = (g_wad_sel + (k == GK_UP ? count - 1 : 1)) % count;
 		else if(k == GK_BACK || k == GK_QUIT)
 			break;
 	}
+	return -1;
 }

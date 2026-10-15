@@ -105,6 +105,7 @@ boolean     sendsave;              // send a save event next tic
 boolean     usergame;               // ok to save / end game 
 
 boolean     timingdemo;             // if true, exit with report on completion 
+static uint32_t timedemo_start;     // CGDoom: PL_GetMicros at a run's start
 boolean     nodrawers;              // for comparative timing purposes 
 boolean     noblit;                 // for comparative timing purposes 
 int      starttime;           // for comparative timing purposes    
@@ -1552,6 +1553,13 @@ static void G_RejectDemo (const char *why, int value)
     Z_Free (demobuffer);
   demobuffer = demo_p = demoplayend = NULL;
   gameaction = ga_nothing;
+  /* CGDoom: a timedemo drops the run and goes on with the next demo */
+  if (timingdemo)
+  {
+    CGD_TimeDemoCount--;
+    if (!G_TimeDemo ())
+      fuck = true;
+  }
 }
 
 void G_DoPlayDemo (void)
@@ -1661,21 +1669,58 @@ void G_DoPlayDemo (void)
 
   usergame = false;
   demoplayback = true;
+
+  /* CGDoom: a timedemo run starts once its level is loaded */
+  if (timingdemo && CGD_TimeDemoCount > 0)
+  {
+    CGD_TimeDemoRuns[CGD_TimeDemoCount - 1].frames = 0;
+    timedemo_start = PL_GetMicros ();
+  }
 }
 
 //
 // G_TimeDemo 
+// CGDoom: starts the next of the WAD's DEMO1..DEMO4 in timedemo mode
+// (CGD_TimeDemo, cgdoom.h). Returns false when no demo is left.
 //
-void G_TimeDemo (char* name) 
+boolean G_TimeDemo (void) 
 {   
+  static char names[CGD_TIMEDEMO_MAX][8];
+  static int next = 0;
+  CGD_TimeDemoRun *run;
+
+  while (next < CGD_TIMEDEMO_MAX)
+  {
+    sprintf (names[next], "DEMO%d", next + 1);
+    if (W_CheckNumForName (names[next]) >= 0)
+      break;
+    next++;
+  }
+  if (next >= CGD_TIMEDEMO_MAX)
+    return false;
+
+  run = &CGD_TimeDemoRuns[CGD_TimeDemoCount++];
+  strcpy (run->name, names[next]);
+  run->frames = 0;
+  run->micros = 0;
+
   nodrawers = 0; 
   noblit = 0; 
   timingdemo = true; 
   singletics = true; 
 
-  defdemoname = name; 
+  defdemoname = names[next++]; 
+  defdemofilename = NULL;
   gameaction = ga_playdemo; 
+  return true;
 } 
+
+/* CGDoom: a timedemo frame was rendered (D_DoomLoop) */
+void G_TimeDemoFrame (void)
+{
+  if (timingdemo && CGD_TimeDemoCount > 0)
+    CGD_TimeDemoRuns[CGD_TimeDemoCount - 1].frames++;
+}
 
 
 /* 
@@ -1690,13 +1735,26 @@ void G_TimeDemo (char* name)
 
 boolean G_CheckDemoStatus (void) 
 { 
-  int             endtime; 
-
+  /* CGDoom: a timedemo run ends (vanilla stopped with I_Error's report):
+     the demo is released as below, then the next one starts, or the game
+     quits after the last (cgdoom.h) */
   if (timingdemo) 
   { 
-    endtime = I_GetTime (); 
-    I_Error ("timed %i gametics in %i realtics",gametic 
-      , endtime-starttime); 
+    CGD_TimeDemoRuns[CGD_TimeDemoCount - 1].micros =
+      PL_GetMicros () - timedemo_start;
+    Z_ChangeTag (demobuffer, PU_CACHE);
+    demoplayback = false;
+    netdemo = false;
+    netgame = false;
+    deathmatch = false;
+    playeringame[1] = playeringame[2] = playeringame[3] = 0;
+    respawnparm = false;
+    fastparm = false;
+    nomonsters = false;
+    consoleplayer = 0;
+    if (!G_TimeDemo ())
+      fuck = true;
+    return true;
   } 
 
   if (demoplayback)

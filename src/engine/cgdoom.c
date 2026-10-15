@@ -66,6 +66,9 @@ int CGD_AutoFrameskip = 0;
 const char *CGD_WADFileName = NULL;
 int CGD_RecordDemoSlot = -1;
 int CGD_PlayDemoOnly = 0;
+int CGD_TimeDemo = 0;
+int CGD_TimeDemoCount = 0;
+CGD_TimeDemoRun CGD_TimeDemoRuns[CGD_TIMEDEMO_MAX];
 
 /* Delayed file accesses */
 CGDoom_DelayedFileWrite CGD_DelayedSaves[CGD_DELAYEDSAVES_COUNT] = { 0 };

@@ -151,13 +151,17 @@ void D_Display (void)
   }
 
   // save the current screen if about to wipe
-  if (gamestate != wipegamestate)
+  /* CGDoom: no wipe in a timedemo (vanilla timed its wipes too) */
+  if (gamestate != wipegamestate && !timingdemo)
   {
     wipe = true;
     wipe_StartScreen();
   }
   else
+  {
     wipe = false;
+    wipegamestate = gamestate;
+  }
 
   if (gamestate == GS_LEVEL && gametic)
     HU_Erase();
@@ -303,6 +307,7 @@ void D_DoomLoop (void)
     {
       D_Display ();
       I_FrameDisplayed ();
+      G_TimeDemoFrame ();
     }
   }
 
@@ -600,8 +605,12 @@ void D_DoomMain()
       G_RecordDemo(filename);
     }
 
+    /* CGDoom: timedemo of the WAD's demos (cgdoom.h); none: quit */
+    if (CGD_TimeDemo && !G_TimeDemo ())
+      fuck = true;
+
     /* CGDoom: Demo file was specified from main menu */
-    if (gameaction == ga_playdemo)
+    if (gameaction == ga_playdemo || fuck)
       {}
     else if (autostart)
       G_DeferedInitNew (startskill, startepisode, startmap);

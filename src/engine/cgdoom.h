@@ -134,6 +134,23 @@ extern int CGD_RecordDemoSlot;
 /* Whether we're only playing a demo and leaving */
 extern int CGD_PlayDemoOnly;
 
+/* Timedemo (vanilla's -timedemo, for every demo of the WAD). Set
+   CGD_TimeDemo before D_DoomMain: the WAD's DEMO1..DEMO4 lumps (those
+   present) play back to back as fast as the renderer goes, every tic
+   rendered, without pacing or wipes; then D_DoomMain returns. Each run
+   counts its rendered frames and the PL_GetMicros time from the end of its
+   level load to the end of the demo. CGD_TimeDemoCount is 0 when the WAD
+   has no demo. */
+#define CGD_TIMEDEMO_MAX 4
+typedef struct {
+    char name[8];
+    int frames;
+    uint32_t micros;
+} CGD_TimeDemoRun;
+extern int CGD_TimeDemo;
+extern int CGD_TimeDemoCount;
+extern CGD_TimeDemoRun CGD_TimeDemoRuns[CGD_TIMEDEMO_MAX];
+
 /* Paused/idle signal for the platform's idle timeout (g_game.c). Nonzero
    when the game is not simulating a level the player is playing, as a mask
    of the reasons below:

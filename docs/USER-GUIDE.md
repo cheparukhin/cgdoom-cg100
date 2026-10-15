@@ -188,7 +188,7 @@ save without typing. If you want to type a name:
 ## Performance tips
 
 On the fx-CG100, the game plays normally with full detail and the status bar. The frame rate has not been
-measured yet: press **PageDown** in the game to show it.
+measured yet: press **PageDown** in the game to show it, or run the timedemo (Diagnostics → Benchmarks).
 
 If it is too slow somewhere, two settings in the game make it faster:
 
@@ -249,6 +249,9 @@ shortened with a hash, for example `FRE0P` for `freedoom1.wad`.
 4. **Benchmarks:**
    - OK/EXE runs the tests at the OS clock and at the game's F4 clock.
    - Results: 64 KiB read from flash and from RAM, and the time to push a 320x200 frame to the screen.
+   - **1** runs the timedemo with the WAD picked on the Storage page: its demos (DEMO1 to DEMO3 for the
+     shareware WAD, a few minutes) play back to back as fast as the calculator can draw them, every tic
+     drawn. A screen then shows each demo's frames, time and frame rate, and CGDoom returns to MPM.
 5. **Log:** the last 12 internal log lines.
 
 **Safe start.** If CGDoom crashes or resets while it starts, launch it again while you hold **DEL**. This

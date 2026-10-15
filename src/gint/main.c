@@ -237,9 +237,11 @@ static char const *wad_action(char const *name)
 	return "Play other WAD";
 }
 
-/* Returns the index of the WAD to play, or -1 to quit */
-static int launcher(gfs_entry_t const *wads, int wad_count)
+/* Returns the index of the WAD to play, or -1 to quit. *timedemo is set
+   when the Diagnostics screen asked for a timedemo of that WAD. */
+static int launcher(gfs_entry_t const *wads, int wad_count, bool *timedemo)
 {
+	*timedemo = false;
 	ui_layout_t l;
 	ui_layout_init(&l);
 
@@ -280,8 +282,13 @@ static int launcher(gfs_entry_t const *wads, int wad_count)
 			return f;
 		else if(f == i_ctrl)
 			screen_controls();
-		else if(f == i_diag)
-			gdiag_screen(wads, wad_count);
+		else if(f == i_diag) {
+			int t = gdiag_screen(wads, wad_count);
+			if(t >= 0) {
+				*timedemo = true;
+				return t;
+			}
+		}
 		else if(f == i_quit)
 			return -1;
 	}
@@ -317,8 +324,32 @@ static void game_entry(void)
 	D_DoomMain();
 }
 
-/* Returns false if the game could not be started (back to the launcher) */
-static bool run_game(gfs_entry_t const *wads, int wad)
+/* The timedemo results (engine: CGD_TimeDemoRuns), until a key */
+static void show_timedemo(char const *wadname)
+{
+	char t[400];
+	int n = snprintf(t, sizeof t, "%s at %s, WAD from %s.", wadname,
+		gclk_name(gclk_current()), gwad_mode_name());
+	if(!CGD_TimeDemoCount)
+		snprintf(t + n, sizeof t - n, " The WAD has no demo.");
+	for(int i = 0; i < CGD_TimeDemoCount && n < (int)sizeof t; i++) {
+		CGD_TimeDemoRun const *r = &CGD_TimeDemoRuns[i];
+		/* Tenths of a frame per second */
+		uint32_t fps10 = r->micros ? (uint32_t)((uint64_t)r->frames *
+			10000000u / r->micros) : 0;
+		n += snprintf(t + n, sizeof t - n, " %s: %d frames in %u.%u s, "
+			"%u.%u fps.", r->name, r->frames,
+			(unsigned)(r->micros / 1000000u),
+			(unsigned)(r->micros / 100000u % 10u),
+			(unsigned)(fps10 / 10), (unsigned)(fps10 % 10));
+	}
+	ui_message("Timedemo", t, true);
+}
+
+/* Returns false if the game could not be started (back to the launcher).
+   timedemo: play the WAD's demos uncapped and show their frame rates
+   (CGD_TimeDemo). */
+static bool run_game(gfs_entry_t const *wads, int wad, bool timedemo)
 {
 	static char wad_base[GFS_LIST_NAME];
 	char const *wadname = wads[wad].name;
@@ -360,6 +391,7 @@ static bool run_game(gfs_entry_t const *wads, int wad)
 	   lower limit slows the game down as soon as a frame takes more than
 	   that many tics plus one. */
 	CGD_AutoFrameskip = CGD_AUTOFRAMESKIP_DEFAULT;
+	CGD_TimeDemo = timedemo;
 	gkm_apply_engine_hooks();
 
 	/* Safe start: the OS clock for this session */
@@ -380,6 +412,10 @@ static bool run_game(gfs_entry_t const *wads, int wad)
 	   the in-game option changes to the file layer (written by the exit
 	   path in one world switch) */
 	gvid_release();
+	if(timedemo) {
+		ginp_wait_release();
+		show_timedemo(wadname);
+	}
 	end_game_session();
 	return true;
 }
@@ -537,9 +573,10 @@ static bool g_poll_busy = false;
 
 static void game_idle_check(void)
 {
-	/* Cheap first: no engine state read until the shorter limit */
+	/* Cheap first: no engine state read until the shorter limit. A
+	   timedemo ends by itself, and a warning would stop its clock. */
 	int idle = gtime_idle_tics();
-	if(idle < GINP_IDLE_MS / 1000 * 35)
+	if(idle < GINP_IDLE_MS / 1000 * 35 || CGD_TimeDemo)
 		return;
 	bool lose_progress;
 	int limit_ms = gtime_game_idle_limit_ms(CGD_IsPaused(), usergame,
@@ -702,14 +739,15 @@ int main(void)
 			gfs_list(wads, 16, &nw);
 
 			while(1) {
-				int w = launcher(wads, nw);
+				bool timedemo;
+				int w = launcher(wads, nw, &timedemo);
 				if(w < 0) {
 					save_settings_if_changed();
 					break;
 				}
 				/* The engine is not re-entrant: once a game has run, we
 				   leave (like CGDoom) */
-				if(run_game(wads, w))
+				if(run_game(wads, w, timedemo))
 					break;
 			}
 		}

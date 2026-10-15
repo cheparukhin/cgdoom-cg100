@@ -40,6 +40,8 @@ static void usage(void)
 "  -skill N              1..5 (default 4, CGDoom's default)\n"
 "  -playdemo LUMP        play a demo lump (e.g. DEMO1) and quit at its end\n"
 "  -playdemofile NAME    play a demo file from the -data directory\n"
+"  -timedemo             play DEMO1..DEMO4 (those present) uncapped, every\n"
+"                        tic rendered, and print each one's frame rate\n"
 "  -record N             record demo slot N (0..99) to <prefix>D<NN>.LMP,\n"
 "                        written at exit when -data is given\n"
 "  -wadname NAME         WAD name used for save/demo names (default: the\n"
@@ -353,6 +355,8 @@ int main(int argc, char **argv)
             demo = argv[++i];
         else if(!strcmp(a, "-playdemofile") && next)
             demo_file = argv[++i];
+        else if(!strcmp(a, "-timedemo"))
+            CGD_TimeDemo = 1;
         else if(!strcmp(a, "-record") && is_number(next))
             record_slot = atoi(argv[++i]);
         else if(!strcmp(a, "-wadname") && next)
@@ -527,6 +531,16 @@ int main(int argc, char **argv)
     D_DoomMain();
 
     Host_Finish();
+    if(CGD_TimeDemo) {
+        if(!CGD_TimeDemoCount)
+            fprintf(stdout, "timedemo: no demo in the WAD\n");
+        for(int i = 0; i < CGD_TimeDemoCount; i++) {
+            const CGD_TimeDemoRun *r = &CGD_TimeDemoRuns[i];
+            double s = r->micros / 1e6;
+            fprintf(stdout, "timedemo %s: %d frames in %.3f s, %.1f fps\n",
+                r->name, r->frames, s, s > 0 ? r->frames / s : 0.0);
+        }
+    }
     if(stats)
         print_stats();
     if(gamelog)

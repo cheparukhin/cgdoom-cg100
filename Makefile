@@ -28,6 +28,8 @@
 #                    skipped when CGD_DOOM1_WAD is not set
 #   make test-map-limit  -warp 33 starts MAP32 (the engine's map tables end at 32);
 #                    also part of test-unit, and test-asan runs it under ASan
+#   make test-timedemo  -timedemo plays every demo, one frame per tic (also in
+#                    test-unit and, under ASan, test-asan)
 #   make check-sh    compile every engine file with sh-elf-gcc (no link)
 #   make sim         build-sim/cgdoom-sim.elf (engine + src/engine/sh4 asm drawers + src/host for
 #                    sh-elf-run, src/sim/cgdoom.mk; CGSIM_SH4=0 for a C-only ELF)
@@ -201,6 +203,20 @@ test-title-keys-asan: host-asan
 	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
 	 sh $(ROOT)/tests/title-keys.sh -bin $(ASAN_BUILD)/cgdoom-host \
 	   -out $(ASAN_BUILD)/tests/titlekeys
+
+# Timedemo: every demo of the WAD, one frame per tic (tests/timedemo.sh)
+.PHONY: test-timedemo test-timedemo-asan
+test-unit: test-timedemo
+test-asan: test-timedemo-asan
+
+test-timedemo: host
+	@sh $(ROOT)/tests/timedemo.sh -bin $(HOST_BUILD)/cgdoom-host
+
+test-timedemo-asan: host-asan
+	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+	 sh $(ROOT)/tests/timedemo.sh -bin $(ASAN_BUILD)/cgdoom-host \
+	   -out $(ASAN_BUILD)/tests/timedemo
 
 # Fast monsters after loading a save (tests/skill-load.sh)
 .PHONY: test-skill-load test-skill-load-asan

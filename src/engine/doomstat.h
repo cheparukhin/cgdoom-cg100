@@ -130,6 +130,7 @@ extern  boolean		viewactive;
 
 extern  boolean		nodrawers;
 extern  boolean		noblit;
+extern  boolean		timingdemo;
 
 extern	int		viewwindowx;
 extern	int		viewwindowy;

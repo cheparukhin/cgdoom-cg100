@@ -400,7 +400,7 @@ make sim                # build-sim/cgdoom-sim.elf (SH4 drawers); a C-only ELF: 
 **Host CLI.** Run `build-host/cgdoom-host` without arguments for the full list. Common options:
 
 - `-iwad F`, `-warp E M`, `-skill N`, `-tics N`;
-- `-playdemo LUMP`, `-record N`;
+- `-playdemo LUMP`, `-record N`, `-timedemo`;
 - `-input builtin:<name>|<file>`;
 - `-crc FILE`, `-shot PREFIX`;
 - `-lowdetail`, `-viewsize N`, `-demos` (title demos, which the calculator always plays);
@@ -430,11 +430,12 @@ Hardware runs are manual, so automated correctness rests on three things:
 | Command | What it checks |
 |---|---|
 | `make test-host` | The 35 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
-| `make test-asan` | The same 35 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys and skill-load tests |
-| `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly, also with the Doom menu opened while recording), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load` |
+| `make test-asan` | The same 35 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys, skill-load and timedemo tests |
+| `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly, also with the Doom menu opened while recording), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load`, `test-timedemo` |
 | `make test-fixed-sim`, `make test-div-sim` | The fixed-point and division tests in the simulator, where `FixedDiv` is inline asm |
 | `make test-title-keys` | Every special key (gamma, cheat, noclip, FPS, view size) pressed on the title screen before any level: no access through the missing player (ASan/UBSan in `test-asan`). Then, with title demos on, a key pressed during a demo opens the Doom menu, as in vanilla |
 | `make test-skill-load` | Fast monsters follow the skill of a loaded save: a fresh session loading a Nightmare save, a Nightmare game loading a normal save, and the reverse (`-gamelog` `skill=` / `sargtics=`) |
+| `make test-timedemo` | `-timedemo` reports every demo of `freedoom1.wad` with one frame per tic of the demo. Also part of `test-unit`; `test-asan` runs it under ASan. |
 | `make test-map-limit` | `-warp 33` on `freedoom2.wad` starts MAP32: `G_InitNew` limits a Doom II map to 32, since the engine's HUD titles, par times and intermission names end there. Also part of `test-unit`; `test-asan` runs it under ASan. |
 | `make test-robust` | `tests/save-demo-robustness.sh`: damaged, foreign and oversized savegames and damaged demos fail cleanly, with no access outside a buffer under ASan (`test-asan`). Loads of a savegame patched by `tests/savetool.py` (which reads the record layout from `cgdoom-host -savelayout`): a bad header is refused before the current game is touched; a truncation, an index out of range or another level layout is a "Bad savegame" error. A save in a generated copy of `freedoom2.wad` whose MAP02 has 3000 extra things is refused ("level too large") and keeps the slot's previous save. Demos that are too short, have a bad console player or player set, or lack their end marker (played like the marker), from a file, a lump and the title loop. |
 | `make check-sh` | Every engine file compiles with sh-elf-gcc |
@@ -542,7 +543,9 @@ Tried and left out:
 - flash vs SDRAM line-fill costs (the reason the RAM image is the primary path);
 - the presenter costs at each clock.
 
-Diagnostics → Benchmarks measures the last two.
+Diagnostics → Benchmarks measures the last two, and its timedemo (key **1**) the first: the WAD's demos
+play uncapped at F4, every tic rendered, without wipes (`CGD_TimeDemo`, `cgdoom.h`; the host's
+`-timedemo` runs the same code).
 
 ## 6. Design decisions
 
@@ -590,6 +593,7 @@ there is no fxlink text channel.
 | UTLB pinning worked | "UTLB pinned N pages: URB x (was 54)", or "executor off", or "SAFE START" | System |
 | Flash vs SDRAM speed | 64 KiB cold read, flash P1 vs SDRAM P1 | Benchmarks (OK/EXE) |
 | Presenter cost | 320x200 push with the game's path (DMA, or CPU without the frame buffer), at the OS clock and at F4 | Benchmarks |
+| Real frame rate | Timedemo: the WAD's demos uncapped at F4, frames and time of each | Benchmarks, key 1 (then a results screen) |
 | Tic timer obtained | TMU number, or "polled clock" | System, last line |
 | `BFile_Read` return convention | Both conventions are accepted (`gfs_read_ok`); a failure shows as an open error | Launcher error / Log |
 | Partial-window DMA | The picture is correct | In game |

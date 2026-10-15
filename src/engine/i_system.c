@@ -201,6 +201,8 @@ static void I_AutoPace (void)
 
 boolean I_DisplayDue (void)
 {
+    if(timingdemo)
+        return true;
     if(CGD_AutoFrameskip <= 0)
         return !(gametic % (CGD_Frameskip + 1));
 
@@ -261,7 +263,13 @@ void I_StartTic (void)
     static boolean ratelimit_started = false;
     static int ratelimit_last = 0;
 
-    if(CGD_AutoFrameskip > 0)
+    /* CGDoom: a timedemo runs uncapped */
+    if(timingdemo)
+    {
+        auto_started = false;
+        ratelimit_started = false;
+    }
+    else if(CGD_AutoFrameskip > 0)
     {
         I_AutoPace();
     }

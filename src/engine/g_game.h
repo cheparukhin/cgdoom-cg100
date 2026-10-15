@@ -56,7 +56,9 @@ void G_RecordDemo (const char* name);
 void G_BeginRecording (void);
 
 void G_PlayDemo (char* name);
-void G_TimeDemo (char* name);
+/* CGDoom: timedemo of the WAD's demos (CGD_TimeDemo, cgdoom.h) */
+boolean G_TimeDemo (void);
+void G_TimeDemoFrame (void);
 boolean G_CheckDemoStatus (void);
 
 void G_ExitLevel (void);
