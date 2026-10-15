@@ -242,12 +242,37 @@ test-timedemo-asan: host-asan
 	 sh $(ROOT)/tests/timedemo.sh -bin $(ASAN_BUILD)/cgdoom-host \
 	   -out $(ASAN_BUILD)/tests/timedemo
 
-# HD build tests (CGD_EXTRAS features; they build the variants they need)
+# Tests of the widescreen and HD builds (they build the variants they need)
 #   test-quicksave  quicksave/quickload actions (tests/quicksave.sh, hd)
-.PHONY: test-quicksave
+#   test-tc-exact   true colour (hd) against 8-bit (wide), frame by frame
+#                   (tests/tc-exact.sh)
+#   test-variants   the scenarios of the wide and hd builds against their
+#                   goldens, under ASan too, plus test-tc-exact and
+#                   test-quicksave
+.PHONY: test-quicksave test-tc-exact test-variants
 test-quicksave:
 	@$(MAKE) --no-print-directory VARIANT=hd host
 	@sh $(ROOT)/tests/quicksave.sh -bin $(ROOT)/build-host-hd/cgdoom-host
+
+test-tc-exact:
+	@$(MAKE) --no-print-directory VARIANT=wide host
+	@$(MAKE) --no-print-directory VARIANT=hd host
+	@sh $(ROOT)/tests/tc-exact.sh -bin8 $(ROOT)/build-host-wide/cgdoom-host \
+	  -bintc $(ROOT)/build-host-hd/cgdoom-host
+
+test-variants: test-tc-exact test-quicksave
+	@$(MAKE) --no-print-directory VARIANT=wide test-host
+	@$(MAKE) --no-print-directory VARIANT=hd test-host
+	@$(MAKE) --no-print-directory VARIANT=wide host-asan
+	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+	 sh $(RUN_SCEN) -mode test -bin $(ROOT)/build-host-asan-wide/cgdoom-host \
+	   -golden $(ROOT)/tests/golden-wide -out $(ROOT)/build-host-asan-wide/tests
+	@$(MAKE) --no-print-directory VARIANT=hd host-asan
+	@ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+	 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+	 sh $(RUN_SCEN) -mode test -bin $(ROOT)/build-host-asan-hd/cgdoom-host \
+	   -golden $(ROOT)/tests/golden-hd -out $(ROOT)/build-host-asan-hd/tests
 
 # Fast monsters after loading a save (tests/skill-load.sh)
 .PHONY: test-skill-load test-skill-load-asan

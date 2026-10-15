@@ -14,13 +14,15 @@ The other developer documents:
 
 **Hardware status:** CGDoom plays normally on an fx-CG100 with the new display under OS 02.20. Everything
 else that depends on the hardware is listed in [§7](#7-hardware-verification) with the probe that settles it.
+The HD add-in ([§2.7](#27-screen-formats-and-the-hd-add-in)) has not run on hardware.
 
 ## 1. Repository layout
 
 ```
-CMakeLists.txt         calculator build (fxsdk build-cg -> CGDoom.g3a, build-cg/cgdoom.bin)
+CMakeLists.txt         calculator build (fxsdk build-cg -> CGDoom.g3a + CGDoomHD.g3a, build-cg/*.bin)
 Makefile               host and simulator builds and tests (includes src/sim/cgdoom.mk)
 src/platform/platform.h  the PL_* platform API: the only interface between engine and platform
+src/platform/cgd_config.h  build switches: screen size, pixel format, extras (§2.7)
 src/engine/            portable DOOM engine (CGDoom's cgdoom/ + vanilla fixes); includes only platform.h
 src/engine/sh4/        SH4AL-DSP assembly: column/span drawers, palette expansion, FixedDiv helper
 src/gint/              fx-CG100 platform on gint: launcher, video, input, time, files, WAD, memory, UTLB
@@ -140,7 +142,7 @@ Rules:
 | `memory.c` | Removes the `_os` arena. `PL_GetZones` (malloc reserve 768 KiB) over gint's arenas: `_uram` and mpm.bin's `_ld1` |
 | `wad.c` | `PL_Wad*`, three back-ends: **RAM image** (primary, whenever it fits), **flash block map** (`Bfile_GetBlockAddress`, checked against the file at open), **BFile** reads (fallback) |
 | `files.c` | World-switched BFile helpers (P1 bounce buffers), `PL_File*`, delayed writes flushed in one world switch at exit (a replacement that does not fit puts the old file back from RAM), failure reporting |
-| `video.c` | Async DMA from an SDRAM RGB565 frame; CPU writes when that frame could not be allocated. The 320x200 frame is centered in the 396x224 panel |
+| `video.c` | Async DMA from an SDRAM RGB565 frame (8-bit: the palette expansion; true colour: a copy); CPU writes when that frame could not be allocated. A 320x200 frame is centered in the 396x224 panel, a 396x224 frame fills it |
 | `input.c`, `keymaps.c` | Raw KEYSC reads only (never gint `getkey`). Launcher keys by physical position. fx-CG100 presets and key names. Rebind checks |
 | `time.c` | 35 Hz TMU tic. Microseconds from gint's profiler TMU. The quit chord and key activity sampled in the tic interrupt |
 | `clock.c` | The OS clock (launcher, safe start) and F4 (gint `CLOCK_SPEED_F4`) for every game |
@@ -198,9 +200,9 @@ fx-CG100 ([PLATFORM.md](PLATFORM.md)), so quitting means returning from `main()`
     or none and are refused by the 3 MiB check.
   - RAM is not zeroed between launches.
   - Zones get the largest blocks, after the malloc reserve.
-  - A packed doom1.wad (3318 KiB image) should fit in RAM. That is a calculation only; no screen shows the
-    WAD mode a game used. Diagnostics → Memory shows the largest free block, against which the image size
-    plus 768 KiB + 1 MiB can be compared.
+  - A packed doom1.wad (3318 KiB image) should fit in RAM. That is a calculation only; only the timedemo's
+    result screen shows the WAD mode a game used. Diagnostics → Memory shows the largest free block,
+    against which the image size plus 768 KiB + 1 MiB can be compared.
 - **Savegames** are built in a 176 KiB buffer (`SAVEGAMESIZE`). Shareware levels fit; a few larger levels
   of other IWADs do not (§8).
 
@@ -316,6 +318,82 @@ id's demos desynced. The engine now matches linuxdoom tic by tic on DEMO1-3 of t
   `Keymap.<action>=NONE` unbinds an action. Unknown keys and malformed values are ignored; an empty or
   wrong `Version` rejects the file.
 
+### 2.7 Screen formats and the HD add-in
+
+Three compile-time switches in `src/platform/cgd_config.h` (only `#define`s, so the assembly reads them
+too) select the screen format; everything else derives from `SCREENWIDTH`, `SCREENHEIGHT`, `pixel_t`
+and `PIXELBYTES`:
+
+| Build | Switch | Screen | Pixels | Extras | Host | Goldens |
+|---|---|---|---|---|---|---|
+| `CGDoom.g3a` | none | 320x200 | palette index | none | `make` | `tests/golden` |
+| (`CGDoomW.g3a`, optional) | `CGD_WIDESCREEN` | 396x224 | palette index | none | `make VARIANT=wide` | `tests/golden-wide` |
+| `CGDoomHD.g3a` | `CGD_HD` | 396x224 | RGB565 (`CGD_TRUECOLOR`) | all (`CGD_EXTRAS`) | `make VARIANT=hd` | `tests/golden-hd` |
+
+The 320x200 8-bit build compiles as before: no golden changed. The two add-ins share `CGDOOM.CFG` and the
+savegames (the archived structures are the same; `cgdoom-host -savelayout` prints identical layouts).
+
+**Widescreen** follows Crispy Doom's "Hor+": the focal length stays the 320-wide view's (`projection`
+is half of `viewwidth_nonwide`, 320 at full size and `blocks*32` below, halved in low detail), and the
+angle tables cover the wider `viewwidth`, so the view shows more to the sides at vanilla's scale. Plane
+steps (`basexscale`), `yslope`, the light tables and the weapon scale use the non-widescreen width. The
+smaller view sizes keep vanilla's proportions of the screen. 2D art keeps its 320x200 layout:
+`V_DrawLayoutPatch` adds `WIDESCREENDELTA` and `HEIGHTDELTA` (38 and 12, both 0 in the 320x200 build) for
+menus, intermission, finale and title pages; `V_DrawFullscreenPatch` centres full-screen pictures and
+clears the borders; the status bar is at the bottom (`ST_Y`), its 320 columns centred (`ST_LX`, `ST_LY`)
+with the view border's flat and bottom edge in the side strips; HUD text and the automap use screen
+coordinates; the bunny scroll shows 396 of the 640 panorama columns.
+
+**True colour.** `pixel_t` and `lighttable_t` are RGB565; the engine applies the palette while drawing
+instead of the presenter at the end:
+
+- 2D art goes through `v_palette`, the RGB565 of the current palette with gamma (`V_PIXEL`).
+- The 3D view goes through `colormaps`, now RGB565 tables that `R_BuildLightTables` rebuilds at every
+  `I_SetPalette` (damage, bonus and radiation palettes, gamma): light level k is the base palette scaled by
+  (32-k)/32 per channel, rounded; then the current palette's tint (`V_GetTint`: per channel, the linear
+  map that takes the base palette's black and white to the current palette's); then gamma. Tinting the
+  lit colour, as the 8-bit build's palettes do, lets a flash wash dark areas too. The invulnerability map
+  is COLORMAP's through the palette. `CGD_TrueColorExact` (host `-tcexact`) uses COLORMAP for every map:
+  frames then equal the 8-bit build's through its palette.
+- What a frame keeps from earlier frames is redrawn when the palette changes: the status bar
+  (`st_firsttime`) and the view border (`v_palette_serial`). A new non-level state's palette is set before
+  drawing (the 8-bit palette recolours a finished frame, a true-colour one cannot).
+- The spectre darkens the pixels behind it by 13/16 per channel, rounded (`FUZZDARK`), colormap 6's
+  brightness.
+- The presenter copies the frame into its DMA frame instead of expanding it.
+
+**Extras.** `CGD_EXTRAS` compiles the rendering and HUD features below, taken from Crispy Doom. Each is
+a bit of `CGD_Features` (`cgdoom.h`), all on in the HD add-in; the host's `-features` sets them by name.
+None changes game state, so demos and savegames stay compatible.
+
+| Bit | Name | What | Where |
+|---|---|---|---|
+| 0x01 | `aspect` | The 3D view scaled 6/5 vertically (`projectiony`), as 320x200 looked on a 4:3 monitor | `r_main.c`, `r_plane.c`, `r_things.c` |
+| 0x02 | `smoothlight` | Twice the sector light levels, distance steps 8 times finer; `zlight` holds colormap numbers | `r_main.c` |
+| 0x04 | `translucent` | Missiles, puffs and fog laid over the scene at 21/32 (`TL_OVER`); their full-bright frames and the gun flash added, saturating (`TL_ADD`). True colour only | `r_things.c`, `r_draw.c` |
+| 0x08 | `colornums` | The ready ammo, health and armour numbers coloured by level: the digits' palette entries recoloured into `v_crpalette`, then tinted like the rest of the bar. True colour only | `st_stuff.c`, `v_video.c` |
+| 0x10 | `crosshair` | A yellow cross at the centre of the view | `r_main.c` |
+| 0x20 | `automap` | The Map key's second press: the map over the view, turned with the player; kills, items, secrets and time | `am_map.c` |
+| 0x40 | `fullhud` | At the largest view size: ammo, health, armour and keys over the view, with a shadow | `st_stuff.c` |
+| 0x80 | `brightmaps` | Crispy Doom's brightmaps for the shareware textures and sprites: their lit pixels at full brightness | `r_bmaps.c` |
+
+The HD add-in also has quicksave and quickload (`M_QuickSave`, `M_QuickLoad`; TOOLS and SETTINGS in both
+presets), which need two more keymap entries (`CGDOOM_KEYMAP_SIZE`).
+
+**Memory.** The larger builds (`CGD_TRANSIENT_SCREENS`) do not keep `screens[1]`: the intermission draws
+its background picture every frame. The wipe allocates `screens[2]` and `[3]` with `malloc` for its
+duration and is skipped when they do not fit. Allocations, by build:
+
+| | 320x200 8-bit | 396x224 8-bit | 396x224 true colour |
+|---|---|---|---|
+| Screens kept (0, 1, 4) | 138,240 B (+ 0-3 and 4: 266,240 B in all) | 101,376 B | 202,752 B |
+| Wipe screens (2, 3), during a wipe | static, included above | 177,408 B | 354,816 B |
+| Presenter frame (startup) | 128,000 B | 177,408 B | 177,408 B |
+
+In the HD add-in the presenter frame (+49 KiB) and `.bss` (+31 KiB, mostly the smooth-lighting table)
+leave about 80 KiB less heap before the WAD is loaded; by calculation the packed shareware WAD still fits in
+RAM. The wipe's screens come from the 768 KiB malloc reserve, next to `screens[0]` and `[4]`.
+
 ## 3. Builds
 
 **Toolchain.** This needs cmake, libpng, libusb, ncurses and Python 3 with Pillow.
@@ -390,9 +468,11 @@ The demo-sync tests also need the shareware `doom1.wad` v1.9 in `$CGD_DOOM1_WAD`
 
 ```sh
 export PATH=$PWD/toolchain/bin:$PATH   # after tools/build-toolchain.sh (+ "sim" step)
-fxsdk build-cg          # calculator: CGDoom.g3a + build-cg/cgdoom.bin + build-cg/cgdoom.map (must be warning-free)
+fxsdk build-cg          # calculator: CGDoom.g3a + CGDoomHD.g3a, build-cg/cgdoom{,-hd}.{bin,map} (warning-free)
+fxsdk build-cg -c -DCGDOOM_WIDE_G3A=ON   # once: also CGDoomW.g3a (396x224 8-bit, no extras)
 make host               # build-host/cgdoom-host (clang -O2 -g, RANGECHECK on)
 make host-asan          # build-host-asan/cgdoom-host (ASan + UBSan)
+make VARIANT=hd host    # build-host-hd/cgdoom-host (VARIANT=wide|hd: every host and test target, §2.7)
 make sim-tool           # once: build-sim/tools/sh-elf-run64 (64-bit counters, PC profiles)
 make sim                # build-sim/cgdoom-sim.elf (SH4 drawers); a C-only ELF: make SIM_BUILD=build-sim-c CGSIM_SH4=0 sim
 ```
@@ -404,6 +484,9 @@ make sim                # build-sim/cgdoom-sim.elf (SH4 drawers); a C-only ELF: 
 - `-input builtin:<name>|<file>`;
 - `-crc FILE`, `-shot PREFIX`;
 - `-lowdetail`, `-viewsize N`, `-demos` (title demos, which the calculator always plays);
+- `-features all|none|LIST`: the HD build's extras (`CGD_Features`, by name, §2.7);
+- `-crc565 FILE`, `-tcexact`, `-palredraw`: the frames as RGB565 and the two modes that make the 8-bit and
+  true-colour builds comparable (`tests/tc-exact.sh`);
 - `-autoframeskip N`, `-rendercost T`, `-ticcost T` (deterministic pacing: a frame or a tic advances the
   virtual clock by T tics);
 - `-nodelaysaves`, `-zone KiB,...`, `-fragment N`, `-poison B`, `-rlimits small`, `-slowwad`, `-gamelog`,
@@ -430,6 +513,10 @@ Hardware runs are manual, so automated correctness rests on three things:
 | Command | What it checks |
 |---|---|
 | `make test-host` | The 35 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
+| `make VARIANT=wide test-host`, `make VARIANT=hd test-host` | The same scenarios in the widescreen and HD builds against `tests/golden-wide` and `tests/golden-hd` (the HD build with all its extras on) |
+| `make test-tc-exact` | `tests/tc-exact.sh`: every scenario in the 396x224 8-bit build (with `-palredraw`, its status bar redrawn at each palette change) and in the HD build (`-tcexact -features none`); their frames as RGB565 (`-crc565`) must be equal, except the frames that differ on purpose and are flagged F: spectre fuzz, the frames after a gamma change, and wipes across a palette change (the 8-bit palette also recolours pixels drawn earlier) |
+| `make test-quicksave` | `tests/quicksave.sh`, HD build: the quicksave and quickload actions (bound in a `CGDOOM.CFG`, which the host reads from `-data`): slot pick, confirmed overwrite, confirmed load, cancelled load |
+| `make test-variants` | Both variants' scenarios against their goldens, also under ASan/UBSan, plus `test-tc-exact` and `test-quicksave` |
 | `make test-asan` | The same 35 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys, skill-load and timedemo tests |
 | `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly, also with the Doom menu opened while recording), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load`, `test-timedemo` |
 | `make test-fixed-sim`, `make test-div-sim` | The fixed-point and division tests in the simulator, where `FixedDiv` is inline asm |
@@ -572,6 +659,11 @@ play uncapped at F4, every tic rendered, without wipes (`CGD_TimeDemo`, `cgdoom.
 | Launcher: the WADs, Controls and Diagnostics only; vanilla's title loop with its demos | Every other setting has one right value on the fx-CG100, or is chosen in the game (skill, episode, view size, detail) | `main.c` |
 | One game per launch | The engine's static state is not re-entrant | `main.c` |
 | Strict 8.3 names | The calculator's Memory app shows longer names truncated (`~1`) and cuts extensions to 3 characters | `cgdoom-names.c` |
+| Widescreen renders 396x224 natively, "Hor+" as Crispy Doom | Stretching 320x200 to the panel doubles every 4th column and 9th row; a native render shows more to the sides at vanilla's scale | `r_main.c`, §2.7 |
+| True colour builds RGB565 light tables per palette change instead of tinting the finished frame | The 3D view stays exact against the 8-bit build (`test-tc-exact`), and palette changes are rare, while a tint would cost a pass over every frame | `i_video.c`, `r_data.c` |
+| The presenter copies the true-colour frame for the DMA | The engine draws the status bar and border incrementally into one persistent screen; two engine screens in turn would need full redraws | `video.c` |
+| The larger builds allocate the wipe's screens per wipe and redraw the intermission background | Keeps the HD add-in's heap close to the 320x200 build's, so the WAD stays in RAM; a wipe that does not fit is skipped | `f_wipe.c`, `wi_stuff.c` |
+| The extras exist only in the HD add-in, as run-time bits | `CGDoom.g3a` stays the build tested on hardware; each extra can be turned off and tested alone (`-features`) | `cgdoom.h` |
 
 ## 7. Hardware verification
 
@@ -688,6 +780,24 @@ every Diagnostics page. Stop at the first failure and report it with the step nu
 
 Use these results to update [§7.1](#71-what-only-hardware-can-answer), the [G] items in
 [PLATFORM.md](PLATFORM.md), and the user guide's performance section.
+
+### 7.3 CGDoom HD
+
+`CGDoomHD.g3a` has not run on hardware. With `CGDoom.g3a` installed and tested as above, copy it next to
+it (storage permitting), then:
+
+1. Diagnostics → Benchmarks in each add-in: record both blocks (the HD push is 396x224, from the true-colour
+   frame) and the timedemo results (key **1**; the result screen also names the WAD mode, which should be
+   "RAM image" in both).
+2. In a game: the picture fills the screen with no border, tearing or garbage; dark areas, damage and
+   pickup flashes, the gamma levels (Brightness key) and invulnerability look right; menus, help screens,
+   the intermission and the E1 text screen are centred.
+3. The extras: translucent fireballs and gun flash, brightmapped switches in the dark, coloured status-bar
+   numbers, the crosshair, the full-screen HUD at the largest view size, the automap overlay (the Map key
+   twice) and its statistics.
+4. Quicksave (TOOLS) to a new slot, play on, quickload (SETTINGS), quit: the slot's file is written, and
+   loads in `CGDoom.g3a` too.
+5. Level changes with the wipe (it needs about 350 KB of the malloc reserve for its duration).
 
 ## 8. Known engine limits
 

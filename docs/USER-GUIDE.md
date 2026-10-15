@@ -10,6 +10,7 @@ troubleshooting.
 - [The launcher](#the-launcher)
 - [Controls](#controls)
 - [Performance tips](#performance-tips)
+- [CGDoom HD](#cgdoom-hd)
 - [Saves and files](#saves-and-files)
 - [Diagnostics and reporting a problem](#diagnostics-and-reporting-a-problem)
 - [Troubleshooting](#troubleshooting)
@@ -143,6 +144,7 @@ The key names are the ones the Controls screen shows. On the fx-CG100, *X,O,t* i
 | Noclip | X,O,t | X,O,t |
 | Brightness | Frac | Frac |
 | FPS counter | PageDown | PageDown |
+| Quicksave / Quickload (CGDoom HD only) | TOOLS / SETTINGS | TOOLS / SETTINGS |
 
 **In the Doom menu:**
 
@@ -207,6 +209,53 @@ In an SH-4 simulator, which counts instructions, they save this much work per fr
 
 CGDoom keeps both settings for the next launch.
 
+## CGDoom HD
+
+`CGDoomHD.g3a` is a second build of the game, **CGDoom HD** in the TOOLS menu, with the improvements
+below. **It has not run on a calculator yet.** Try it next to `CGDoom.g3a`: copy both to the storage
+root. With the packed shareware WAD they take about 4.1 MB, which may not leave room for anything else
+(see [WAD files](#wad-files)); keep only one of them if storage is short.
+
+**What is different:**
+
+- **The whole screen.** The game draws the calculator's full 396×224 pixels instead of 320×200 with black
+  borders. The view is wider, so you see more to the sides. The status bar, menus and pictures keep
+  their size, centred.
+- **True colour.** Light and shadow are computed in full colour. Dark areas no longer band and change
+  colour (dark reds turning brown), as they do with DOOM's 256-colour palette.
+- **DOOM's proportions.** DOOM was drawn for 4:3 monitors, where its pixels were taller than wide. The
+  view is stretched by 6/5 vertically, so rooms, monsters and weapons have the shapes they were drawn
+  with.
+- **Smoother lighting.** The light fades with distance in finer steps.
+- **See-through effects.** Fireballs, plasma, BFG blasts, bullet puffs, smoke and teleport fog are
+  translucent: an explosion in your face no longer hides the monster behind it. Fire, plasma and the gun
+  flash glow.
+- **Brightmaps.** Switch lights, exit signs, barrels and armour bonuses glow in dark rooms. (Most of the
+  shareware WAD's brightmapped walls are in well-lit rooms, so the effect is rare there.)
+- **Coloured numbers** on the status bar: health is red below 25%, gold below 50%, green up to 100% and
+  blue above; armour is green or blue by armour type; ammo is red when low and gold below half; all
+  three are gray in god mode.
+- **Crosshair:** a small yellow cross at the centre of the view.
+- **Full-screen HUD.** At the largest view size, without the status bar, ammo and health are shown at the
+  bottom left of the view, armour and keys at the bottom right, with a shadow that keeps them readable on
+  any wall.
+- **Automap.** The Map key opens the map as before. A second press puts the map over the view, turned so
+  that forward is up, while you keep playing; a third press closes it. The map shows the kills, items
+  and secrets found, and the time spent in the level.
+- **Quicksave and quickload:** **TOOLS** saves to your quicksave slot and **SETTINGS** loads it, in both
+  presets (rebind them in *Controls...*). The first quicksave asks for a slot; after that, both ask
+  before they save or load (EXE confirms). Loading a game from the Doom menu also makes its slot the
+  quicksave slot.
+
+**Shared with CGDoom.** Both add-ins read and write the same `CGDOOM.CFG` and the same saves, so a game
+saved in one loads in the other. CGDoom does not know the two quick keys: when it writes `CGDOOM.CFG`,
+CGDoom HD goes back to their default keys.
+
+**Speed.** CGDoom HD draws 39% more pixels, at two bytes each instead of one, so it is slower than
+CGDoom. Compare the two with the timedemo (Diagnostics → Benchmarks, key **1**). *Detail* and *View size*
+make it faster as they do in CGDoom. It needs about 80 KB more RAM, and by calculation the packed
+shareware WAD still fits in RAM.
+
 ## Saves and files
 
 CGDoom only creates files with short 8.3 names, which the calculator requires, in the storage root.
@@ -248,7 +297,8 @@ shortened with a hash, for example `FRE0P` for `freedoom1.wad`.
    - It also shows which UTLB slots the OS changed, and URB before and after.
 4. **Benchmarks:**
    - OK/EXE runs the tests at the OS clock and at the game's F4 clock.
-   - Results: 64 KiB read from flash and from RAM, and the time to push a 320x200 frame to the screen.
+   - Results: 64 KiB read from flash and from RAM, and the time to push a frame to the screen (320x200, or
+     396x224 in CGDoom HD).
    - **1** runs the timedemo with the WAD picked on the Storage page: its demos (DEMO1 to DEMO3 for the
      shareware WAD, a few minutes) play back to back as fast as the calculator can draw them, every tic
      drawn. A screen then shows each demo's frames, time and frame rate, and CGDoom returns to MPM.
@@ -288,7 +338,8 @@ it with the Diagnostics pages.
 ## Known limitations
 
 - **Partly tested on hardware.** CGDoom plays normally on an fx-CG100 with the new display and OS 02.20.
-  Saves, the title-screen demos and the old display have not been tried yet.
+  Saves, the title-screen demos and the old display have not been tried yet, and
+  [CGDoom HD](#cgdoom-hd) has not run on a calculator at all.
   The parts that depend most on the hardware are memory protection (UTLB), the flash layout, display
   timing and the overclock.
 - **No sound or music.**
