@@ -1085,7 +1085,21 @@ AM_drawMline
   static fline_t fl;
 
   if (AM_clipMline(ml, &fl))
+  {
+#if CGD_EXTRAS
+    /* CGDoom: over the view, a black shadow one pixel below and right of
+       each line keeps it visible on brown and red walls (a line along the
+       window's right or bottom edge has none) */
+    if (automapoverlay && fl.a.x + 1 < f_w && fl.b.x + 1 < f_w
+      && fl.a.y + 1 < f_h && fl.b.y + 1 < f_h)
+    {
+      fline_t sh = fl;
+      sh.a.x++; sh.a.y++; sh.b.x++; sh.b.y++;
+      AM_drawFline(&sh, 0);
+    }
+#endif
     AM_drawFline(&fl, color); // draws it on frame buffer using fb coords
+  }
 }
 
 
@@ -1139,36 +1153,84 @@ static void AM_rotatePoint (mpoint_t *pt)
   pt->y = plr->mo->y + y;
 }
 
-/* Kills, items, secrets and the level's time, in the HUD font, at the
-   bottom of the window: above the level title (HU_Drawer) on the full map */
-static void AM_drawStats (void)
+/* Width of a string in the HUD font (unknown characters: 4 pixels) */
+static int AM_textWidth (const char *s)
 {
   extern const patch_t *hu_font[HU_FONTSIZE];
-  char text[64];
-  int t = leveltime / TICRATE;
-  int h = SHORT(hu_font[0]->height) + 1;
-  int x = fb_x + 2;
-  int y = fb_y + f_h - h - (automapoverlay ? 1 : h + 1);
+  int w = 0;
 
-  snprintf (text, sizeof text, "K %d/%d  I %d/%d  S %d/%d  %d:%02d",
-    plr->killcount, totalkills, plr->itemcount, totalitems,
-    plr->secretcount, totalsecret, t / 60, t % 60);
-  for (const char *s = text; *s; s++)
+  for ( ; *s; s++)
   {
     int c = toupper_int (*s) - HU_FONTSTART;
-    int w;
+    w += (c < 0 || c >= HU_FONTSIZE) ? 4 : SHORT(hu_font[c]->width);
+  }
+  return w;
+}
+
+static void AM_drawText (int x, int y, const char *s)
+{
+  extern const patch_t *hu_font[HU_FONTSIZE];
+
+  for ( ; *s; s++)
+  {
+    int c = toupper_int (*s) - HU_FONTSTART;
 
     if (c < 0 || c >= HU_FONTSIZE)
     {
       x += 4;
       continue;
     }
-    w = SHORT(hu_font[c]->width);
-    if (x + w > fb_x + f_w)
-      break;
     V_DrawPatch (x, y, FB, hu_font[c]);
-    x += w;
+    x += SHORT(hu_font[c]->width);
   }
+}
+
+/* Kills, items, secrets and the level's time, in the HUD font, in words
+   when they fit the window (the font's S and 5 look alike), else shorter.
+   On the full map: at the bottom, above the level title (HU_Drawer). Over
+   the view: at the top, under the HUD message line, with a black shadow
+   (true colour), away from the weapon. */
+static void AM_drawStats (void)
+{
+  extern const patch_t *hu_font[HU_FONTSIZE];
+  char text[3][64];
+  int t = leveltime / TICRATE;
+  int h = SHORT(hu_font[0]->height) + 1;
+  int x = fb_x + 2;
+  int y;
+  int i;
+
+  snprintf (text[0], sizeof text[0], "KILLS %d/%d  ITEMS %d/%d  SECRETS %d/%d"
+    "  %d:%02d", plr->killcount, totalkills, plr->itemcount, totalitems,
+    plr->secretcount, totalsecret, t / 60, t % 60);
+  snprintf (text[1], sizeof text[1], "K %d/%d  I %d/%d  S %d/%d  %d:%02d",
+    plr->killcount, totalkills, plr->itemcount, totalitems,
+    plr->secretcount, totalsecret, t / 60, t % 60);
+  snprintf (text[2], sizeof text[2], "K %d/%d I %d/%d S %d/%d",
+    plr->killcount, totalkills, plr->itemcount, totalitems,
+    plr->secretcount, totalsecret);
+  for (i = 0; i < 3 && AM_textWidth (text[i]) > f_w - 4; i++)
+    ;
+  if (i == 3)
+    return;
+
+  if (!automapoverlay)
+  {
+    AM_drawText (x, fb_y + f_h - 2*h - 1, text[i]);
+    return;
+  }
+  y = fb_y + 1;
+  if (y < HU_MSGY + h + 1)
+    y = HU_MSGY + h + 1;
+#if CGD_TRUECOLOR
+  {
+    static const uint16_t black[256];
+    v_patchpal = black;
+    AM_drawText (x + 1, y + 1, text[i]);
+    v_patchpal = v_palette;
+  }
+#endif
+  AM_drawText (x, y, text[i]);
 }
 #endif
 
@@ -1364,6 +1426,9 @@ void AM_drawPlayers(void)
   {
     angle_t angle = plr->mo->angle;
 #if CGD_EXTRAS
+    /* Over the view, the crosshair marks the player, and up is forward */
+    if (automapoverlay && (CGD_Features & CGD_FEAT_CROSSHAIR))
+      return;
     if (automapoverlay)
       angle = ANG90;
 #endif
