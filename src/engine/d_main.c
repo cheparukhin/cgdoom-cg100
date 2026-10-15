@@ -168,12 +168,24 @@ void D_Display (void)
   if (gamestate == GS_LEVEL && gametic)
     HU_Erase();
 
+  /* CGDoom: the palette of a new non-level state (vanilla set it after
+     drawing, which the 8-bit palette recolours at presentation, but a
+     true-colour frame keeps the colours it was drawn with: the wipe would
+     melt into a tinted intermission) */
+  if (gamestate != oldgamestate && gamestate != GS_LEVEL)
+    I_SetPalette ((byte *)W_CacheLumpNameConst ("PLAYPAL", PU_CACHE));
+
   // do buffered drawing
   switch (gamestate)
   {
   case GS_LEVEL:
     if (!gametic)
       break;
+#if CGD_TRUECOLOR
+    /* CGDoom: the damage/bonus palette before the automap is drawn
+       (ST_Drawer below sets it for the rest) */
+    ST_doPaletteStuff ();
+#endif
     if (automapactive)
       AM_Drawer ();
     if (wipe || (viewheight != SCREENHEIGHT && fullscreen) )
@@ -232,10 +244,6 @@ void D_Display (void)
 
   if (gamestate == GS_LEVEL && gametic)
     HU_Drawer ();
-
-  // clean up border stuff
-  if (gamestate != oldgamestate && gamestate != GS_LEVEL)
-    I_SetPalette ((byte *)W_CacheLumpNameConst ("PLAYPAL", PU_CACHE));
 
   menuactivestate = menuactive;
   automapactivestate = automapactive;

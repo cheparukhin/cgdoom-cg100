@@ -508,6 +508,11 @@ void G_Ticker (void)
     } 
   }
 
+  /* CGDoom: a timedemo that has just ended (its last demo finished or was
+     rejected, possibly before any level was loaded) runs nothing more */
+  if (timingdemo && fuck)
+    return;
+
   //I_Error("loopdaloop2"); //fine as far as this...
 
   // get commands
@@ -1740,6 +1745,9 @@ boolean G_CheckDemoStatus (void)
      quits after the last (cgdoom.h) */
   if (timingdemo) 
   { 
+    /* Nothing is playing when D_DoomLoop calls this at the end */
+    if (!demoplayback)
+      return false;
     CGD_TimeDemoRuns[CGD_TimeDemoCount - 1].micros =
       PL_GetMicros () - timedemo_start;
     Z_ChangeTag (demobuffer, PU_CACHE);

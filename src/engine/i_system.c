@@ -266,11 +266,13 @@ void I_StartTic (void)
     static boolean ratelimit_started = false;
     static int ratelimit_last = 0;
 
-    /* CGDoom: a timedemo runs uncapped */
+    /* CGDoom: a timedemo runs uncapped. PL_GetTics is still called once
+       per tic: on the calculator it polls the quit chord. */
     if(timingdemo)
     {
         auto_started = false;
         ratelimit_started = false;
+        (void)PL_GetTics();
     }
     else if(CGD_AutoFrameskip > 0)
     {

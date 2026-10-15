@@ -44,6 +44,10 @@ boolean ST_Responder (event_t* ev);
 // Called by main loop.
 void ST_Ticker (void);
 
+/* Sets the damage/bonus/radiation palette of the player's state (also
+   done by ST_Drawer) */
+void ST_doPaletteStuff (void);
+
 // Called by main loop.
 void ST_Drawer (boolean fullscreen, boolean refresh);
 

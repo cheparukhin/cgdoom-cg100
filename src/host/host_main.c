@@ -78,6 +78,7 @@ static void usage(void)
 "  -input SPEC           builtin:<name> or a script file (see host_input.c)\n"
 "  -crc FILE             write per-frame CRC32 lines ('-' = stdout)\n"
 "  -crc565 FILE          write per-frame CRC32 lines of the frame as RGB565\n"
+"                        ('-' = stdout)\n"
 "                        (equal in the 8-bit and true-colour builds; ' F'\n"
 "                        marks frames that differ on purpose: spectre fuzz,\n"
 "                        after a gamma change, a wipe across a palette\n"
@@ -538,7 +539,8 @@ int main(int argc, char **argv)
     }
 
     if(crc565_path) {
-        host.crc565_file = fopen(crc565_path, "w");
+        host.crc565_file = !strcmp(crc565_path, "-") ? stdout
+            : fopen(crc565_path, "w");
         if(!host.crc565_file) {
             fprintf(stderr, "cannot open %s\n", crc565_path);
             return 1;
@@ -622,7 +624,7 @@ int main(int argc, char **argv)
         CGD_FlushDelayedWrites();
     if(host.crc_file && host.crc_file != stdout)
         fclose(host.crc_file);
-    if(host.crc565_file)
+    if(host.crc565_file && host.crc565_file != stdout)
         fclose(host.crc565_file);
     return 0;
 }

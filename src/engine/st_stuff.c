@@ -433,13 +433,15 @@ void ST_refreshBackground(void)
     {
       const byte *flat = (const byte *)W_CacheLumpNameConst (
         gamemode == commercial ? "GRNROCK" : "FLOOR7_2", PU_CACHE);
-      const patch_t *edge = W_CacheLumpNamePatch ("BRDR_B", PU_CACHE);
+      const patch_t *edge;
       pixel_t *dest = screens[BG];
       int x, y;
 
       for (y = 0; y < ST_HEIGHT; y++)
         for (x = 0; x < SCREENWIDTH; x++)
           *dest++ = V_PIXEL(flat[((y + ST_Y) & 63)*64 + (x & 63)]);
+      /* (only now: this lookup may purge the flat) */
+      edge = W_CacheLumpNamePatch ("BRDR_B", PU_CACHE);
       for (x = 0; x < ST_BARX; x += 8)
       {
         V_DrawPatch(x, 0, BG, edge);
