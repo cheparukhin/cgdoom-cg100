@@ -72,6 +72,7 @@ const char *const CGD_FeatureNames[CGD_FEATURE_COUNT + 1] = {
 	"smoothlight",
 	"translucent",
 	"colornums",
+	"crosshair",
 	NULL,
 };
 int CGD_TrueColorExact = 0;

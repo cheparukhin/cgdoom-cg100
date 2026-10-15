@@ -151,7 +151,9 @@ extern int CGD_PlayDemoOnly;
 #define CGD_FEAT_COLORNUMS 0x08 /* status-bar health, armour and ammo
                                    coloured by level; true colour only
                                    (st_stuff.c) */
-#define CGD_FEATURE_COUNT 4
+#define CGD_FEAT_CROSSHAIR 0x10 /* a small red cross at the centre of the
+                                   view (r_main.c) */
+#define CGD_FEATURE_COUNT 5
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
 #if CGD_EXTRAS && CGD_TRUECOLOR

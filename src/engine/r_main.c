@@ -36,6 +36,7 @@
 
 #include "r_local.h"
 #include "r_sky.h"
+#include "v_video.h"
 #ifdef CGD_SH4
 #include "sh4/cgd_sh4.h"
 #endif
@@ -887,6 +888,27 @@ void R_SetupFrame (player_t* player)
 
 
 
+#if CGD_EXTRAS
+//
+// R_DrawCrosshair
+// CGDoom: CGD_FEAT_CROSSHAIR. Four arms of two pixels around an open centre,
+// at the centre of the view (where a shot goes when autoaim finds nothing
+// above or below), in the palette's brightest red. Drawn over the weapon.
+//
+static void R_DrawCrosshair (void)
+{
+  static const signed char arm[8][2] = {
+    {-3,0}, {-2,0}, {2,0}, {3,0}, {0,-3}, {0,-2}, {0,2}, {0,3},
+  };
+  int cx = viewwindowx + scaledviewwidth/2;
+  int cy = viewwindowy + viewheight/2;
+  pixel_t red = V_PIXEL(176);
+
+  for (int i = 0; i < 8; i++)
+    screens[0][(cy + arm[i][1])*SCREENWIDTH + cx + arm[i][0]] = red;
+}
+#endif
+
 //
 // R_RenderView
 // Main 3D render function, where all the accursed gypsy magic happens
@@ -907,4 +929,9 @@ void R_RenderPlayerView (player_t* player)
 
   R_DrawMasked ();
   //I_Error("poof");
+
+#if CGD_EXTRAS
+  if (CGD_Features & CGD_FEAT_CROSSHAIR)
+    R_DrawCrosshair ();
+#endif
 }
