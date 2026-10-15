@@ -544,6 +544,11 @@ void M_LoadSelect(int choice)
 {
     G_LoadGame (choice);
     M_ClearMenus ();
+#if CGD_EXTRAS
+    /* CGDoom: a loaded game is the one to quickload and quicksave over
+       (as Crispy Doom) */
+    quickSaveSlot = choice;
+#endif
 }
 
 //
@@ -563,6 +568,73 @@ void M_LoadGame(int choice)
     M_ReadSaveStrings();
 }
 
+
+#if CGD_EXTRAS
+//
+// CGDoom: quicksave and quickload (vanilla's, behind the keymap actions of
+// the CGD_EXTRAS builds). The first quicksave picks its slot in the Save
+// menu; then both ask before they overwrite or load (EXE/OK confirms).
+//
+static char quickmsg[128];
+
+void M_DoSave(int slot);
+
+static void M_QuickSaveResponse(int ch)
+{
+    if (ch != 'y' && ch != ' ' && ch != KEY_ENTER)
+	return;
+    M_DoSave(quickSaveSlot);
+}
+
+void M_QuickSave(void)
+{
+    if (!usergame)
+    {
+	M_StartMessage(SAVEDEAD,NULL,false);
+	return;
+    }
+
+    if (gamestate != GS_LEVEL)
+	return;
+
+    if (quickSaveSlot < 0)
+    {
+	M_StartControlPanel();
+	M_ReadSaveStrings();
+	M_SetupNextMenu(&SaveDef);
+	quickSaveSlot = -2;	// means to pick a slot now
+	return;
+    }
+    snprintf(quickmsg, sizeof quickmsg, QSPROMPT,
+	savegamestrings[quickSaveSlot]);
+    M_StartMessage(quickmsg,M_QuickSaveResponse,true);
+}
+
+static void M_QuickLoadResponse(int ch)
+{
+    if (ch != 'y' && ch != ' ' && ch != KEY_ENTER)
+	return;
+    M_LoadSelect(quickSaveSlot);
+}
+
+void M_QuickLoad(void)
+{
+    if (netgame)
+    {
+	M_StartMessage(QLOADNET,NULL,false);
+	return;
+    }
+
+    if (quickSaveSlot < 0)
+    {
+	M_StartMessage(QSAVESPOT,NULL,false);
+	return;
+    }
+    snprintf(quickmsg, sizeof quickmsg, QLPROMPT,
+	savegamestrings[quickSaveSlot]);
+    M_StartMessage(quickmsg,M_QuickLoadResponse,true);
+}
+#endif
 
 //
 //  M_SaveGame & Cie.
@@ -1193,6 +1265,16 @@ boolean M_Responder (event_t* ev)
 	  case KEY_F3:            // Quickload
 	    //M_QuickLoad();
 	    return true;
+
+#if CGD_EXTRAS
+	  case KEY_F6:            // CGDoom: quicksave (keymap action)
+	    M_QuickSave ();
+	    return true;
+
+	  case KEY_F9:            // CGDoom: quickload (keymap action)
+	    M_QuickLoad ();
+	    return true;
+#endif
 	}
     // Pop-up menu?
     if (!menuactive)

@@ -18,12 +18,18 @@
    input configuration. */
 
 #include <stdint.h>
+#include "cgd_config.h"
 
 //---
 // Keymaps
 //---
 
+/* (CGD_EXTRAS builds: two more actions, quicksave and quickload) */
+#if CGD_EXTRAS
+#define CGDOOM_KEYMAP_SIZE 26
+#else
 #define CGDOOM_KEYMAP_SIZE 24
+#endif
 
 /* Array of Doom keys indicating the meaning of keymap indices. */
 extern int16_t CGD_KeymapEntries[CGDOOM_KEYMAP_SIZE];

@@ -242,6 +242,13 @@ test-timedemo-asan: host-asan
 	 sh $(ROOT)/tests/timedemo.sh -bin $(ASAN_BUILD)/cgdoom-host \
 	   -out $(ASAN_BUILD)/tests/timedemo
 
+# HD build tests (CGD_EXTRAS features; they build the variants they need)
+#   test-quicksave  quicksave/quickload actions (tests/quicksave.sh, hd)
+.PHONY: test-quicksave
+test-quicksave:
+	@$(MAKE) --no-print-directory VARIANT=hd host
+	@sh $(ROOT)/tests/quicksave.sh -bin $(ROOT)/build-host-hd/cgdoom-host
+
 # Fast monsters after loading a save (tests/skill-load.sh)
 .PHONY: test-skill-load test-skill-load-asan
 test-unit: test-skill-load

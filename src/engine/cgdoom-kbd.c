@@ -35,6 +35,10 @@ int16_t CGD_KeymapEntries[CGDOOM_KEYMAP_SIZE] = {
     SKEY_NOCLIP,
     SKEY_GAMMA,
     SKEY_FPSCOUNTER,
+#if CGD_EXTRAS
+    KEY_F6,                  /* Quicksave */
+    KEY_F9,                  /* Quickload */
+#endif
 };
 
 /* Default keymap: CGDoom 0.03 */
@@ -63,6 +67,10 @@ const CGDoom_Keymap CGD_Keymap_CGDoom_0_03 = {
     KEYCODE_ARROW,
     KEYCODE_FRAC,
     KEYCODE_LEFTP,
+#if CGD_EXTRAS
+    -1,
+    -1,
+#endif
 };
 /* Default keymap: thumbs only */
 const CGDoom_Keymap CGD_Keymap_ThumbsOnly = {
@@ -90,6 +98,10 @@ const CGDoom_Keymap CGD_Keymap_ThumbsOnly = {
     KEYCODE_ARROW,
     KEYCODE_FRAC,
     KEYCODE_LEFTP,
+#if CGD_EXTRAS
+    -1,
+    -1,
+#endif
 };
 /* Default keymap: full-hands */
 const CGDoom_Keymap CGD_Keymap_FullHands = {
@@ -117,6 +129,10 @@ const CGDoom_Keymap CGD_Keymap_FullHands = {
     KEYCODE_ARROW,
     KEYCODE_FRAC,
     KEYCODE_LEFTP,
+#if CGD_EXTRAS
+    -1,
+    -1,
+#endif
 };
 
 /* The maps above are the fx-CG50 ones. fx-CG100 / Graph Math+ keymaps live
@@ -430,6 +446,10 @@ static const struct DoomkeyInfo doomkeys[] = {
     { SKEY_NOCLIP,       "ToggleNoclip",        "Noclip"            },
     { SKEY_GAMMA,        "GammaCorrection",     "Brightness"        },
     { SKEY_FPSCOUNTER,   "FPSCounter",          "FPS counter"       },
+#if CGD_EXTRAS
+    { KEY_F6,            "QuickSave",           "Quicksave"         },
+    { KEY_F9,            "QuickLoad",           "Quickload"         },
+#endif
     { -1,                NULL,                  NULL                },
 };
 

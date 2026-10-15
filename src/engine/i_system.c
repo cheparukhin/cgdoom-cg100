@@ -328,6 +328,9 @@ void I_StartTic (void)
         KEY_RCTRL, KEY_TAB, KEY_PAUSE, KEY_SLEFTARROW, KEY_SRIGHTARROW,
         KEY_RSHIFT, KEY_ESCAPE, KEY_ENTER,
         ' ', '1', '2', '3', '4', '5', '6', '7',
+#if CGD_EXTRAS
+        KEY_F6, KEY_F9,         /* quicksave, quickload */
+#endif
         0
     };
     static const int input_keys[] = {

@@ -99,7 +99,8 @@ static void usage(void)
 "                        finale coverage)\n"
 "  -demos                play WAD demos in the title loop (CGD_TitleDemos;\n"
 "                        the calculator always does)\n"
-"  -data DIR             directory for config/saves/demos (default .)\n"
+"  -data DIR             directory for config/saves/demos (default .);\n"
+"                        a CGDOOM.CFG there is read (keymap, DelaySaves)\n"
 "  -stats                print memory/timing statistics at exit\n"
 "  -demotrace FILE       write one line of game state per tic (gametic,\n"
 "                        P_Random index, player position/momentum/angle,\n"
@@ -551,8 +552,13 @@ int main(int argc, char **argv)
         }
     }
 
-    /* Options and keymap must be set before the input script is resolved */
+    /* Options and keymap must be set before the input script is resolved.
+       A CGDOOM.CFG in the -data directory is read as on the calculator
+       (keymap, DelaySaves); the command line still sets detail and view
+       size. */
     CGD_DefaultOptions(&CGD_Options);
+    if(strcmp(host.data_dir, ".") != 0)
+        CGD_LoadSettings(&CGD_Options);
     CGD_TitleDemos = demos;
     CGD_Options.LowDetail = lowdetail;
     if(nodelaysaves)

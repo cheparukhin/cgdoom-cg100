@@ -241,6 +241,8 @@ typedef enum
 #define KEY_F1				(0x80+0x3b)
 #define KEY_F2				(0x80+0x3c)
 #define KEY_F3				(0x80+0x3d)
+#define KEY_F6				(0x80+0x40)
+#define KEY_F9				(0x80+0x43)
 
 #define KEY_BACKSPACE		127
 #define KEY_PAUSE			0xff

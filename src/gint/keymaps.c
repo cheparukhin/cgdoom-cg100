@@ -31,7 +31,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-_Static_assert(CGDOOM_KEYMAP_SIZE == 24, "keymaps below have 24 entries");
+_Static_assert(CGDOOM_KEYMAP_SIZE == 24 + 2 * CGD_EXTRAS,
+	"keymaps below have 24 entries (+2 with CGD_EXTRAS)");
 
 #define CG100_ON        0x91
 #define CG100_HOME      0x92
@@ -70,7 +71,8 @@ _Static_assert(CGDOOM_KEYMAP_SIZE == 24, "keymaps below have 24 entries");
    left thumb on SHIFT (fire) / ALPHA (use) / VARIABLE (run), BACK opens the
    Doom menu, weapons on the digits. Every one of the 24 actions is bound;
    OK, HOME, ON, SETTINGS, TOOLS, sqrt and ) are left free. No binding
-   needs the abort chord SHIFT+7+3+AC (time.c). */
+   needs the abort chord SHIFT+7+3+AC (time.c). The CGD_EXTRAS builds add
+   quicksave on TOOLS and quickload on SETTINGS. */
 static const CGDoom_Keymap keymap_cg100_thumbs = {
 	CG100_LEFT,       /* Turn left */
 	CG100_RIGHT,      /* Turn right */
@@ -96,6 +98,10 @@ static const CGDoom_Keymap keymap_cg100_thumbs = {
 	CG100_XOT,        /* Noclip */
 	CG100_FRAC,       /* Brightness */
 	CG100_PAGEDOWN,   /* FPS counter */
+#if CGD_EXTRAS
+	CG100_TOOLS,      /* Quicksave */
+	CG100_SETTINGS,   /* Quickload */
+#endif
 };
 
 /* Variant: turn with PREVTAB/NEXTTAB, strafe with LEFT/RIGHT */
@@ -124,6 +130,10 @@ static const CGDoom_Keymap keymap_cg100_strafe = {
 	CG100_XOT,
 	CG100_FRAC,
 	CG100_PAGEDOWN,
+#if CGD_EXTRAS
+	CG100_TOOLS,
+	CG100_SETTINGS,
+#endif
 };
 
 static const gkm_preset_t presets_cg100[] = {
