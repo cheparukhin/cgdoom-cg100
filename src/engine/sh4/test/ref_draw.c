@@ -18,8 +18,15 @@
 #define FUZZOFF (SCREENWIDTH)
 
 #if CGD_TRUECOLOR
-#define FUZZDARK(p)	((pixel_t)((((p) >> 1) & 0x7bef) + (((p) >> 2) & 0x39e7) \
-			  + (((p) >> 4) & 0x0861)))
+/* r_draw.c FuzzDark: each RGB565 channel scaled by 13/16 with rounding, on the pixel spread over
+   32 bits (0x01004008: 8 in the blue, red and green fields) */
+static inline pixel_t FuzzDark(pixel_t p)
+{
+  uint32_t s = ((uint32_t)p | ((uint32_t)p << 16)) & 0x07e0f81f;
+  s = ((s * 13 + 0x01004008) >> 4) & 0x07e0f81f;
+  return (pixel_t)(s | (s >> 16));
+}
+#define FUZZDARK(p)	FuzzDark(p)
 #else
 #define FUZZDARK(p)	(colormaps[6*256+(p)])
 #endif

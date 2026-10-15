@@ -38,9 +38,16 @@ extern int viewheight;
 extern const pix_t *colormaps;
 extern int fuzzpos;
 
-/* The spectre's darkening of the pixel behind it, as r_draw.c FUZZDARK */
+/* The spectre's darkening of the pixel behind it, as r_draw.c FUZZDARK: in RGB565, each channel
+   scaled by 13/16 with rounding, on the pixel spread over 32 bits */
 #if CGD_TRUECOLOR
-#define FUZZDARK(p) ((pix_t)((((p) >> 1) & 0x7bef) + (((p) >> 2) & 0x39e7) + (((p) >> 4) & 0x0861)))
+static inline pix_t FuzzDark(pix_t p)
+{
+	uint32_t s = ((uint32_t)p | ((uint32_t)p << 16)) & 0x07e0f81f;
+	s = ((s * 13 + 0x01004008) >> 4) & 0x07e0f81f;
+	return (pix_t)(s | (s >> 16));
+}
+#define FUZZDARK(p) FuzzDark(p)
 #else
 #define FUZZDARK(p) (colormaps[6 * 256 + (p)])
 #endif

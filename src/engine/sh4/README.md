@@ -6,8 +6,8 @@ vanilla-exact `FixedDiv` helper. The drawers exist for both pixel formats of
 (`r_draw16_sh4.S`), at any `SCREENWIDTH` that is a multiple of 4 below 512 (the 320×200 and 396×224
 screens are built and tested). Every routine is **bit-exact** with its C reference and writes no
 memory the C reference does not write. The randomized test (`make -C src/engine/sh4/test run`) runs
-66,216 cases in each of the four screen-format builds (320×200 and 396×224, 8-bit and RGB565), plus
-6,729 in each `.text` build and 600 in the forced-P1 build of the expansion, with 0 mismatches, 0
+66,966 cases in each of the four screen-format builds (320×200 and 396×224, 8-bit and RGB565), plus
+6,803 in each `.text` build and 600 in the forced-P1 build of the expansion, with 0 mismatches, 0
 stray writes to static memory, 0 stack-canary hits and 0 callee-saved-register violations, after
 checking that the `.S` files also assemble without `-Wa,--dsp` (raw-opcode form, §8).
 
@@ -63,7 +63,7 @@ colormaps fuzzpos`. The types match the engine: `pixel_t *ylookup[]`, `int colum
 | asm | replaces | semantics / side effects |
 |---|---|---|
 | `R_DrawColumn_SH4` | `R_DrawColumn` | `dc_colormap[dc_source[(frac>>16)&127]]`, frac = `texturemid + (yl-centery)*iscale` (32-bit wrap) |
-| `R_DrawFuzzColumn_SH4` | `R_DrawFuzzColumn` | Writes `dc_yl=1` / `dc_yh=viewheight-2` like C. `FUZZDARK(dest[fuzzoffset[fuzzpos]])`, `fuzzpos` advanced (mod 50) exactly like C. `FUZZDARK(p)` is `colormaps[6*256+p]`, or in RGB565 `((p>>1)&0x7bef)+((p>>2)&0x39e7)+((p>>4)&0x0861)` (`r_draw.c`) |
+| `R_DrawFuzzColumn_SH4` | `R_DrawFuzzColumn` | Writes `dc_yl=1` / `dc_yh=viewheight-2` like C. `FUZZDARK(dest[fuzzoffset[fuzzpos]])`, `fuzzpos` advanced (mod 50) exactly like C. `FUZZDARK(p)` is `colormaps[6*256+p]`, or in RGB565 `r_draw.c`'s `FuzzDark`: each channel times 13/16, rounded (`s = (p \| p<<16) & 0x07e0f81f; s = ((13*s + 0x01004008) >> 4) & 0x07e0f81f; p' = s \| s>>16`) |
 | `R_DrawTranslatedColumn_SH4` | `R_DrawTranslatedColumn` | `dc_colormap[dc_translation[dc_source[frac>>16]]]`. Arithmetic shift, **no** `&127`, as in vanilla |
 | `R_DrawSpan_SH4` | `R_DrawSpan` | `spot = ((yfrac>>10)&4032) + ((xfrac>>16)&63)`, the exact vanilla math (not Chocolate's packed position). `ds_x2 < ds_x1` returns; the C loop would run 2^32 times |
 | `R_DrawColumnLow_SH4` | `R_DrawColumnLow` | low detail, see below |
@@ -145,7 +145,7 @@ static inline void     cgd_pref(const void *p);
   - Columns of 2 pixels (low detail: 2 texels) run prologue plus epilogue only, with one taken branch from the set-up to the epilogue (a delayed conditional branch, `bt/s` or `bf/s`).
 - **1-pixel columns.** `R_DrawColumn_SH4` and `R_DrawColumnLow_SH4` load `dc_yl`/`dc_yh` (and `dc_iscale`, `centery`) first and branch on `dc_yl == dc_yh` before saving anything. The 1-pixel path is straight-line code in r0–r7 (nothing saved, no colormap check, no repeat loop): `frac = dc_texturemid + (dc_yl − centery)·dc_iscale`, texel, `extu.b`, colour from `dc_colormap`, one store (low detail: two stores, to `columnofs[x]` and `columnofs[x+1]`, so no contiguity check either). In sprite-heavy scenes half of all column calls are 1 pixel (§3).
 - **Translated drawers share one body** that stores every texel through r4 and r8, both stepped by a row. In low detail r8 is the second column. In full detail r8 = r4, so the second store rewrites the same pixel with the same value, and no other memory is touched.
-- **RGB565 fuzz.** `FUZZDARK` is 9 ops on one temporary: `(p>>4)&0x0861` is taken as `(((p>>2)&0x39e7)>>2)&0x0861`. The pixel is loaded sign-extended; the shifts are logical and every mask is below 0x8000, so the sign bits never reach the result. The table holds each offset plus one row and the dest pointer stays a row behind until the pixel's load has issued, so the next row's load address never waits on the pointer step.
+- **RGB565 fuzz.** `FUZZDARK` is 14 ops on one temporary (12 EX). The pixel is loaded sign-extended; `shll16` then `xtrct` build `p | p<<16` from exactly its 16 bits, `13s` is `((2s + s) << 2) + s` (the fields cannot overflow into each other: 13·63 + 8 < 2^10 for green, 13·31 + 8 < 2^9 for red and blue), and `swap.w` + `or` bring green back into the low half, which `mov.w` stores. The table holds each offset plus one row and the dest pointer stays a row behind until the pixel's load has issued, so the next row's load address never waits on the pointer step.
 - **Set-up code** is ordered by `test/listsched.py`, a list scheduler using the same pipeline model.
   - The frac→`mul.l`→prologue chain goes first.
   - The checks branch to C (after popping saved registers) before any store.
@@ -303,10 +303,10 @@ epilogue stay one pass each (`--stages 2`, or the 8-bit stage split for the span
 | translated | 16 c/px | 12 c/px | 16 c/px |
 | fuzz | 10 c/px | 7 c/px | 11 c/px |
 | translated, RGB565 | 18 c/px | 14 c/px | 18 c/px |
-| fuzz, RGB565 (low detail: per pixel) | 11 c/px | 11 c/px | 12 c/px |
+| fuzz, RGB565 (low detail: per pixel) | 17 c/px | 17 c/px | 18 c/px |
 
 These are simple loops in `.text`. Fuzz rows must stay strictly ordered, because `dest[-SCREENWIDTH]`
-must see the row just written; in RGB565 the `FUZZDARK` chain (8 EX after the load) sets the pace.
+must see the row just written; in RGB565 the `FUZZDARK` chain (12 EX after the load) sets the pace.
 
 ### Per-call model
 
@@ -393,7 +393,7 @@ At 396×224 with RGB565 pixels:
 | R_DrawColumn, len 1 / 2 / 3 / 8 / 32 / 192 | 47.0 / 31.0 / 25.7 / 19.0 / 16.0 / 15.2 | **44.0** / 42.0 / 35.7 / 18.5 / 12.1 / 10.4 | |
 | R_DrawColumnLow, len 10..192 | 8.70 | **5.42** | 1.60× |
 | R_DrawTranslatedColumn | 17.33 | 12.65 | 1.37× |
-| R_DrawFuzzColumn | 28.41 | 14.82 | 1.92× |
+| R_DrawFuzzColumn | 33.35 | 19.82 | 1.68× |
 | R_DrawSpan, len 20..396 | 23.18 | **13.41** | 1.73× |
 | R_DrawSpanLow, len 20..396 | 16.73 | **6.99** | 2.39× |
 
@@ -408,7 +408,7 @@ The asm executes more instructions per call: set-up is about 70–90 instruction
 | `.rodata` | 500 | the 5×50 fuzz offset table (6×50, 600 bytes, at 224 rows) |
 | `.data` / `.bss` | 0 | none |
 | RGB565 `.ilram` | **1424** | R_DrawColumn 348, R_DrawColumnLow 384, R_DrawSpan 336, R_DrawSpanLow 356 |
-| RGB565 `.text`, `.rodata` | 548, 600 | translated + fuzz; the 6×50 fuzz table at 224 rows (500 at 200) |
+| RGB565 `.text`, `.rodata` | 588, 600 | translated + fuzz; the 6×50 fuzz table at 224 rows (500 at 200) |
 
 The 8-bit and RGB565 drawers are never linked together: each file assembles empty in the other
 format. The RGB565 light tables' rotated copy (17,408 bytes) comes from the zone (§7).
@@ -562,6 +562,7 @@ the reference in both pixel formats (the RGB565 spectre through `FUZZDARK`).
 - 30,000 `FixedDiv` operands, plus `a == INT_MIN` against fixed boundary divisors (±1, ±32767..±32769, ±40000, ±65535..±65537, ±131072, INT_MAX, INT_MIN) and 300 random `|b| <= 65600`.
 - A **long pass**: full-height columns on the full screen (`dc_yl = 0`, `dc_yh = SCREENHEIGHT - 1`) and full-width spans for every drawer, `N/100 + 8` cases each.
 - A **palette change**: new random light tables, `cgd_sh4_colormaps_changed()`, then `N/8` cases of each column and span drawer (and fuzz). Without the rebuild the first cases fail.
+- The **fuzz drawers' C fallbacks** called directly, `N/8` cases each: the RGB565 fuzz drawers read no colormap, so only counts or `fuzzpos` values the engine never produces reach them.
 
 **Checks:**
 - After every case, the touched area plus a margin is compared.
@@ -571,7 +572,7 @@ the reference in both pixel formats (the RGB565 spectre through `FUZZDARK`).
 - **Calling convention:** every asm drawer call goes through `test/abi_call.S`, which loads r8–r14 with values derived from a random word and checks them, and r15, after the call. This matters for the 1-pixel paths, which save no registers: `mov #0,r9` in the 1-pixel path makes every 1-pixel case fail with "callee-saved register clobbered".
 - **Assembler flags** (`asmcheck`): see the top of this file. Restoring the plain `ldrs`/`ldre`/`ldrc` mnemonics makes it fail with gas's "opcode not valid for this cpu variant"; a wrong displacement in the `LDRE` macro makes it fail with a byte diff.
 - **Other injected bugs the comparison catches:** a wrong mask or a missing `extu.b` in the 1-pixel column path; a dropped second store in the 1-pixel low-detail path; a swapped write-after-read pair in the R_DrawSpanLow loop (fails from case 2 at N=300); a `>> 16` instead of `>> 15` second guard in `cgd_fixed_div` (7 of the fixed `INT_MIN` divisors and about half of the random ones fail).
-- **Injected bugs, RGB565 and width** (each fails at N=300): a dropped store or a missing step in each of the four loops; the dropped second store of the low-detail translated drawer; the stored phantom pixel of an odd count (column and span epilogues); a wrong low-detail row step; `ds_x1` not doubled; a missing `extu.b` in either 1-pixel path; a missing mask in `FUZZDARK`; the colormap check without its `rotr` (each of the five drawers that check: the half-map pointers); `cgd_sh4_colormaps_changed()` doing nothing (both formats); and, at 396×224 8-bit, a 320 row step in the column or low-column loop, or ±320 in the fuzz table.
+- **Injected bugs, RGB565 and width** (each fails at N=300): a dropped store or a missing step in each of the four loops; the dropped second store of the low-detail translated drawer; the stored phantom pixel of an odd count (column and span epilogues); a wrong low-detail row step; `ds_x1` not doubled; a missing `extu.b` in either 1-pixel path; a missing rounding add, a wrong rounding constant or a missing green fold in `FUZZDARK`, and a wrong rounding constant in the C fallback's; the colormap check without its `rotr` (each of the five drawers that check: the half-map pointers); `cgd_sh4_colormaps_changed()` doing nothing (both formats); and, at 396×224 8-bit, a 320 row step in the column or low-column loop, or ±320 in the fuzz table.
 
 Design tools in `test/`:
 - **`pipesim.py`:** loop, straight-line and per-call models over the linked ELF. `--path A:B C:D …` models one call through taken branches, e.g. `pipesim.py ELF - - --path _R_DrawColumn_SH4:cgd_col_disp cgd_col_one:cgd_col_one_end` for the 1-pixel column, or `_R_DrawColumn_SH4:cgd_col_n2 cgd_col_end:cgd_col_ret` for n = 2.

@@ -983,29 +983,37 @@ ENDFUNC(R_DrawTranslatedColumn_SH4)
    if (!dc_yl) dc_yl = 1; if (dc_yh == viewheight-1) dc_yh = viewheight-2;   (globals)
    count = dc_yh - dc_yl; if (count < 0) return;
    *dest = FUZZDARK(dest[fuzzoffset[fuzzpos]]); fuzzpos = (fuzzpos + 1) % 50 per row, where
-   FUZZDARK(p) = ((p >> 1) & 0x7bef) + ((p >> 2) & 0x39e7) + ((p >> 4) & 0x0861) (r_draw.c: each
-   RGB565 channel scaled by 13/16). No colormap is read, so no registration is needed.
+   FUZZDARK (r_draw.c FuzzDark) scales each RGB565 channel by 13/16 with rounding, on the pixel
+   spread over 32 bits: s = (p | p << 16) & 0x07e0f81f; s = ((13 * s + 0x01004008) >> 4) &
+   0x07e0f81f; p' = s | s >> 16. No colormap is read, so no registration is needed.
    Rows are processed strictly in order (dest[-SCREENWIDTH] must see the row just written).
    The offsets come from an unrolled copy of fuzzoffset[] (FUZZ_COPIES x 50 entries) starting at
    fuzzpos (count <= FUZZ_MAXCOUNT, else C), each plus ROWB: the dest pointer stays one row
    behind until the pixel's load has issued, so the next row's load address is never waiting
-   on the pointer step; fuzzpos += pixels (mod 50) at the end. 11 cycles per row in the model
-   (the FUZZDARK chain: 8 EX after the load). */
+   on the pointer step; fuzzpos += pixels (mod 50) at the end. 17 cycles per row in the model
+   (the FUZZDARK chain: 12 EX after the load). */
 
-/* FUZZDARK of P (the pixel, loaded sign-extended) into P; clobbers T. M1-M3 hold the masks.
-   (p >> 4) & 0x0861 is computed as (((p >> 2) & 0x39e7) >> 2) & 0x0861 (0x0861 is inside
-   0x39e7 >> 2), so one temporary does. The shifts are logical and every mask is below 0x8000,
-   so the sign bits never reach the result. */
-.macro FUZZDARK16 P, T, M1, M2, M3
+/* FUZZDARK of P (the pixel, loaded sign-extended) into the low 16 bits of P (what mov.w
+   stores); clobbers T. M = 0x07e0f81f, K = 0x01004008 (8 in each field), S = -4.
+   xtrct P,T after shll16 T gives (p << 16) | p with both halves exactly the 16 pixel bits (the
+   sign bits of the load are shifted out); 13s = ((2s + s) << 2) + s; the fields cannot overflow
+   into each other (13 * 63 + 8 < 2^10 for green at bit 21, 13 * 31 + 8 < 2^9 for red and blue);
+   swap.w + or bring green back next to red and blue. */
+.macro FUZZDARK16 P, T, M, K, S
 	mov	\P, \T
-	shlr	\P			/* p >> 1 */
-	shlr2	\T			/* p >> 2 */
-	and	\M1, \P
-	and	\M2, \T
-	add	\T, \P
-	shlr2	\T
-	and	\M3, \T			/* (p >> 4) & 0x0861 */
-	add	\T, \P
+	shll16	\T
+	xtrct	\P, \T			/* p | p << 16 */
+	and	\M, \T			/* s */
+	mov	\T, \P
+	add	\P, \P
+	add	\T, \P			/* 3s */
+	shll2	\P
+	add	\T, \P			/* 13s */
+	add	\K, \P
+	shld	\S, \P			/* (13s + K) >> 4 */
+	and	\M, \P
+	swap.w	\P, \T
+	or	\T, \P			/* low 16 bits: s | s >> 16 */
 .endm
 
 	CGD_SH4_COLD
@@ -1076,9 +1084,9 @@ FUNC(R_DrawFuzzColumn_SH4)
 	add	r2, r5
 	add	#1, r5			/* fuzzpos + pixels */
 	add	#1, r2			/* pixels */
-	mov.w	.Lf_m1, r6		/* the FUZZDARK masks */
-	mov.w	.Lf_m2, r9
-	mov.w	.Lf_m3, r10
+	mov.l	.Lf_mask, r6		/* the FUZZDARK constants */
+	mov.l	.Lf_round, r9
+	mov	#-4, r10
 	mov.w	@r1+, r0		/* offset of the first row, + ROWB */
 	LDRS(.Lf_rs1)
 	LDRE(.Lf_re1)
@@ -1140,11 +1148,10 @@ cgd_fl16_end:
 	mov.l	@r15+, r8
 
 	.balign 2
-.Lf_m1:		.word	0x7bef
-.Lf_m2:		.word	0x39e7
-.Lf_m3:		.word	0x0861
 .Lf_row:	.word	ROWB
 	.balign 4
+.Lf_mask:	.long	0x07e0f81f
+.Lf_round:	.long	0x01004008
 .Lf_yl:		.long	_dc_yl
 .Lf_yh:		.long	_dc_yh
 .Lf_viewheight:	.long	_viewheight

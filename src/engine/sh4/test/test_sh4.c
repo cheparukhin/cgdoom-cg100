@@ -79,6 +79,9 @@ static uint32_t rndn(uint32_t n) { return n ? (uint32_t)(((uint64_t)rnd() * n) >
 static int rndr(int lo, int hi) { return lo + (int)rndn((uint32_t)(hi - lo + 1)); }   /* [lo, hi] */
 
 typedef void (*drawfn)(void);
+/* C fallbacks of r_draw_sh4_c.c (not in cgd_sh4.h: only the assembly calls them) */
+void cgd_sh4_slow_fuzz(void);
+void cgd_sh4_slow_fuzz_low(void);
 void cgd_test_abi_call(drawfn fn, uint32_t out[9], uint32_t p);
 
 /* The view sizes of R_ExecuteSetViewSize (320x200: 320x200, 320x168, 224x112, 96x48) */
@@ -727,6 +730,10 @@ int main(int argc, char **argv)
 	test_fuzz("R_DrawFuzzColumn(newpal)", ref_R_DrawFuzzColumn, R_DrawFuzzColumn_SH4, 0, N / 8);
 	test_spans("R_DrawSpan(newpal)", ref_R_DrawSpan, R_DrawSpan_SH4, 0, N / 8);
 	test_spans("R_DrawSpanLow(newpal)", ref_R_DrawSpanLow, R_DrawSpanLow_SH4, 1, N / 8);
+	/* the fuzz drawers' C fallbacks, called directly: the RGB565 fuzz drawers read no colormap,
+	   so only counts or fuzzpos values the engine never produces would reach them */
+	test_fuzz("cgd_sh4_slow_fuzz", ref_R_DrawFuzzColumn, cgd_sh4_slow_fuzz, 0, N / 8);
+	test_fuzz("cgd_sh4_slow_fuzz_low", ref_R_DrawFuzzColumnLow, cgd_sh4_slow_fuzz_low, 1, N / 8);
 	test_expand(N / 10 + 20);
 	test_fill(N / 10 + 20);
 	test_div(N * 10);
