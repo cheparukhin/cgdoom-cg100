@@ -110,12 +110,12 @@ void R_RenderMaskedSegRange( drawseg_t*	ds, int		x1, int		x2 )
   backsector = curline->backsector;
   texnum = texturetranslation[curline->sidedef->midtexture];
 
-  lightnum = (frontsector->lightlevel >> LIGHTSEGSHIFT)+extralight;
+  lightnum = (frontsector->lightlevel >> LIGHTSEGSHIFT)+extralight*LIGHTBRIGHT;
 
   if (curline->v1->y == curline->v2->y)
-    lightnum--;
+    lightnum -= LIGHTBRIGHT;
   else if (curline->v1->x == curline->v2->x)
-    lightnum++;
+    lightnum += LIGHTBRIGHT;
 
   if (lightnum < 0)		
     walllights = scalelight[0];
@@ -733,12 +733,12 @@ void R_StoreWallRange ( int start, int stop )
     // OPTIMIZE: get rid of LIGHTSEGSHIFT globally
     if (!fixedcolormap)
     {
-      lightnum = (frontsector->lightlevel >> LIGHTSEGSHIFT)+extralight;
+      lightnum = (frontsector->lightlevel >> LIGHTSEGSHIFT)+extralight*LIGHTBRIGHT;
 
       if (curline->v1->y == curline->v2->y)
-        lightnum--;
+        lightnum -= LIGHTBRIGHT;
       else if (curline->v1->x == curline->v2->x)
-        lightnum++;
+        lightnum += LIGHTBRIGHT;
 
       if (lightnum < 0)		
         walllights = scalelight[0];

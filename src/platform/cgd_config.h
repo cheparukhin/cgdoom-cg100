@@ -1,14 +1,14 @@
 /* CGDoom build configuration: the screen format, chosen at compile time.
 
    Shared by the engine, the platforms and the SH4 assembly, so it holds only
-   #defines. Pass the switches with -D (Makefile VARIANT=..., CMake
-   -DCGDOOM_VARIANT=...):
+   #defines. The switches come from -D (Makefile VARIANT=wide|hd; one add-in
+   per format in CMakeLists.txt):
 
    - CGD_WIDESCREEN=1: the engine renders the panel's 396x224 instead of
      320x200 (the 3D view widens; 2D art keeps its 320x200 layout, centred).
    - CGD_TRUECOLOR=1: the engine renders RGB565 pixels instead of 8-bit
      palette indices, with its light tables in RGB565.
-   - CGD_HD=1: both (the "HD" build).
+   - CGD_HD=1: both (the "HD" build), with the features of CGD_EXTRAS.
 
    The default (all 0) is the 320x200 8-bit build. */
 
@@ -31,6 +31,12 @@
 #else
 #define SCREENWIDTH   320
 #define SCREENHEIGHT  200
+#endif
+
+/* CGD_EXTRAS: the rendering and HUD features beyond vanilla (engine:
+   cgdoom.h CGD_Features), compiled in the HD build */
+#ifndef CGD_EXTRAS
+#define CGD_EXTRAS CGD_HD
 #endif
 
 /* Bytes per pixel of the engine's screens */

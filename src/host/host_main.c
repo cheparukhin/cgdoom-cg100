@@ -36,7 +36,7 @@
 static int parse_features(const char *list)
 {
     if(!strcmp(list, "all")) {
-        CGD_Features = (1 << CGD_FEATURE_COUNT) - 1;
+        CGD_Features = CGD_FEATURES_ALL;
         return 0;
     }
     CGD_Features = 0;
@@ -49,8 +49,9 @@ static int parse_features(const char *list)
             if(strlen(CGD_FeatureNames[k]) == n
                 && !strncmp(CGD_FeatureNames[k], list, n))
                 break;
-        if(k == CGD_FEATURE_COUNT) {
-            fprintf(stderr, "unknown feature: %.*s\n", (int)n, list);
+        if(k == CGD_FEATURE_COUNT || !(CGD_FEATURES_ALL & (1 << k))) {
+            fprintf(stderr, "unknown feature (in this build): %.*s\n",
+                (int)n, list);
             return -1;
         }
         CGD_Features |= 1 << k;

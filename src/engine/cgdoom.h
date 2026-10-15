@@ -134,21 +134,26 @@ extern int CGD_RecordDemoSlot;
 /* Whether we're only playing a demo and leaving */
 extern int CGD_PlayDemoOnly;
 
-/* Rendering features beyond vanilla, as bits of CGD_Features: on by default
-   in the HD build (CGD_FEATURES_DEFAULT), off in the others. None changes
-   game state, so demos stay in sync either way. Set before D_DoomMain (host
-   -features); the names are for the host's option. */
+/* Rendering features beyond vanilla, as bits of CGD_Features. The builds
+   with CGD_EXTRAS (cgd_config.h; the HD build) have them all, on by default;
+   the others have none. None changes game state, so demos stay in sync
+   either way. Set before D_DoomMain (host -features); the names are for the
+   host's option. */
 #define CGD_FEAT_ASPECT   0x01  /* aspect-ratio correction: the 3D view
                                    scaled 6/5 vertically, as DOOM's 320x200
                                    looked on a 4:3 monitor (r_main.c) */
-#define CGD_FEATURE_COUNT 1
+#define CGD_FEAT_SMOOTHLIGHT 0x02 /* smooth diminishing lighting: twice the
+                                   sector light levels, distance steps 8
+                                   times finer (r_main.h) */
+#define CGD_FEATURE_COUNT 2
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
-#if CGD_HD
-#define CGD_FEATURES_DEFAULT ((1 << CGD_FEATURE_COUNT) - 1)
+#if CGD_EXTRAS
+#define CGD_FEATURES_ALL ((1 << CGD_FEATURE_COUNT) - 1)
 #else
-#define CGD_FEATURES_DEFAULT 0
+#define CGD_FEATURES_ALL 0
 #endif
+#define CGD_FEATURES_DEFAULT CGD_FEATURES_ALL
 
 /* True-colour build (CGD_TRUECOLOR): 1 builds the light tables from the
    COLORMAP lump, so that frames equal the 8-bit build's through its palette
