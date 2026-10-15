@@ -46,6 +46,7 @@ e3m4-low     -iwad $WADS/freedoom1.wad -warp 3 4 -tics 600 -input builtin:explor
 demo1-low    -iwad $WADS/freedoom1.wad -playdemo DEMO1 -tics 2000 -lowdetail
 map07-low    -iwad $WADS/freedoom2.wad -warp 7 -tics 700 -input builtin:noclip -lowdetail
 e1m1-options -iwad $WADS/freedoom1.wad -warp 1 1 -tics 1200 -input builtin:options
+e1m1-help    -iwad $WADS/freedoom1.wad -warp 1 1 -tics 300 -input builtin:help
 e1m1-view7   -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -viewsize 7
 e1m1-auto    -iwad $WADS/freedoom1.wad -warp 1 1 -tics 900 -input builtin:explore -autoframeskip 3 -rendercost 2.5
 demo2-1-auto -iwad $WADS/freedoom2.wad -playdemo DEMO1 -tics 3000 -autoframeskip 2 -rendercost 1.6 -ticcost 0.2

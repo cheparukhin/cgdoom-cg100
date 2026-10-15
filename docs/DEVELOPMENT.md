@@ -485,11 +485,11 @@ Hardware runs are manual, so automated correctness rests on three things:
 
 | Command | What it checks |
 |---|---|
-| `make test-host` | The 35 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits and the optional modes. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
+| `make test-host` | The 36 scenarios of `tests/scenarios.txt` against `tests/golden/*.crc`. These cover Freedoom E1–E3 maps, Doom II maps, the title, demos, finales, renderer limits, the optional modes, and the menus and help screens over a level. Variant lines (`golden=<other>`) must reproduce another scenario's CRCs exactly: the WAD copy path (`-fragment`), small or multiple zones, poisoned zone memory, renderer arrays that start tiny (`-rlimits small`), and the slow-WAD precache path (`-slowwad`). |
 | `make VARIANT=wide test-host`, `make VARIANT=hd test-host` | The same scenarios in the widescreen and HD builds against `tests/golden-wide` and `tests/golden-hd` (the HD build with all its extras on) |
 | `make test-quicksave` | `tests/quicksave.sh`, HD build: the quicksave and quickload actions (bound in a `CGDOOM.CFG`, which the host reads from `-data`): slot pick, confirmed overwrite, confirmed load, cancelled load; then 40 save/load rounds over two level exits in a zone too small for the old in-zone save buffer |
 | `make test-variants` | Both variants' scenarios against their goldens, also under ASan/UBSan, plus `test-quicksave` |
-| `make test-asan` | The same 35 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys, skill-load and timedemo tests |
+| `make test-asan` | The same 36 scenarios under ASan/UBSan, plus the save-entry, unbegun-demo, map-limit, robustness, title-keys, skill-load and timedemo tests |
 | `make test-unit` | `test-fixed` (FixedMul/FixedDiv vs vanilla), `test-div`, `test-names` (8.3 mapping), `test-roundtrip` (record and replay a demo bit-exactly, also with the Doom menu opened while recording), `test-settings` (CGDOOM.CFG), `test-saveentry`, `test-demo-unbegun`, `test-map-limit`, `test-robust`, `test-title-keys`, `test-skill-load`, `test-timedemo` |
 | `make test-fixed-sim`, `make test-div-sim` | The fixed-point and division tests in the simulator, where `FixedDiv` is inline asm |
 | `make test-title-keys` | Every special key (gamma, cheat, noclip, FPS, view size) pressed on the title screen before any level: no access through the missing player (ASan/UBSan in `test-asan`). Then, with title demos on, a key pressed during a demo opens the Doom menu, as in vanilla |
@@ -503,7 +503,7 @@ Hardware runs are manual, so automated correctness rests on three things:
 | `sh tests/gint-host/run.sh` | 11 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: sys (model/OS/API gate, table reset and open wrapper), expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification). The platform sources have `CGD_HOST_TEST` seams (OS string in `sys.c`, image size in `memory.c`, KIUDATA in `input.c`); some suites `#include` the `.c` under test, and `test_files` interposes `malloc`. |
 | `python3 -m unittest discover -s tests -p 'test_gint_runtime.py' -v` | After rebuilding gint: exercises its actual patched OS selection and old/new LCD world-switch callbacks on the host |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
-| `make test-sim-full` | All 35 scenarios in the simulator vs the goldens (about 4 min) |
+| `make test-sim-full` | All 36 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
 
 **Warnings.** Every build uses one warning set, `warnings.mk`'s `CGD_WARN`: `-Wall -Wextra` plus `-Wshadow`,
@@ -550,22 +550,23 @@ from frame 42 to the end, with view size 10 and full detail. They exclude the ho
 
 | Scenario (Freedoom) | CGDoom | Current | Change |
 |---|---|---|---|
-| e1m1 | 2,017,661 | 1,115,669 | −44.7% |
-| map01 | 1,715,048 | 1,001,172 | −41.6% |
-| demo1 | 4,044,224 | 1,700,980 | −57.9% |
-| demo2-1 | 2,868,025 | 1,676,888 | −41.5% |
+| e1m1 | 2,017,661 | 1,031,352 | −48.9% |
+| map01 | 1,715,048 | 908,500 | −47.0% |
+| demo1 | 4,044,224 | 1,602,103 | −60.4% |
+| demo2-1 | 2,868,025 | 1,562,152 | −45.5% |
 
 The engine now follows vanilla's arithmetic and game logic, so the demos show different scenes than in
 CGDoom; e1m1 and map01 are the closest comparisons.
 
 - **Optional modes**, compared with the default:
-  - low detail: −34 to −39%;
-  - view size 9: −13 to −16%;
-  - view size 7: −32 to −38%.
+  - low detail: −33 to −39%;
+  - view size 9: −13 to −17%;
+  - view size 7: −33 to −40%.
 - **Screen formats** (§2.7), against the 320x200 build ([perf-baseline](../tests/perf-baseline.md#screen-formats)):
-  - 396x224: +18 to +30%, for 41% more pixels;
-  - HD: +23 to +29% in the demos and the bot and walk scenarios, the same as 396x224: its extras cost under 1% of
-    the frame. The automap overlay costs more while it is open (it keeps the 3D view and turns every map line).
+  - 396x224: +19 to +32%, for 41% more pixels;
+  - HD: +23 to +30% in the demos and the bot and walk scenarios, about the same as 396x224: its extras cost
+    nothing measurable (−1.7 to −0.1% of the 396x224 frame). The automap overlay costs more while it is open (it
+    keeps the 3D view and turns the map lines it draws).
 - **The simulator charges 1 cycle per instruction (plus 2 per taken branch)** and models no cache or dual
   issue, so the SH4 drawers' gain is a lower bound. Under the SH-4A pipeline model
   (`src/engine/sh4/README.md` §3), the drawers run 2.4–3.2× faster than GCC's C drawers over a frame's call mix
@@ -594,6 +595,10 @@ the engine just before it.
 | **Empty wall columns skipped.** A single-sided wall no longer calls `R_GetColumn` and the drawer when `yh < yl` (26% of the column calls in e1m1). Lighting and the `dc_iscale` division are computed only before the first tier a column draws | `r_segs.c` | −0.8% (map01) to −5.8% (e1m1); libgcc division −34% in e1m1 |
 | **`R_DrawMaskedColumn` loop state in locals.** Only drawn posts store the `dc_*` globals | `r_things.c` | −21% of the function in demo1 |
 | **No repeated sight check.** In single player, vanilla's `P_LookForPlayers` loop comes back to player 0 and checks sight again when the first look fails (about 45% of the `P_CheckSight` calls in id's demos). A player already looked at in the call is skipped; the loop variables and the result advance exactly as in vanilla | `p_enemy.c` | −0.6% in demo1 |
+| **Empty plane columns skipped.** `R_DrawPlanes` calls `R_MakeSpans` only for a column whose top or bottom differs from the previous column's; for the others, most of a plane's columns, its four loops were all empty | `r_plane.c` | −3.0% (e1m1) to −5.4% (map01) |
+| **Unchanged status-bar numbers not redrawn.** Vanilla redrew all 11 numbers of the bar, digit by digit over a copy of their background, each frame. Like the icons, they are now drawn only when they change and when the whole bar is refreshed: nothing else draws over the bar during play. While a help screen is up, and in the frame after it, before the bar's refresh, they are drawn every frame as before | `st_lib.c` | −1.5% (demo2-1) to −3.3% (map01) |
+| **Texture column computed only when used.** `R_RenderSegLoop` computes it before the first tier a column draws, or for a masked texture, instead of for every column | `r_segs.c` | −0.4% (map01) to −1.1% (e1m1) |
+| **The automap overlay rotates only the lines it draws** (HD build). The colour of a line is chosen first; vanilla's order would rotate every line of the level, mapped or not | `am_map.c` | −4.4% (e2m2) to −9.9% (e1m2) in the noclip scenarios, whose overlay is on |
 
 Tried and left out:
 

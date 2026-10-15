@@ -483,6 +483,38 @@ static const Builtin builtins[] = {
       "1 decvp\n"
       "bot 3000 7\n" },
 
+    /* The status bar is refreshed one frame after a help screen closes
+       (st_lib.c, D_Display); health and ammo stay the same meanwhile. */
+    { "help",
+      "menu Read This! (both pages), closed with the menu key; again, back "
+      "to the main menu with DEL, closed; then the bot",
+      "8\n"
+      "1 menu\n"
+      "3\n"
+      "1 back\n"
+      "2\n"
+      "1 back\n"
+      "2\n"
+      "1 back\n"
+      "2\n"
+      "1 back\n"
+      "2\n"
+      "1 enter\n"
+      "6\n"
+      "1 enter\n"
+      "6\n"
+      "1 menu\n"
+      "20\n"
+      "1 menu\n"
+      "3\n"
+      "1 enter\n"
+      "6\n"
+      "1 del\n"
+      "6\n"
+      "1 menu\n"
+      "20\n"
+      "bot 3000 1\n" },
+
     { "random",
       "no cheats: blind pseudo-random key segments",
       "rand 120 4\n" },

@@ -46,6 +46,9 @@
 // in AM_map.c
 extern boolean  automapactive; 
 
+// in m_menu.c
+extern boolean  inhelpscreens;
+
 
 //
 // Hack display negative frags.
@@ -89,6 +92,16 @@ void STlib_drawNum( st_number_t* n,  boolean refresh )
 
   int  neg;
 
+  /* CGDoom: an unchanged number is not drawn again (vanilla redrew every
+     number every frame), as the icons below are not. Nothing else draws
+     over the status bar during play: the view, its border, the automap,
+     the HUD text and the menus stay above ST_Y, and wipes, view size
+     changes and help screens refresh the whole bar (D_Display). That
+     refresh comes one frame after a help screen closes (inhelpscreens is
+     cleared later, by M_Drawer), so the numbers are drawn while it is set,
+     as vanilla drew them. */
+  if (!refresh && !inhelpscreens && num == n->oldnum)
+    return;
   n->oldnum = *n->num;
 
   neg = num < 0;
@@ -132,9 +145,6 @@ void STlib_drawNum( st_number_t* n,  boolean refresh )
   // draw a minus sign if necessary
   if (neg)
     V_DrawPatch(x - 8, n->y, FG, sttminus);
-
-  //Shut up, GCC
-  refresh= false;
 }
 
 

@@ -224,7 +224,6 @@ void R_RenderSegLoop (void)
   const fixed_t		plowstep = pixlowstep;
   const boolean		mceiling = markceiling;
   const boolean		mfloor = markfloor;
-  const boolean		textured = segtextured;
   const boolean		masked = maskedtexture;
   const int		midtex = midtexture;
   const int		toptex = toptexture;
@@ -242,12 +241,23 @@ void R_RenderSegLoop (void)
   const short		vheight = (short)viewheight;
   boolean		lit;
 
-  /* Lighting and per-column drawer state, once per column before the first
-     tier it draws (textured is always true when a tier is drawn). */
+  /* The texture column. Computed only for a column that uses it: one that
+     draws a tier (SEG_COLUMN_SETUP) or saves it for the masked texture. */
+#define SEG_TEXTURECOLUMN()						\
+  do {									\
+    angle = (centerangle + xtoviewangle[x])>>ANGLETOFINESHIFT;		\
+    texturecolumn = offset-FixedMul(finetangent[angle],distance);	\
+    texturecolumn >>= FRACBITS;						\
+  } while (0)
+
+  /* Lighting, the texture column and the per-column drawer state, once per
+     column before the first tier it draws (segtextured is always true when a
+     tier is drawn). */
 #define SEG_COLUMN_SETUP()						\
   do {									\
     if (!lit)								\
     {									\
+      SEG_TEXTURECOLUMN();						\
       index = scale>>LIGHTSCALESHIFT;					\
       if (index >=  MAXLIGHTSCALE )					\
         index = MAXLIGHTSCALE-1;					\
@@ -300,22 +310,9 @@ void R_RenderSegLoop (void)
       }
     }
 
-    // texturecolumn is independent of wall tiers
-    if (textured)
-    {
-      // calculate texture offset
-      angle = (centerangle + xtoviewangle[x])>>ANGLETOFINESHIFT;
-      texturecolumn = offset-FixedMul(finetangent[angle],distance);
-      texturecolumn >>= FRACBITS;
-    }
-    else
-    {
-      // purely to shut up the compiler
-
-      texturecolumn = 0;
-    }
-    /* CGDoom: the lighting and dc_x/dc_iscale are set up only
-       before the first tier this column actually draws (SEG_COLUMN_SETUP).
+    /* CGDoom: the texture column, the lighting and dc_x/dc_iscale are set
+       up only before the first tier this column actually draws
+       (SEG_COLUMN_SETUP); the texture column is independent of the tiers.
        Every other reader of dc_colormap, dc_x and dc_iscale (masked segs,
        sprites, sky) sets them itself first, and the values at each colfunc
        call are vanilla's, so the frames are the same; a column that draws
@@ -411,6 +408,8 @@ void R_RenderSegLoop (void)
       {
         // save texturecol
         //  for backdrawing of masked mid texture
+        if (!lit)
+          SEG_TEXTURECOLUMN();
         mtcol[x] = (short)texturecolumn;
       }
     }
@@ -421,6 +420,7 @@ void R_RenderSegLoop (void)
   }
 
 #undef SEG_COLUMN_SETUP
+#undef SEG_TEXTURECOLUMN
 
   rw_x = x;
   rw_scale = scale;

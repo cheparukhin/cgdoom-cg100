@@ -1282,10 +1282,41 @@ void AM_drawGrid(int color)
 void AM_drawWalls(void)
 {
   int i;
+  int color;
   static mline_t l;
 
   for (i=0;i<numlines;i++)
   {
+    /* CGDoom: the colour is chosen first (vanilla's colours; -1: not
+       drawn), so that the overlay rotates only the lines it draws */
+    color = -1;
+    if (cheating || (lines[i].flags & ML_MAPPED))
+    {
+      if ((lines[i].flags & LINE_NEVERSEE) && !cheating)
+        continue;
+      if (!lines[i].backsector)
+        color = WALLCOLORS+lightlev;
+      else if (lines[i].special == 39) // teleporters
+        color = WALLCOLORS+WALLRANGE/2;
+      else if (lines[i].flags & ML_SECRET) // secret door
+        color = cheating ? SECRETWALLCOLORS + lightlev : WALLCOLORS+lightlev;
+      else if (lines[i].backsector->floorheight
+        != lines[i].frontsector->floorheight)
+        color = FDWALLCOLORS + lightlev; // floor level change
+      else if (lines[i].backsector->ceilingheight
+        != lines[i].frontsector->ceilingheight)
+        color = CDWALLCOLORS+lightlev; // ceiling level change
+      else if (cheating)
+        color = TSWALLCOLORS+lightlev;
+    }
+    else if (plr->powers[pw_allmap])
+    {
+      if (!(lines[i].flags & LINE_NEVERSEE))
+        color = GRAYS+3;
+    }
+    if (color < 0)
+      continue;
+
     l.a.x = lines[i].v1->x;
     l.a.y = lines[i].v1->y;
     l.b.x = lines[i].v2->x;
@@ -1297,42 +1328,7 @@ void AM_drawWalls(void)
       AM_rotatePoint (&l.b);
     }
 #endif
-    if (cheating || (lines[i].flags & ML_MAPPED))
-    {
-      if ((lines[i].flags & LINE_NEVERSEE) && !cheating)
-        continue;
-      if (!lines[i].backsector)
-      {
-        AM_drawMline(&l, WALLCOLORS+lightlev);
-      }
-      else
-      {
-        if (lines[i].special == 39)
-        { // teleporters
-          AM_drawMline(&l, WALLCOLORS+WALLRANGE/2);
-        }
-        else if (lines[i].flags & ML_SECRET) // secret door
-        {
-          if (cheating) AM_drawMline(&l, SECRETWALLCOLORS + lightlev);
-          else AM_drawMline(&l, WALLCOLORS+lightlev);
-        }
-        else if (lines[i].backsector->floorheight
-          != lines[i].frontsector->floorheight) {
-            AM_drawMline(&l, FDWALLCOLORS + lightlev); // floor level change
-          }
-        else if (lines[i].backsector->ceilingheight
-          != lines[i].frontsector->ceilingheight) {
-            AM_drawMline(&l, CDWALLCOLORS+lightlev); // ceiling level change
-          }
-        else if (cheating) {
-          AM_drawMline(&l, TSWALLCOLORS+lightlev);
-        }
-      }
-    }
-    else if (plr->powers[pw_allmap])
-    {
-      if (!(lines[i].flags & LINE_NEVERSEE)) AM_drawMline(&l, GRAYS+3);
-    }
+    AM_drawMline(&l, color);
   }
 }
 

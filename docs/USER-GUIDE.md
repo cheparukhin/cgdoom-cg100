@@ -242,7 +242,7 @@ saved in one loads in the other. CGDoom does not know the two quick keys: when i
 CGDoom HD goes back to their default keys.
 
 **Speed.** CGDoom HD draws 39% more pixels, so it is slower than CGDoom: in the simulator a frame costs
-23–29% more, and the automap over the view costs more while it is open. Compare the two with the timedemo
+23–30% more, and the automap over the view costs more while it is open. Compare the two with the timedemo
 (Diagnostics → Benchmarks, key **1**). *Detail* and *View size* make it faster as they do in CGDoom. It
 needs about 53 KB more RAM, and by calculation the packed shareware WAD still fits in RAM.
 

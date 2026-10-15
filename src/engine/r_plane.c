@@ -586,7 +586,14 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
 
     for (x=pl->minx ; x<= stop ; x++)
     {
-      R_MakeSpans(x,pl->top[x-1],pl->bottom[x-1],pl->top[x],pl->bottom[x]);
+      /* CGDoom: R_MakeSpans does nothing for a column whose top and bottom
+         are the previous column's (its four loops are all empty), which is
+         most of a plane's columns */
+      int t1 = pl->top[x-1], b1 = pl->bottom[x-1];
+      int t2 = pl->top[x], b2 = pl->bottom[x];
+
+      if (t1 != t2 || b1 != b2)
+        R_MakeSpans(x,t1,b1,t2,b2);
     }
 
     Z_ChangeTag (ds_source, PU_CACHE);

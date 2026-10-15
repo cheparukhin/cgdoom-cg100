@@ -1,14 +1,14 @@
 # Performance baseline: the engine in the SH simulator
 
-These are the per-frame costs of the engine as it is now, compared with the CGDoom engine this port started from. They
-were measured on 2026-10-14 (commit `6181d43`) with `make perf-sim`. Every number is deterministic, so a rerun on
-the same sources gives the same values to the instruction.
+These are the per-frame costs of the engine as it is now, compared with the CGDoom engine this port started from,
+measured with `make perf-sim`. Every number is deterministic, so a rerun on the same sources with the same compiler
+gives the same values to the instruction.
 
 ## What is measured
 
 - **Build:** `make sim` builds `build-sim/cgdoom-sim.elf` from the same engine and host sources as `make host`, plus
   the SH4 assembly drawers of `src/engine/sh4`, exactly as the calculator build selects them. The compiler is
-  `sh-elf-gcc 14.1 -m4-nofpu -mb -O2 -std=gnu11 -fno-strict-aliasing -DPL_SIM`, with RANGECHECK off as on the
+  `sh-elf-gcc 16.2 -m4-nofpu -mb -O2 -std=gnu11 -fno-strict-aliasing -DPL_SIM`, with RANGECHECK off as on the
   calculator.
 - **Simulator:** `build-sim/tools/sh-elf-run64` (from `make sim-tool`): the GDB 15.2 SH simulator with 64-bit
   counters and an exact per-PC profile.
@@ -28,20 +28,20 @@ the same sources gives the same values to the instruction.
 
 ## Against the CGDoom engine
 
-"CGDoom (upstream)" is the starting point, measured on 2026-10-09 with the same method: CGDoom's C renderer and its
-bit-serial `FixedMul`/`FixedDiv`, no assembly. "Now" is the current default ELF.
+"CGDoom (upstream)" is the starting point, measured with the same method (and sh-elf-gcc 14.1): CGDoom's C renderer
+and its bit-serial `FixedMul`/`FixedDiv`, no assembly. "Now" is the current default ELF.
 
 | scenario | insts/frame CGDoom (upstream) | insts/frame now | Δ | cycles/frame CGDoom (upstream) | cycles/frame now | Δ |
 |---|---|---|---|---|---|---|
-| e1m1 | 2,017,661 | 1,115,669 | −44.7% | 2,219,747 | 1,175,566 | −47.0% |
-| e1m2 | 2,140,728 | 1,020,237 | −52.3% | 2,374,393 | 1,084,714 | −54.3% |
-| e1m3 | 1,617,624 | 843,052 | −47.9% | 1,774,804 | 880,753 | −50.4% |
-| e2m2 | 1,634,253 | 690,772 | −57.7% | 1,832,426 | 739,900 | −59.6% |
-| e3m4 | 1,883,890 | 1,085,992 | −42.4% | 2,070,369 | 1,145,210 | −44.7% |
-| demo1 | 4,044,224 | 1,700,980 | −57.9% | 4,463,376 | 1,813,665 | −59.4% |
-| map01 | 1,715,048 | 1,001,172 | −41.6% | 1,878,984 | 1,049,420 | −44.1% |
-| map07 | 1,792,072 | 881,703 | −50.8% | 1,982,551 | 935,530 | −52.8% |
-| demo2-1 | 2,868,025 | 1,676,888 | −41.5% | 3,174,992 | 1,780,900 | −43.9% |
+| e1m1 | 2,017,661 | 1,031,352 | −48.9% | 2,219,747 | 1,084,797 | −51.1% |
+| e1m2 | 2,140,728 | 951,190 | −55.6% | 2,374,393 | 1,009,514 | −57.5% |
+| e1m3 | 1,617,624 | 787,775 | −51.3% | 1,774,804 | 818,956 | −53.9% |
+| e2m2 | 1,634,253 | 642,000 | −60.7% | 1,832,426 | 687,893 | −62.5% |
+| e3m4 | 1,883,890 | 1,012,496 | −46.3% | 2,070,369 | 1,064,501 | −48.6% |
+| demo1 | 4,044,224 | 1,602,103 | −60.4% | 4,463,376 | 1,704,685 | −61.8% |
+| map01 | 1,715,048 | 908,500 | −47.0% | 1,878,984 | 944,300 | −49.7% |
+| map07 | 1,792,072 | 822,130 | −54.1% | 1,982,551 | 871,342 | −56.0% |
+| demo2-1 | 2,868,025 | 1,562,152 | −45.5% | 3,174,992 | 1,650,241 | −48.0% |
 
 The two columns do not show exactly the same frames. The engine now follows vanilla's fixed-point arithmetic and game
 logic, so monsters act differently and the scripted runs see slightly different scenes. The demos changed most: under
@@ -52,15 +52,15 @@ the closest like-for-like comparisons.
 
 | scenario | frames | insts/frame | cycles/frame | median | p90 | max | render | game | other | CRC |
 |---|---|---|---|---|---|---|---|---|---|---|
-| e1m1 | 899 | 1,115,669 | 1,175,566 | 1,081,804 | 1,701,211 | 2,915,865 | 92.2% | 3.3% | 4.5% | ok |
-| e1m2 | 899 | 1,020,237 | 1,084,714 | 1,055,745 | 1,798,747 | 5,538,582 | 85.1% | 5.7% | 9.2% | ok |
-| e1m3 | 931 (+1 load) | 843,052 | 880,753 | 835,070 | 1,158,129 | 2,002,505 | 90.1% | 5.3% | 4.6% | ok |
-| e2m2 | 599 | 690,772 | 739,900 | 221,016 | 1,869,233 | 5,592,169 | 79.5% | 3.6% | 16.9% | ok |
-| e3m4 | 599 | 1,085,992 | 1,145,210 | 1,102,207 | 1,542,039 | 1,851,533 | 89.4% | 6.1% | 4.5% | ok |
-| demo1 | 1999 | 1,700,980 | 1,813,665 | 1,682,036 | 2,637,372 | 3,084,795 | 91.3% | 6.1% | 2.6% | ok |
-| map01 | 899 | 1,001,172 | 1,049,420 | 1,050,466 | 1,465,764 | 3,376,879 | 92.2% | 2.9% | 5.0% | ok |
-| map07 | 699 | 881,703 | 935,530 | 1,012,769 | 1,459,925 | 5,343,132 | 80.4% | 7.4% | 12.2% | ok |
-| demo2-1 | 2663 | 1,676,888 | 1,780,900 | 1,776,144 | 2,438,332 | 3,115,556 | 95.2% | 2.1% | 2.6% | ok |
+| e1m1 | 899 | 1,031,352 | 1,084,797 | 990,644 | 1,585,909 | 2,801,926 | 95.2% | 3.6% | 1.2% | ok |
+| e1m2 | 899 | 951,190 | 1,009,514 | 974,757 | 1,678,067 | 5,501,627 | 87.8% | 6.1% | 6.2% | ok |
+| e1m3 | 931 (+1 load) | 787,775 | 818,956 | 775,654 | 1,101,516 | 1,870,272 | 92.5% | 5.7% | 1.8% | ok |
+| e2m2 | 599 | 642,000 | 687,893 | 172,779 | 1,837,013 | 5,580,903 | 83.4% | 3.8% | 12.8% | ok |
+| e3m4 | 599 | 1,012,496 | 1,064,501 | 1,021,554 | 1,460,152 | 1,762,813 | 92.4% | 6.5% | 1.1% | ok |
+| demo1 | 1999 | 1,602,103 | 1,704,685 | 1,584,337 | 2,496,486 | 2,931,113 | 92.8% | 6.4% | 0.8% | ok |
+| map01 | 899 | 908,500 | 944,300 | 937,035 | 1,321,814 | 3,284,198 | 95.5% | 3.2% | 1.4% | ok |
+| map07 | 699 | 822,130 | 871,342 | 943,553 | 1,383,982 | 5,260,376 | 83.3% | 7.9% | 8.9% | ok |
+| demo2-1 | 2663 | 1,562,152 | 1,650,241 | 1,638,007 | 2,298,424 | 3,019,250 | 96.7% | 2.3% | 1.0% | ok |
 
 Median, p90 and max are per-frame cycles; render, game and other are shares of the average cycles per frame. The
 noclip scenarios (e1m2, e2m2, map07) fly through walls and into the void, so their spread is very wide. **e1m1, map01
@@ -73,41 +73,40 @@ Instructions per frame, same window, with `-lowdetail` (160 columns), `-viewsize
 
 | scenario | default | low detail | view size 9 | view size 7 |
 |---|---|---|---|---|
-| e1m1 | 1,115,669 | 696,105 (−37.6%) | 950,865 (−14.8%) | 709,929 (−36.4%) |
-| map01 | 1,001,172 | 612,737 (−38.8%) | 843,225 (−15.8%) | 617,544 (−38.3%) |
-| demo1 | 1,700,980 | 1,104,793 (−35.0%) | 1,484,091 (−12.8%) | 1,153,798 (−32.2%) |
-| demo2-1 | 1,676,888 | 1,100,663 (−34.4%) | 1,449,452 (−13.6%) | 1,112,772 (−33.6%) |
+| e1m1 | 1,031,352 | 640,008 (−37.9%) | 870,777 (−15.6%) | 639,756 (−38.0%) |
+| map01 | 908,500 | 554,010 (−39.0%) | 755,166 (−16.9%) | 541,280 (−40.4%) |
+| demo1 | 1,602,103 | 1,047,766 (−34.6%) | 1,391,350 (−13.2%) | 1,075,006 (−32.9%) |
+| demo2-1 | 1,562,152 | 1,044,974 (−33.1%) | 1,342,088 (−14.1%) | 1,023,725 (−34.5%) |
 
-Low detail saves 34–39%, view size 9 saves 13–16% and view size 7 saves 32–38%. Cycles drop by about the same
-amount (within 0.8 points). Game tics and the status bar cost the same in every mode; only rendering gets cheaper.
+Low detail saves 33–39%, view size 9 saves 13–17% and view size 7 saves 33–40%. Cycles drop by about the same
+amount (within 0.9 points). Game tics and the status bar cost the same in every mode; only rendering gets cheaper.
 
 ## Screen formats
 
 The same measure in the three builds of `src/platform/cgd_config.h` (DEVELOPMENT.md §2.7), each with its SH4 drawers,
 the HD build with its extras on as shipped: `make perf-sim`, `make VARIANT=wide perf-sim` and `make VARIANT=hd
-perf-sim`, all built with sh-elf-gcc 16.2 (so the 320x200 column differs slightly from the tables above, measured
-with 14.1). Every run reproduced its goldens (`tests/golden`, `tests/golden-wide`, `tests/golden-hd`).
+perf-sim`. Every run reproduced its goldens (`tests/golden`, `tests/golden-wide`, `tests/golden-hd`).
 
 | scenario | input | 320x200 | 396x224 | HD (396x224, extras) |
 |---|---|---|---|---|
-| e1m1 | explore | 1,110,437 | 1,410,272 (+27.0%) | 1,418,221 (+27.7%) |
-| e1m2 | noclip | 1,020,993 | 1,286,145 (+26.0%) | 1,797,367 (+76.0%) |
-| e1m3 | walk | 841,835 | 1,092,451 (+29.8%) | 1,087,853 (+29.2%) |
-| e2m2 | noclip | 693,864 | 818,864 (+18.0%) | 988,010 (+42.4%) |
-| e3m4 | explore | 1,079,843 | 1,372,767 (+27.1%) | 1,376,981 (+27.5%) |
-| demo1 | demo | 1,696,833 | 2,094,509 (+23.4%) | 2,090,699 (+23.2%) |
-| map01 | explore | 999,159 | 1,295,622 (+29.7%) | 1,287,549 (+28.9%) |
-| map07 | noclip | 882,147 | 1,106,888 (+25.5%) | 1,368,493 (+55.1%) |
-| demo2-1 | demo | 1,682,011 | 2,096,552 (+24.6%) | 2,065,962 (+22.8%) |
+| e1m1 | explore | 1,031,352 | 1,322,924 (+28.3%) | 1,321,917 (+28.2%) |
+| e1m2 | noclip | 951,190 | 1,209,007 (+27.1%) | 1,536,533 (+61.5%) |
+| e1m3 | walk | 787,775 | 1,031,878 (+31.0%) | 1,024,929 (+30.1%) |
+| e2m2 | noclip | 642,000 | 764,217 (+19.0%) | 882,285 (+37.4%) |
+| e3m4 | explore | 1,012,496 | 1,298,872 (+28.3%) | 1,294,682 (+27.9%) |
+| demo1 | demo | 1,602,103 | 1,988,468 (+24.1%) | 1,980,719 (+23.6%) |
+| map01 | explore | 908,500 | 1,195,268 (+31.6%) | 1,177,584 (+29.6%) |
+| map07 | noclip | 822,130 | 1,041,074 (+26.6%) | 1,196,168 (+45.5%) |
+| demo2-1 | demo | 1,562,152 | 1,959,905 (+25.5%) | 1,926,687 (+23.3%) |
 
-- **Widescreen:** the view has 41% more pixels (396x192 against 320x168); the frame costs 18–30% more. The presenter
+- **Widescreen:** the view has 41% more pixels (396x192 against 320x168); the frame costs 19–32% more. The presenter
   also expands 39% more pixels for the DMA (not counted here).
-- **The extras** cost between −1.5% and +0.6% of the 396x224 frame in the other scenarios: the 4:3 proportions, the
+- **The extras** cost between −1.7% and −0.1% of the 396x224 frame in the other scenarios: the 4:3 proportions, the
   coloured numbers and the crosshair draw no more pixels, and the full-screen HUD shows only at the largest view
   size (there it costs 1.4–2.7%).
 - **The `noclip` scenarios are not like for like:** their script presses the Map key twice, which in the HD build
-  leaves the automap overlay on (the 3D view plus every map line rotated each frame), where the other builds show
-  the map alone.
+  leaves the automap overlay on (the 3D view plus the map's drawn lines, rotated each frame), where the other builds
+  show the map alone.
 
 ## Where the time goes
 
@@ -115,14 +114,14 @@ Shares of simulator cycles from the PC profiles (`build-sim/perf/<name>.top` has
 
 | group | e1m1 | map01 | demo1 |
 |---|---|---|---|
-| column drawer (`R_DrawColumn_SH4`, `cgd_col_*`) | 44.1% | 41.1% | 27.3% |
-| `R_RenderSegLoop` (with the inlined `R_GetColumn`) | 16.4% | 16.0% | 14.3% |
-| planes (`R_MakeSpans`, `R_DrawPlanes`, `R_MapPlane`, ...) | 8.1% | 12.7% | 10.5% |
-| span drawer (`R_DrawSpan_SH4`, `cgd_span_*`) | 5.3% | 12.3% | 12.3% |
-| sprites and masked walls (`R_DrawMaskedColumn`, `R_DrawSprite`, ...) | 7.2% | 2.7% | 12.5% |
-| BSP walk and wall set-up (`R_StoreWallRange`, `R_AddLine`, `FixedDiv`, ...) | 7.4% | 3.6% | 10.2% |
-| libgcc division | 3.3% | 3.4% | 4.2% |
-| `V_*` (status bar, HUD) | 3.6% | 3.9% | 2.1% |
+| column drawer (`R_DrawColumn_SH4`, `cgd_col_*`) | 47.8% | 45.7% | 29.1% |
+| `R_RenderSegLoop` (with the inlined `R_GetColumn`) | 16.8% | 17.3% | 14.7% |
+| planes (`R_MakeSpans`, `R_DrawPlanes`, `R_MapPlane`, ...) | 5.5% | 8.0% | 7.5% |
+| span drawer (`R_DrawSpan_SH4`, `cgd_span_*`) | 5.8% | 13.6% | 13.0% |
+| sprites and masked walls (`R_DrawMaskedColumn`, `R_DrawSprite`, ...) | 7.8% | 2.9% | 13.6% |
+| BSP walk and wall set-up (`R_StoreWallRange`, `R_AddLine`, `FixedDiv`, ...) | 7.8% | 3.9% | 10.4% |
+| libgcc division | 3.6% | 3.8% | 4.5% |
+| `V_*` (status bar, HUD) | 0.4% | 0.5% | 0.5% |
 
 The simulator charges the drawers' repeat loops exactly 1 cycle per instruction (they have no taken branch), so this
 table overstates the drawers' share of hardware time; their speed comes from dual issue.
@@ -134,20 +133,20 @@ README's model of the GCC -O2 C drawers to the same pixels. Per frame:
 
 | scenario | column calls (multi / 2 px / 1 px) | span calls | SH4 drawers (pess / opt / gcc) | C drawers (pess / opt / gcc) | speed-up (pess / opt / gcc) | frame estimate C → SH4 (pess) |
 |---|---|---|---|---|---|---|
-| e1m1 | 642 (600 / 19 / 23) | 99 | 303k / 301k / 364k | 969k / 772k / 1035k | 3.2× / 2.6× / 2.8× | 1.56M → 0.90M (1.74×) |
-| map01 | 709 (695 / 8 / 7) | 145 | 295k / 292k / 344k | 935k / 755k / 995k | 3.2× / 2.6× / 2.9× | 1.42M → 0.78M (1.81×) |
-| demo1 | 2626 (1109 / 431 / 1086) | 246 | 398k / 389k / 445k | 1130k / 928k / 1199k | 2.8× / 2.4× / 2.7× | 2.23M → 1.50M (1.49×) |
-| e1m1-low | 320 (300 / 9 / 11) | 95 | 174k / 173k / 191k | 611k / 505k / 654k | 3.5× / 2.9× / 3.4× | 1.02M → 0.58M (1.75×) |
-| demo1-low | 1312 (554 / 215 / 543) | 241 | 230k / 227k / 248k | 767k / 640k / 840k | 3.3× / 2.8× / 3.4× | 1.54M → 1.00M (1.54×) |
+| e1m1 | 642 (600 / 19 / 23) | 99 | 303k / 301k / 364k | 969k / 772k / 1035k | 3.2× / 2.6× / 2.8× | 1.47M → 0.81M (1.83×) |
+| map01 | 709 (695 / 8 / 7) | 145 | 295k / 292k / 344k | 935k / 755k / 995k | 3.2× / 2.6× / 2.9× | 1.32M → 0.68M (1.94×) |
+| demo1 | 2626 (1109 / 431 / 1086) | 246 | 398k / 389k / 445k | 1130k / 928k / 1199k | 2.8× / 2.4× / 2.7× | 2.12M → 1.38M (1.53×) |
+| e1m1-low | 320 (300 / 9 / 11) | 95 | 174k / 173k / 191k | 611k / 505k / 654k | 3.5× / 2.9× / 3.4× | 0.96M → 0.52M (1.84×) |
+| demo1-low | 1312 (554 / 215 / 543) | 241 | 230k / 227k / 248k | 767k / 640k / 840k | 3.3× / 2.8× / 3.4× | 1.48M → 0.94M (1.57×) |
 
 - No column or span call takes the C fallback (count out of range or an unregistered colormap), and the fuzz and
   translated drawers run less than once per 100 frames. In low detail the counts are texels, which are 2 pixels wide.
 - Wall-heavy scenes draw long columns (e1m1: about 92 pixels per call). In demo1, 58% of the column calls are sprite
   posts of 1 or 2 pixels, so per-call set-up weighs more there and the speed-up is smaller.
 - The frame estimate adds the modelled drawers to the rest of the frame, counted at the simulator's cycles (e1m1
-  595k, map01 490k, demo1 1.10M, e1m1-low 406k, demo1-low 771k). The rest is the same code in both builds. On hardware
+  503k, map01 384k, demo1 987k, e1m1-low 346k, demo1-low 709k). The rest is the same code in both builds. On hardware
   it dual-issues too, but it also misses the caches and waits on memory, so the estimate is only an illustration. At
-  the game's F4 CPU clock (235.93 MHz), e1m1's 0.90M cycles would be 3.8 ms of engine work per frame, as an idealised
+  the game's F4 CPU clock (235.93 MHz), e1m1's 0.81M cycles would be 3.4 ms of engine work per frame, as an idealised
   lower bound that leaves out presentation.
 
 ## Profiler artefacts
@@ -173,7 +172,7 @@ None of these is done; the figures are for the current code.
    ([`src/engine/sh4/README.md` §9](../src/engine/sh4/README.md#9-further-work-not-done)). The callers already hold
    the values in registers, so set-up drops by about 40 modelled cycles per multi-pixel call and about 20 per 1-pixel
    call. With the call mix above, that is about 25k cycles per frame in e1m1 (about 3% of the modelled frame) and
-   83k in demo1 (about 5.5%).
+   83k in demo1 (about 6%).
 2. **An exact reciprocal for `dc_iscale` and `SlopeDiv`**: a table, a Newton step, a multiply and a ±1 correction, at
    about 25–30 instructions against 46–47. That saves about 1.5% of the frame. It needs its own exactness proof, and
    SH4 has no count-leading-zeros instruction for the normalisation. An inexact reciprocal would change pixels.
@@ -181,7 +180,7 @@ None of these is done; the figures are for the current code.
    place of about 10 literal loads per call. This overlaps with item 1.
 4. **The locals pattern for `R_RenderMaskedSegRange`.** `R_RenderSegLoop` and `R_DrawMaskedColumn` keep their loop
    state in locals; `R_RenderMaskedSegRange` still loops on the globals `dc_x` and `spryscale` around every
-   `R_DrawMaskedColumn` call. It is 0.5% of e1m1 and 0.7% of demo1, so the gain is a fraction of that.
+   `R_DrawMaskedColumn` call. It is 0.5% of e1m1 and 0.8% of demo1, so the gain is a fraction of that.
 5. **Re-scheduled column loops for 3-cycle loads** (README §9): worth doing only if hardware timing shows GCC's
    "gcc" latencies.
 
@@ -195,7 +194,7 @@ From the repository root, with the project toolchain on the `PATH` (`export PATH
 make sim-tool        # once: builds build-sim/tools/sh-elf-run64 (64-bit counters, PC profile)
 make sim             # build-sim/cgdoom-sim.elf (SH4 drawers; C only: make SIM_BUILD=build-sim-c CGSIM_SH4=0 sim)
 make test-sim        # quick check: the first 60 tics of e1m1, map01 and demo1 against the goldens
-make test-sim-full   # all 35 scenarios in the simulator against the goldens (about 4 min)
+make test-sim-full   # all 36 scenarios in the simulator against the goldens (about 4 min)
 make perf-sim        # the per-frame table and the e1m1/map01/demo1 profiles (about 1 min); output in build-sim/perf/
 make VARIANT=hd sim-tool   # once per screen format (VARIANT=wide|hd): build-sim-hd/tools/sh-elf-run64
 make VARIANT=hd perf-sim   # the per-frame table for that format; output in build-sim-hd/perf/
