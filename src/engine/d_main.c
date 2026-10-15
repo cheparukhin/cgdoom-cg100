@@ -263,12 +263,14 @@ void D_Display (void)
   oldgamestate = gamestate;
 
   // draw pause pic
+  // CGDoom: no higher than the top of the centred 320x200 layout
+  // (HEIGHTDELTA), so that the menu's logo, drawn there, still covers it
   if (paused)
   {
     if (AM_FULLMAP)
-      y = 4;
+      y = HEIGHTDELTA+4;
     else
-      y = viewwindowy+4;
+      y = (viewwindowy > HEIGHTDELTA ? viewwindowy : HEIGHTDELTA)+4;
     V_DrawPatchDirect(viewwindowx+(scaledviewwidth-68)/2, y ,0 ,W_CacheLumpNamePatch("M_PAUSE", PU_CACHE) );
   }
 

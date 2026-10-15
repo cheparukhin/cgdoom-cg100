@@ -934,12 +934,30 @@ static void ST_UpdateColored (st_number_t *num, st_percent_t *per,
 #if CGD_EXTRAS
 //
 // CGDoom: the full-screen HUD (CGD_FEAT_FULLHUD, as Crispy Doom's): at the
-// largest view size, where the status bar is hidden, the ready ammo,
-// health, armour and keys are drawn over the view at the bar's height, the
-// first two at the left edge, the others at the right edge. No background:
-// the view under them is drawn again every frame. Colours as on the bar
+// largest view size, where the status bar is hidden, the ready ammo and
+// health are drawn over the view at the bottom left, the armour and keys
+// at the bottom right. No background: the view under them is drawn again
+// every frame. In true colour each patch has a black shadow, so that it
+// stays readable on any wall (and in a red flash); colours as on the bar
 // (CGD_FEAT_COLORNUMS).
 //
+
+#define HUD_Y     (SCREENHEIGHT - 21)   /* the numbers' top, 5 px up */
+#define HUD_KEYW  9                     /* a key and the gap after it */
+
+/* A patch with its shadow */
+static void ST_HudPatch (int x, int y, const patch_t *patch)
+{
+#if CGD_TRUECOLOR
+  static const uint16_t black[256];
+  const uint16_t *pal = v_patchpal;
+
+  v_patchpal = black;
+  V_DrawPatch (x + 1, y + 1, FG, patch);
+  v_patchpal = pal;
+#endif
+  V_DrawPatch (x, y, FG, patch);
+}
 
 /* A tall number right-aligned at x, as STlib_drawNum (negative: 0) */
 static void ST_HudNum (int x, int y, int num)
@@ -949,11 +967,11 @@ static void ST_HudNum (int x, int y, int num)
   if (num < 0)
     num = 0;
   if (!num)
-    V_DrawPatch (x - w, y, FG, tallnum[0]);
+    ST_HudPatch (x - w, y, tallnum[0]);
   while (num)
   {
     x -= w;
-    V_DrawPatch (x, y, FG, tallnum[num % 10]);
+    ST_HudPatch (x, y, tallnum[num % 10]);
     num /= 10;
   }
 }
@@ -961,11 +979,14 @@ static void ST_HudNum (int x, int y, int num)
 void ST_DrawFullscreenHUD (void)
 {
   ammotype_t type = weaponinfo[plyr->readyweapon].ammo;
-  /* The left group as at the left end of the bar; the right one (armour,
-     keys) moved to the screen's right edge, where the bar's ammo table
-     was */
-  int dl = -ST_BARX;
-  int dr = SCREENWIDTH - 2 - SHORT(keys[0]->width) - ST_KEY0X;
+  int w = SHORT(tallnum[0]->width);
+  /* Three digits each: the ammo from x = 2, the health 18 px after it;
+     the key slots (blue, yellow, red, as on the bar) at the right edge,
+     centred on the numbers, the armour 5 px before them */
+  int ammox = 2 + 3*w;
+  int healthx = ammox + 18 + 3*w;
+  int keyx = SCREENWIDTH - 2 - 3*HUD_KEYW + 2;
+  int armorx = keyx - 5 - SHORT(tallpercent->width);
 
 #if CGD_TRUECOLOR
   boolean colored = (CGD_Features & CGD_FEAT_COLORNUMS) != 0;
@@ -973,29 +994,29 @@ void ST_DrawFullscreenHUD (void)
     v_patchpal = ST_AmmoColor ();
 #endif
   if (type != am_noammo)
-    ST_HudNum (ST_AMMOX + dl, ST_AMMOY, plyr->ammo[type]);
+    ST_HudNum (ammox, HUD_Y, plyr->ammo[type]);
 #if CGD_TRUECOLOR
   if (colored)
     v_patchpal = ST_HealthColor ();
 #endif
-  ST_HudNum (ST_HEALTHX + dl, ST_HEALTHY, plyr->health);
-  V_DrawPatch (ST_HEALTHX + dl, ST_HEALTHY, FG, tallpercent);
+  ST_HudNum (healthx, HUD_Y, plyr->health);
+  ST_HudPatch (healthx, HUD_Y, tallpercent);
 #if CGD_TRUECOLOR
   if (colored)
     v_patchpal = ST_ArmorColor ();
 #endif
-  ST_HudNum (ST_ARMORX + dr - 4, ST_ARMORY, plyr->armorpoints);
-  V_DrawPatch (ST_ARMORX + dr - 4, ST_ARMORY, FG, tallpercent);
+  ST_HudNum (armorx, HUD_Y, plyr->armorpoints);
+  ST_HudPatch (armorx, HUD_Y, tallpercent);
 #if CGD_TRUECOLOR
   v_patchpal = v_palette;
 #endif
 
   if (keyboxes_0 >= 0)
-    V_DrawPatch (ST_KEY0X + dr, ST_KEY0Y, FG, keys[keyboxes_0]);
+    ST_HudPatch (keyx, HUD_Y + 5, keys[keyboxes_0]);
   if (keyboxes_1 >= 0)
-    V_DrawPatch (ST_KEY1X + dr, ST_KEY1Y, FG, keys[keyboxes_1]);
+    ST_HudPatch (keyx + HUD_KEYW, HUD_Y + 5, keys[keyboxes_1]);
   if (keyboxes_2 >= 0)
-    V_DrawPatch (ST_KEY2X + dr, ST_KEY2Y, FG, keys[keyboxes_2]);
+    ST_HudPatch (keyx + 2*HUD_KEYW, HUD_Y + 5, keys[keyboxes_2]);
 }
 #endif
 
