@@ -13,9 +13,8 @@ launcher, fx-CG100 keymaps, overclocking and SH4 assembly renderers.
 You need an fx-CG100 or Graph Math+ with MPM.
 
 **1. Install MPM.** MPM (the Math+ Mod) is the community mod that lets the calculator run add-ins: an OS
-patch, plus `mpm.bin`, the add-in menu at the root of the storage memory. Install it with
-[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220). It updates a calculator on an OS older than 2.20 to
-OS 02.20 with MPM, and currently needs a Mac.
+patch, plus `mpm.bin`, the add-in menu at the root of the storage memory. CGDoom needs MPM's OS 02.20
+port, which isn't publicly available.
 
 **2. Copy the files.** Download the zip from [Releases](https://github.com/cheparukhin/cgdoom-cg100/releases)
 and unzip it. Connect the calculator in **USB flash drive** mode, and copy both files in the zip's
@@ -58,8 +57,7 @@ launcher, the keymaps and saves.
 ## If something goes wrong
 
 - **Black screen or reset at launch:** launch CGDoom again while holding **DEL** (safe start).
-- **"Unsupported calculator":** CGDoom only runs on the fx-CG100 / Graph Math+, with MPM from
-  [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220).
+- **"Unsupported calculator":** CGDoom only runs on the fx-CG100 / Graph Math+ with MPM's OS 02.20 port.
 - **The game froze:** hold **SHIFT + 7 + 3 + AC/ON**.
 
 To report a problem, open an [issue](https://github.com/cheparukhin/cgdoom-cg100/issues) with your OS

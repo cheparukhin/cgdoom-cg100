@@ -5,7 +5,8 @@ on, and that any other add-in for this calculator needs. What CGDoom builds on t
 pinning, WAD back-ends, exit path, OS gate) is in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 Revisions: gint `463f180` plus [`tools/gint/cgdoom-compat.patch`](../tools/gint/cgdoom-compat.patch), fxSDK
-`a6e46eb`, MPM `cbd1a41` (`mpm.bin` 1.1, which casio-mpm-220 builds on). Source paths are in those trees.
+`a6e46eb`, MPM `cbd1a41` (`mpm.bin` 1.1, which the private casio-mpm-220 project builds on). Source paths
+are in those trees.
 
 Tags: **[V]** verified in source code, an OS image or primary documentation; **[HW]** observed on an
 fx-CG100 running CGDoom; **[F]** reported by others (forums, other projects' code or docs), not checked
@@ -244,9 +245,8 @@ Physical layout as matrix codes `(row << 4) | (7 − col)` [V `src/gint/keymaps.
   Exam mode disables MPM; any Casio OS update removes it [V].
 - **Recovery** [HW, 14 Oct 2026, new display]: Casio's unchanged Mac updater reinstalled stock 02.20 over
   casio-mpm-220's patched 02.20 from the OS ERROR screen, on the first attempt after the calculator had
-  been off overnight; attempts minutes after a RESTART failed at the first handshake. Details: casio-mpm-220
-  [`docs/UPDATER.md`](https://github.com/cheparukhin/casio-mpm-220/blob/main/docs/UPDATER.md); the patch
-  and its build: `docs/ARCHITECTURE.md`, `docs/BUILDING.md` there.
+  been off overnight; attempts minutes after a RESTART failed at the first handshake. Details:
+  casio-mpm-220's `docs/UPDATER.md`.
 - **Menu** [V `mpm/main.c`, `addins.c`]: lists non-folder `*.g3a` files of at least 0x7002 B in the root;
   OK/EXE launches, VARS shows details. Icons: 92 × 64 at g3a offsets 0x1000 and 0x4000. SETTINGS receives
   a 4-byte big-endian size and a header-less binary over USB straight into RAM (AC cancels):
@@ -275,7 +275,7 @@ Physical layout as matrix codes `(row << 4) | (7 − col)` [V `src/gint/keymaps.
   `generate_g3a()` also writes the header-less `build-cg/<target>.bin` for MPM's push. sh-elf-gcc 16.2 has
   the `.` and `m4-nofpu` multilibs; pass `-m4a-nofpu` at compile time only [V].
 - **gint** is used from its dev branch (no release in a long time [F]). Any gint add-in needs
-  `tools/gint/cgdoom-compat.patch` for OS 02.20 and the new LCD; casio-mpm-220's README points to it.
+  `tools/gint/cgdoom-compat.patch` for OS 02.20 and the new LCD.
 - **Prior art** [F]:
   - gpSP-sh4-jit (GBA emulator, gint): `-O3` on hot files ran slower than `-O2` on hardware (I-cache);
     large DMA strips from X/Y RAM beat 4-row strips and per-scanline streaming; the block-map rules of §6.
@@ -294,7 +294,7 @@ Physical layout as matrix codes `(row << 4) | (7 − col)` [V `src/gint/keymaps.
   the forum facts above unless another source is named.
 - [gpSP-sh4-jit](https://github.com/KaraRyougi/gpsp-sh4-jit) (`ports/fxcg100`, `docs/performance-history.md`);
   CalcLoverHK's [libsyscall](https://git.planet-casio.com/CalcLoverHK/libsyscall);
-  [casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220).
+  casio-mpm-220 (private).
 - Local clones (not in git): `ref/` holds gint, fxsdk, fxlibc, OpenLibm, sh-elf-gcc, sh-elf-binutils and
   CGDoom at the pinned commits, and `ref/extra/` the projects above (gpsp-sh4-jit, Azur, d32xr, GBADoom,
   CalcLoverHK's ports and libsyscall, Kin1009's gint, unmerged gint PRs in `gint-prs.git`). MPM's source

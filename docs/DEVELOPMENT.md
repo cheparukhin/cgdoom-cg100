@@ -424,8 +424,7 @@ The OS 02.20 addresses come from the stock image with SHA-256
 `1413bb39864b9590c80c3ba761b7a1791d5701b9f4fb3fc25c6d7bd9e89d95e7`. They were checked against it: the
 code at each address matches the OS 02.00 function (64 bytes, PC-relative fields masked), and the BFile
 wrappers that look alike call inner functions that all moved by the same offset. MPM itself (the OS
-patch, the `mpm.bin` builds and the firmware research) lives in
-[casio-mpm-220](https://github.com/cheparukhin/casio-mpm-220).
+patch, the `mpm.bin` builds and the firmware research) lives in casio-mpm-220, which is private.
 
 **Test WADs.** The host and simulator tests use Freedoom 0.13.0 (BSD license):
 
