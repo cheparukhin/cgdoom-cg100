@@ -21,7 +21,7 @@ The HD add-in ([§2.7](#27-screen-formats-and-the-hd-add-in)) has not run on har
 ```
 CMakeLists.txt         calculator build (fxsdk build-cg -> CGDoom.g3a + CGDoomHD.g3a, build-cg/*.bin)
 Makefile               host and simulator builds and tests (includes src/sim/cgdoom.mk)
-warnings.mk            the test builds' warning flags, as errors (§4)
+warnings.mk            the warning flags of every build; errors in the test builds (§4)
 src/platform/platform.h  the PL_* platform API: the only interface between engine and platform
 src/platform/cgd_config.h  build switches: screen size, extras (§2.7)
 src/engine/            portable DOOM engine (CGDoom's cgdoom/ + vanilla fixes); includes only platform.h
@@ -506,12 +506,13 @@ Hardware runs are manual, so automated correctness rests on three things:
 | `make test-sim-full` | All 35 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
 
-**Warnings.** The test builds (host, ASan, unit tests, `check-sh`, simulator, the SH4 test harness, the
-gint-host tests) use one warning set, `warnings.mk`'s `CGD_WARN`, as errors: `-Wall -Wextra` plus `-Wshadow`,
+**Warnings.** Every build uses one warning set, `warnings.mk`'s `CGD_WARN`: `-Wall -Wextra` plus `-Wshadow`,
 `-Wstrict-prototypes`, `-Wimplicit-fallthrough` (an intended fall-through is marked `FALLTHROUGH`,
-`doomdef.h`), `-Wformat=2`, `-Wvla`, `-Wundef`, `-Wpointer-arith` and `-Wdouble-promotion`. The calculator
-build keeps its own flags without `-Werror`, so that a newer compiler's new warning does not stop it;
-`check-sh` compiles the same engine with the same compiler and the strict set.
+`doomdef.h`), `-Wformat=2`, `-Wvla`, `-Wundef`, `-Wpointer-arith` and `-Wdouble-promotion`. The test builds
+(host, ASan, unit tests, `check-sh`, simulator, the SH4 test harness, the gint-host tests) treat them as
+errors. The calculator build (`CMakeLists.txt` reads the set from `warnings.mk`) does not, so that a newer
+compiler's new warning does not stop it; `check-sh` compiles the same engine with the same compiler and the
+set as errors.
 
 Other targets:
 

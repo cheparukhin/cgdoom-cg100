@@ -38,10 +38,24 @@ file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/gint/*.S")
 
 # One add-in per screen format (src/platform/cgd_config.h), from the same
-# sources: CGDoom.g3a (320x200, 8-bit) and CGDoomHD.g3a (396x224, true
-# colour, CGD_HD). -DCGDOOM_WIDE_G3A=ON also builds CGDoomW.g3a (396x224,
+# sources: CGDoom.g3a (320x200) and CGDoomHD.g3a (396x224 with the extras,
+# CGD_HD). -DCGDOOM_WIDE_G3A=ON also builds CGDoomW.g3a (396x224,
 # 8-bit), to compare the costs of the two HD parts on the calculator.
 option(CGDOOM_WIDE_G3A "Also build CGDoomW.g3a (widescreen, 8-bit)" OFF)
+
+# Warnings: warnings.mk's CGD_WARN, the set of every build, without -Werror,
+# so a newer compiler's new warning can't stop this build; check-sh compiles
+# the engine with the same compiler and the set as errors.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/warnings.mk")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/warnings.mk" CGDOOM_WARN)
+string(REGEX REPLACE "\\\\\n" " " CGDOOM_WARN "${CGDOOM_WARN}")
+string(REGEX MATCH "\nCGD_WARN[ \t]*:=([^\n]*)" CGDOOM_WARN "${CGDOOM_WARN}")
+separate_arguments(CGDOOM_WARN UNIX_COMMAND "${CMAKE_MATCH_1}")
+list(REMOVE_ITEM CGDOOM_WARN -Werror)
+if(NOT "-Wall" IN_LIST CGDOOM_WARN)
+  message(FATAL_ERROR "Cannot read CGD_WARN from warnings.mk")
+endif()
 
 function(cgdoom_addin target defines g3a name icon_uns icon_sel)
   add_executable(${target}
@@ -58,7 +72,7 @@ function(cgdoom_addin target defines g3a name icon_uns icon_sel)
   target_compile_options(${target} PRIVATE
     $<$<COMPILE_LANGUAGE:C>:-std=gnu11>
     -O2 -fno-strict-aliasing -ffunction-sections -fdata-sections
-    -Wall -Wextra)
+    ${CGDOOM_WARN})
 
   target_link_options(${target} PRIVATE
     -Wl,--gc-sections
@@ -73,10 +87,6 @@ function(cgdoom_addin target defines g3a name icon_uns icon_sel)
   generate_g3a(TARGET ${target} OUTPUT "${g3a}" NAME "${name}"
     ICONS ${icon_uns} ${icon_sel})
 endfunction()
-
-# DOOM/CGDoom code triggers these a lot (same set as the host Makefile)
-set_source_files_properties(${ENGINE_SOURCES} ${ENGINE_SH4_C} PROPERTIES
-  COMPILE_OPTIONS "-Wno-sign-compare;-Wno-unused-parameter;-Wno-unused-but-set-variable;-Wno-unused-but-set-parameter;-Wno-missing-field-initializers;-Wno-deprecated-declarations;-Wno-implicit-fallthrough")
 
 # SH4 assembly (src/engine/sh4): readable DSP mnemonics (ldrs/ldre/ldrc). The fxSDK toolchain
 # file already passes -m4-nofpu -mb -Wa,--dsp; the raw-opcode fallback of sh4_asm.h stays
