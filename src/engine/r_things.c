@@ -37,6 +37,7 @@
 #include "w_wad.h"
 
 #include "r_local.h"
+#include "r_bmaps.h"
 
 #include "doomstat.h"
 
@@ -454,8 +455,14 @@ void R_DrawMaskedColumn (const column_t* column)
 //
 // R_DrawVisSprite
 //  mfloorclip and mceilingclip should also be set.
+//  CGDoom: brightmap is the sprite's brightmap or NULL (CGD_EXTRAS builds,
+//  r_bmaps.h).
 //
+#if CGD_EXTRAS
+static void R_DrawVisSprite( vissprite_t* vis, const byte* brightmap)
+#else
 static void R_DrawVisSprite( vissprite_t* vis)
+#endif
 {
   const column_t*		column;
   int			texturecolumn;
@@ -484,6 +491,19 @@ static void R_DrawVisSprite( vissprite_t* vis)
     colfunc = detailshift ? R_DrawTLAddColumnLow : R_DrawTLAddColumn;
   else if (vis->tl == TL_OVER)
     colfunc = detailshift ? R_DrawTLOverColumnLow : R_DrawTLOverColumn;
+#endif
+#if CGD_EXTRAS
+  /* CGDoom: brightmaps (CGD_FEAT_BRIGHTMAPS): a sprite that has one and is
+     lit by its sector is drawn by R_DrawBrightColumn. Spectre fuzz, the
+     players' colour translation and translucency keep their drawers (no
+     sprite with a brightmap is translated or translucent); fullbright
+     frames and fixedcolormap light every texel alike. */
+  else if (brightmap && (CGD_Features & CGD_FEAT_BRIGHTMAPS)
+    && !fixedcolormap && dc_colormap != colormaps)
+  {
+    dc_brightmap = brightmap;
+    colfunc = detailshift ? R_DrawBrightColumnLow : R_DrawBrightColumn;
+  }
 #endif
 
   dc_iscale = vis->yiscale>>detailshift;
@@ -848,7 +868,12 @@ static void R_DrawPSprite (pspdef_t* psp)
     vis->colormap = spritelights[MAXLIGHTSCALE-1];
   }
 
+#if CGD_EXTRAS
+  /* CGDoom: the weapons' brightmaps go by state (the BFG's firing frames) */
+  R_DrawVisSprite (vis, R_StateBrightmap ((int)(psp->state - states)));
+#else
   R_DrawVisSprite (vis);
+#endif
 }
 
 
@@ -1059,7 +1084,11 @@ void R_DrawSprite (vissprite_t* spr)
 
   mfloorclip = clipbot;
   mceilingclip = cliptop;
+#if CGD_EXTRAS
+  R_DrawVisSprite (spr, R_SpriteBrightmap (spr->patch));
+#else
   R_DrawVisSprite (spr);
+#endif
 }
 
 

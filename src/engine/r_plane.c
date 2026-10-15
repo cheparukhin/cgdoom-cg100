@@ -39,6 +39,7 @@
 
 #include "r_local.h"
 #include "r_sky.h"
+#include "r_bmaps.h"
 
 
 
@@ -498,6 +499,13 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
   int				x;
   int				stop;
   int				angle;
+#if CGD_EXTRAS
+  /* CGDoom: brightmaps (CGD_FEAT_BRIGHTMAPS, r_bmaps.h): a flat that has
+     one is drawn by R_DrawBrightSpan, the others by spanfunc */
+  void			(* const basespanfunc) (void) = spanfunc;
+  const boolean		bright = (CGD_Features & CGD_FEAT_BRIGHTMAPS)
+			  && !fixedcolormap;
+#endif
 
   /* CGDoom: renderer limit statistics (the BSP walk is done: drawsegs,
      visplanes, vissprites and openings are final for this frame) */
@@ -561,6 +569,13 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
 
     // regular flat
     ds_source = (const byte*)W_CacheLumpNumConst(firstflat +flattranslation[pl->picnum],PU_STATIC);
+#if CGD_EXTRAS
+    if (bright
+      && (ds_brightmap = R_FlatBrightmap (flattranslation[pl->picnum])))
+      spanfunc = detailshift ? R_DrawBrightSpanLow : R_DrawBrightSpan;
+    else
+      spanfunc = basespanfunc;
+#endif
 
     planeheight = abs(pl->height-viewz);
     light = (pl->lightlevel >> LIGHTSEGSHIFT)+extralight*LIGHTBRIGHT;
@@ -585,4 +600,7 @@ CGD_NO_SANITIZE_BOUNDS void R_DrawPlanes (void)
 
     Z_ChangeTag (ds_source, PU_CACHE);
   }
+#if CGD_EXTRAS
+  spanfunc = basespanfunc;
+#endif
 }

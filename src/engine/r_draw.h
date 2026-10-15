@@ -130,6 +130,21 @@ void	R_InitTranslationTables (void);
 void R_DrawViewBorder (void);
 
 
+/* CGDoom: brightmapped columns and spans (CGD_FEAT_BRIGHTMAPS, r_bmaps.h):
+   R_DrawColumn(Low) and R_DrawSpan(Low), except that a texel whose
+   dc_brightmap / ds_brightmap flag is set is lit through colormaps (full
+   brightness) instead of dc_colormap / ds_colormap */
+#if CGD_EXTRAS
+extern const byte*	dc_brightmap;
+extern const byte*	ds_brightmap;
+
+void	R_DrawBrightColumn (void);
+void	R_DrawBrightColumnLow (void);
+void	R_DrawBrightSpan (void);
+void	R_DrawBrightSpanLow (void);
+#endif
+
+
 
 #endif
 //-----------------------------------------------------------------------------

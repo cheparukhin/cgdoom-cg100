@@ -35,6 +35,7 @@
 
 #include "r_local.h"
 #include "r_sky.h"
+#include "r_bmaps.h"
 
 
 // OPTIMIZE: closed two sided lines as single sided
@@ -149,6 +150,14 @@ void R_RenderMaskedSegRange( drawseg_t*	ds, int		x1, int		x2 )
   if (fixedcolormap)
     dc_colormap = fixedcolormap;
 
+#if CGD_EXTRAS
+  /* CGDoom: a texture with a brightmap (CGD_FEAT_BRIGHTMAPS, r_bmaps.h)
+     is drawn by R_DrawBrightColumn (R_DrawMaskedColumn calls colfunc) */
+  if ((CGD_Features & CGD_FEAT_BRIGHTMAPS) && !fixedcolormap
+    && (dc_brightmap = R_TextureBrightmap (texnum)) != NULL)
+    colfunc = detailshift ? R_DrawBrightColumnLow : R_DrawBrightColumn;
+#endif
+
   // draw the columns
   for (dc_x = x1 ; dc_x <= x2 ; dc_x++)
   {
@@ -177,6 +186,9 @@ void R_RenderMaskedSegRange( drawseg_t*	ds, int		x1, int		x2 )
     spryscale += rw_scalestep;
   }
 
+#if CGD_EXTRAS
+  colfunc = basecolfunc;
+#endif
 }
 
 
@@ -241,6 +253,24 @@ void R_RenderSegLoop (void)
   short* const		mtcol = maskedtexturecol;
   const short		vheight = (short)viewheight;
   boolean		lit;
+#if CGD_EXTRAS
+  /* CGDoom: brightmaps (CGD_FEAT_BRIGHTMAPS, r_bmaps.h): a tier whose
+     texture has one is drawn by R_DrawBrightColumn with that brightmap,
+     the others by colfunc. Under fixedcolormap every tier uses colfunc. */
+  const boolean		bright = (CGD_Features & CGD_FEAT_BRIGHTMAPS)
+			  && !fixedcolormap;
+  const byte* const	midbm = bright ? R_TextureBrightmap (midtex) : NULL;
+  const byte* const	topbm = bright ? R_TextureBrightmap (toptex) : NULL;
+  const byte* const	bottombm = bright ? R_TextureBrightmap (bottomtex) : NULL;
+  void		(* const brightfunc) (void) =
+    detailshift ? R_DrawBrightColumnLow : R_DrawBrightColumn;
+  void		(* const midfunc) (void) = midbm ? brightfunc : colfunc;
+  void		(* const topfunc) (void) = topbm ? brightfunc : colfunc;
+  void		(* const bottomfunc) (void) = bottombm ? brightfunc : colfunc;
+#define SEG_DRAW(tier)	(dc_brightmap = tier##bm, tier##func ())
+#else
+#define SEG_DRAW(tier)	colfunc ()
+#endif
 
   /* Lighting and per-column drawer state, once per column before the first
      tier it draws (textured is always true when a tier is drawn). */
@@ -340,7 +370,7 @@ void R_RenderSegLoop (void)
         dc_yh = yh;
         dc_texturemid = midtexturemid;
         dc_source = R_GetColumn(midtex,texturecolumn);
-        colfunc ();
+        SEG_DRAW (mid);
       }
       ceilingclip[x] = vheight;
       floorclip[x] = -1;
@@ -364,7 +394,7 @@ void R_RenderSegLoop (void)
           dc_yh = mid;
           dc_texturemid = toptexturemid;
           dc_source = R_GetColumn(toptex,texturecolumn);
-          colfunc ();
+          SEG_DRAW (top);
           ceilingclip[x] = (short)mid;
         }
         else
@@ -394,7 +424,7 @@ void R_RenderSegLoop (void)
           dc_yh = yh;
           dc_texturemid = bottomtexturemid;
           dc_source = R_GetColumn(bottomtex, texturecolumn);
-          colfunc ();
+          SEG_DRAW (bottom);
           floorclip[x] = (short)mid;
         }
         else
@@ -421,6 +451,7 @@ void R_RenderSegLoop (void)
   }
 
 #undef SEG_COLUMN_SETUP
+#undef SEG_DRAW
 
   rw_x = x;
   rw_scale = scale;

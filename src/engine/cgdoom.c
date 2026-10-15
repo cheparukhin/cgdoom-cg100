@@ -75,6 +75,7 @@ const char *const CGD_FeatureNames[CGD_FEATURE_COUNT + 1] = {
 	"crosshair",
 	"automap",
 	"fullhud",
+	"brightmaps",
 	NULL,
 };
 int CGD_TrueColorExact = 0;

@@ -49,6 +49,7 @@
 #include "cgdoom.h"
 
 #include "r_data.h"
+#include "r_bmaps.h"
 #include "v_video.h"
 #include "i_video.h"
 
@@ -740,6 +741,9 @@ void R_InitData (void)
   R_InitSpriteLumps ();
   printf ("InitColormaps\n");
   R_InitColormaps ();
+#if CGD_EXTRAS
+  R_InitBrightmaps ();	/* CGDoom: r_bmaps.c */
+#endif
 }
 
 
