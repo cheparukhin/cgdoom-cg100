@@ -79,6 +79,9 @@ void I_SetPalette(const byte* pal)
   {
     extern boolean st_firsttime;
     memcpy(v_palette, gPaletteData, sizeof v_palette);
+#if CGD_EXTRAS
+    V_BuildColorPalettes();
+#endif
     R_BuildLightTables(pal, gamma);
     st_firsttime = true;
     v_palette_serial++;

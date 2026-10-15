@@ -862,6 +862,72 @@ void ST_doPaletteStuff(void)
   }
 }
 
+#if CGD_EXTRAS && CGD_TRUECOLOR
+//
+// CGDoom: the colours of the ready ammo, health and armour numbers
+// (CGD_FEAT_COLORNUMS, as Crispy Doom's coloured HUD): v_palette (the
+// numbers' own red) or a v_crpalette
+//
+static const uint16_t *ST_AmmoColor (void)
+{
+  ammotype_t type = weaponinfo[plyr->readyweapon].ammo;
+  int ammo, full;
+
+  if (type == am_noammo)
+    return v_palette;
+  ammo = plyr->ammo[type];
+  full = maxammo[type];
+  if (ammo < full/4)
+    return v_palette;
+  if (ammo < full/2)
+    return v_crpalette[CR_GOLD];
+  if (ammo <= full)
+    return v_crpalette[CR_GREEN];
+  return v_crpalette[CR_BLUE];
+}
+
+static const uint16_t *ST_HealthColor (void)
+{
+  if ((plyr->cheats & CF_GODMODE) || plyr->powers[pw_invulnerability])
+    return v_crpalette[CR_GRAY];
+  if (plyr->health < 25)
+    return v_palette;
+  if (plyr->health < 50)
+    return v_crpalette[CR_GOLD];
+  if (plyr->health <= 100)
+    return v_crpalette[CR_GREEN];
+  return v_crpalette[CR_BLUE];
+}
+
+static const uint16_t *ST_ArmorColor (void)
+{
+  if ((plyr->cheats & CF_GODMODE) || plyr->powers[pw_invulnerability])
+    return v_crpalette[CR_GRAY];
+  if (plyr->armortype >= 2)
+    return v_crpalette[CR_BLUE];
+  if (plyr->armortype == 1)
+    return v_crpalette[CR_GREEN];
+  return v_palette;
+}
+
+/* A number in its colour; redrawn when only the colour changed */
+static void ST_UpdateColored (st_number_t *num, st_percent_t *per,
+  const uint16_t *pal, const uint16_t **oldpal, boolean refresh)
+{
+  if (!(CGD_Features & CGD_FEAT_COLORNUMS))
+    pal = v_palette;
+  if (pal != *oldpal)
+    refresh = true;
+  *oldpal = pal;
+  v_patchpal = pal;
+  if (per)
+    STlib_updatePercent(per, refresh);
+  else
+    STlib_updateNum(num, refresh);
+  v_patchpal = v_palette;
+}
+#endif
+
 void ST_drawWidgets(boolean refresh)
 {
   int  i;
@@ -872,7 +938,12 @@ void ST_drawWidgets(boolean refresh)
   // used by w_frags widget
   //st_fragson = deathmatch && st_statusbaron; 
 
+#if CGD_EXTRAS && CGD_TRUECOLOR
+  static const uint16_t *oldready, *oldhealth, *oldarmor;
+  ST_UpdateColored(&w_ready, NULL, ST_AmmoColor(), &oldready, refresh);
+#else
   STlib_updateNum(&w_ready, refresh);
+#endif
 
   for (i=0;i<4;i++)
   {
@@ -880,8 +951,13 @@ void ST_drawWidgets(boolean refresh)
     STlib_updateNum(&w_maxammo[i], refresh);
   }
 
+#if CGD_EXTRAS && CGD_TRUECOLOR
+  ST_UpdateColored(NULL, &w_health, ST_HealthColor(), &oldhealth, refresh);
+  ST_UpdateColored(NULL, &w_armor, ST_ArmorColor(), &oldarmor, refresh);
+#else
   STlib_updatePercent(&w_health, refresh);
   STlib_updatePercent(&w_armor, refresh);
+#endif
 
   STlib_updateBinIcon(&w_armsbg, refresh);
 

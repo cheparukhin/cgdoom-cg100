@@ -71,6 +71,17 @@ extern	int	v_palette_serial;
 #define V_PIXEL(c)	((pixel_t)(c))
 #endif
 
+#if CGD_EXTRAS && CGD_TRUECOLOR
+/* The colours V_DrawPatch draws with: v_palette, or for a moment one of
+   v_crpalette's recoloured palettes (status-bar numbers, CGD_FEAT_COLORNUMS):
+   the saturated reds of the palette turned into the colour CR_*, the other
+   colours kept. Rebuilt with v_palette. */
+enum { CR_GREEN, CR_GOLD, CR_BLUE, CR_GRAY, CR_COUNT };
+extern	const uint16_t	*v_patchpal;
+extern	uint16_t	v_crpalette[CR_COUNT][256];
+void V_BuildColorPalettes (void);
+#endif
+
 /* CGDoom: fills count pixels with c */
 void V_FillPixels (pixel_t *dest, int count, pixel_t c);
 

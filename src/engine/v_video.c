@@ -52,6 +52,40 @@ pixel_t* screens[SCREEN_COUNT];
 uint16_t v_palette[256];
 int v_palette_serial;
 #endif
+#if CGD_EXTRAS && CGD_TRUECOLOR
+const uint16_t *v_patchpal = v_palette;
+uint16_t v_crpalette[CR_COUNT][256];
+
+/* The recoloured palettes (v_video.h), from v_palette: a colour whose red
+   is more than twice its green and its blue keeps its brightness (red)
+   and its whiteness (the larger of green and blue) in the new colour */
+void V_BuildColorPalettes (void)
+{
+  for (int c = 0; c < 256; c++)
+  {
+    uint16_t p = v_palette[c];
+    int r = (p >> 11) << 3, g = ((p >> 5) & 63) << 2, b = (p & 31) << 3;
+    int w = g > b ? g : b;
+
+    for (int k = 0; k < CR_COUNT; k++)
+    {
+      int nr = r, ng = g, nb = b;
+      if (r > 2*g && r > 2*b)
+      {
+        switch (k)
+        {
+        case CR_GREEN: nr = w; ng = r; nb = w; break;
+        case CR_GOLD:  nr = r; ng = (r*13 + w*3) / 16; nb = w; break;
+        case CR_BLUE:  nr = w; ng = w; nb = r; break;
+        case CR_GRAY:  nr = ng = nb = (r*5 + w*3) / 8; break;
+        }
+      }
+      v_crpalette[k][c] = (uint16_t)(((nr >> 3) << 11) | ((ng >> 2) << 5)
+        | (nb >> 3));
+    }
+  }
+}
+#endif
 
 int    dirtybox[4]; 
 
@@ -219,9 +253,16 @@ void V_CopyRect(int srcx,int srcy,int srcscrn,int width,int height,int destx,int
 
 static void CopyColumn(pixel_t *pTarget,const byte *pSource,int iLength)
 {
+#if CGD_EXTRAS && CGD_TRUECOLOR
+  const uint16_t *pal = v_patchpal;
+#endif
   while(iLength) 
   { 
+#if CGD_EXTRAS && CGD_TRUECOLOR
+    pTarget[0] = pal[pSource[0]];
+#else
     pTarget[0] = V_PIXEL(pSource[0]);
+#endif
     pSource++; 
     pTarget += SCREENWIDTH; 
     iLength--;
