@@ -67,6 +67,19 @@ void 	R_DrawFuzzColumnLow (void);
 void	R_DrawTranslatedColumn (void);
 void	R_DrawTranslatedColumnLow (void);
 
+/* CGDoom: translucent columns (CGD_FEAT_TRANSLUCENT, true colour): the lit
+   texel blended with the pixel behind it, added (TL_ADD, glowing) or 21/32
+   over it (TL_OVER) */
+#define TL_NONE		0
+#define TL_OVER		1
+#define TL_ADD		2
+#if CGD_EXTRAS && CGD_TRUECOLOR
+void	R_DrawTLOverColumn (void);
+void	R_DrawTLOverColumnLow (void);
+void	R_DrawTLAddColumn (void);
+void	R_DrawTLAddColumnLow (void);
+#endif
+
 void
 R_VideoErase
 ( unsigned	ofs,

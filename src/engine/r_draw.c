@@ -503,6 +503,88 @@ void R_DrawTranslatedColumnLow (void)
 
 
 
+#if CGD_EXTRAS && CGD_TRUECOLOR
+//
+// CGDoom: translucent columns (r_draw.h). An RGB565 pixel is spread over 32
+// bits with a gap above each channel (0x07e0f81f: green in bits 21-26, red
+// in 11-15, blue in 0-4), so that the three channels are added or scaled
+// at once without carrying into each other.
+//
+static inline uint32_t TL_Spread (pixel_t p)
+{
+  return ((uint32_t)p | ((uint32_t)p << 16)) & 0x07e0f81f;
+}
+
+static inline pixel_t TL_Fold (uint32_t s)
+{
+  s &= 0x07e0f81f;
+  return (pixel_t)(s | (s >> 16));
+}
+
+/* 21/32 of fg over bg (Boom's TRANMAP and Crispy Doom: 66%) */
+static inline pixel_t TL_Over (pixel_t bg, pixel_t fg)
+{
+  return TL_Fold ((TL_Spread (fg) * 21 + TL_Spread (bg) * 11) >> 5);
+}
+
+/* fg added to bg, each channel saturated */
+static inline pixel_t TL_Add (pixel_t bg, pixel_t fg)
+{
+  uint32_t s = TL_Spread (fg) + TL_Spread (bg);
+  uint32_t o = s & 0x00010020, og = s & 0x08000000;	/* carries */
+  return TL_Fold (s | (o - (o >> 5)) | (og - (og >> 6)));
+}
+
+#define TL_DRAWER(name, blend)						\
+void name (void)							\
+{									\
+  int		count = dc_yh - dc_yl;					\
+  pixel_t*	dest;							\
+  fixed_t	frac, fracstep;						\
+									\
+  if (count < 0)							\
+    return;								\
+  dest = ylookup[dc_yl] + columnofs[dc_x];				\
+  fracstep = dc_iscale;							\
+  frac = dc_texturemid + (dc_yl-centery)*fracstep;			\
+  do									\
+  {									\
+    *dest = blend (*dest, dc_colormap[dc_source[(frac>>FRACBITS)&127]]); \
+    dest += SCREENWIDTH;						\
+    frac += fracstep;							\
+  } while (count--);							\
+}									\
+									\
+void name##Low (void)							\
+{									\
+  int		count = dc_yh - dc_yl;					\
+  pixel_t*	dest;							\
+  pixel_t*	dest2;							\
+  fixed_t	frac, fracstep;						\
+  int		x = dc_x << 1;						\
+									\
+  if (count < 0)							\
+    return;								\
+  dest = ylookup[dc_yl] + columnofs[x];					\
+  dest2 = ylookup[dc_yl] + columnofs[x+1];				\
+  fracstep = dc_iscale;							\
+  frac = dc_texturemid + (dc_yl-centery)*fracstep;			\
+  do									\
+  {									\
+    pixel_t c = dc_colormap[dc_source[(frac>>FRACBITS)&127]];		\
+    *dest = blend (*dest, c);						\
+    *dest2 = blend (*dest2, c);						\
+    dest += SCREENWIDTH;						\
+    dest2 += SCREENWIDTH;						\
+    frac += fracstep;							\
+  } while (count--);							\
+}
+
+TL_DRAWER (R_DrawTLOverColumn, TL_Over)
+TL_DRAWER (R_DrawTLAddColumn, TL_Add)
+#endif
+
+
 //
 // R_InitTranslationTables
 // Creates the translation tables to map

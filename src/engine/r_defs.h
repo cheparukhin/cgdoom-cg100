@@ -413,6 +413,9 @@ typedef struct vissprite_s
 
   int			mobjflags;
 
+  // CGDoom: translucent draw (CGD_FEAT_TRANSLUCENT, r_draw.h TL_*)
+  int			tl;
+
 } vissprite_t;
 
 

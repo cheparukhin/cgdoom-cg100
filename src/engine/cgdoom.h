@@ -145,11 +145,16 @@ extern int CGD_PlayDemoOnly;
 #define CGD_FEAT_SMOOTHLIGHT 0x02 /* smooth diminishing lighting: twice the
                                    sector light levels, distance steps 8
                                    times finer (r_main.h) */
-#define CGD_FEATURE_COUNT 2
+#define CGD_FEAT_TRANSLUCENT 0x04 /* see-through fireballs, plasma, BFG,
+                                   puffs, fog, spheres and gun flash; true
+                                   colour only (r_things.c) */
+#define CGD_FEATURE_COUNT 3
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
-#if CGD_EXTRAS
+#if CGD_EXTRAS && CGD_TRUECOLOR
 #define CGD_FEATURES_ALL ((1 << CGD_FEATURE_COUNT) - 1)
+#elif CGD_EXTRAS
+#define CGD_FEATURES_ALL (((1 << CGD_FEATURE_COUNT) - 1) & ~CGD_FEAT_TRANSLUCENT)
 #else
 #define CGD_FEATURES_ALL 0
 #endif
