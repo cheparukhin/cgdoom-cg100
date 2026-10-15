@@ -146,7 +146,7 @@ extern int CGD_PlayDemoOnly;
                                    sector light levels, distance steps 8
                                    times finer (r_main.h) */
 #define CGD_FEAT_TRANSLUCENT 0x04 /* see-through fireballs, plasma, BFG,
-                                   puffs, fog, spheres and gun flash; true
+                                   puffs and fog, glowing gun flash; true
                                    colour only (r_things.c) */
 #define CGD_FEAT_COLORNUMS 0x08 /* status-bar health, armour and ammo
                                    coloured by level; true colour only

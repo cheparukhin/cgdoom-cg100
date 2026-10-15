@@ -66,6 +66,17 @@ extern	uint16_t	v_palette[256];
 /* Counts the palette changes (I_SetPalette): what a true-colour screen keeps
    from earlier frames must be redrawn when it changes */
 extern	int	v_palette_serial;
+/* The current palette as a tint of the base palette (PLAYPAL 0): every
+   palette of PLAYPAL (damage, bonus, radiation suit) blends the base toward
+   a colour, i.e. channel c is base*scale[c]/256 + offset[c], read from
+   the palettes' black and white (indices 0 and 4). True colour lights a
+   colour first, then tints it, as the 8-bit palette tints the lit index. */
+typedef struct vtint_s { int scale[3], offset[3]; } vtint_t;
+void V_GetTint (vtint_t *t, const byte *base, const byte *pal);
+/* The RGB565 of an 8-bit-per-channel colour, tinted, then gamma-corrected
+   (rounded to the nearest RGB565 value) */
+uint16_t V_TintedRGB565 (const vtint_t *t, const byte *gamma, int r, int g,
+  int b);
 #define V_PIXEL(c)	(v_palette[(byte)(c)])
 #else
 #define V_PIXEL(c)	((pixel_t)(c))
@@ -79,7 +90,8 @@ extern	int	v_palette_serial;
 enum { CR_GREEN, CR_GOLD, CR_BLUE, CR_GRAY, CR_COUNT };
 extern	const uint16_t	*v_patchpal;
 extern	uint16_t	v_crpalette[CR_COUNT][256];
-void V_BuildColorPalettes (void);
+void V_BuildColorPalettes (const byte *base, const vtint_t *tint,
+  const byte *gamma);
 #endif
 
 /* CGDoom: fills count pixels with c */

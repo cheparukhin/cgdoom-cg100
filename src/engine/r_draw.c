@@ -222,10 +222,18 @@ int	fuzzpos = 0;
 
 /* CGDoom: the spectre's darkening of the pixel behind it. Vanilla maps its
    palette index through colormap 6; in true colour, each RGB565 channel is
-   scaled by 13/16 (colormap 6's brightness, 26/32). */
+   scaled by 13/16 (colormap 6's brightness, 26/32), rounded: computed on
+   the pixel spread over 32 bits (blue in bits 0-4, red in 11-15, green in
+   21-26) so that no channel carries into the next, with 8 added to each
+   field before the shift. Grays stay gray. */
 #if CGD_TRUECOLOR
-#define FUZZDARK(p)	((pixel_t)((((p) >> 1) & 0x7bef) + (((p) >> 2) & 0x39e7) \
-			  + (((p) >> 4) & 0x0861)))
+static inline pixel_t FuzzDark (pixel_t p)
+{
+  uint32_t s = ((uint32_t)p | ((uint32_t)p << 16)) & 0x07e0f81f;
+  s = ((s * 13 + 0x01004008) >> 4) & 0x07e0f81f;
+  return (pixel_t)(s | (s >> 16));
+}
+#define FUZZDARK(p)	FuzzDark(p)
 #else
 #define FUZZDARK(p)	(colormaps[6*256+(p)])
 #endif

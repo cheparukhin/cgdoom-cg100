@@ -29,6 +29,7 @@
 #include "v_video.h"
 #include "d_main.h"
 #include "r_data.h"
+#include "w_wad.h"
 
 #include "doomdef.h"
 
@@ -78,11 +79,16 @@ void I_SetPalette(const byte* pal)
      border (D_Display, v_palette_serial). */
   {
     extern boolean st_firsttime;
+    const byte *base = (const byte *)W_CacheLumpNameConst ("PLAYPAL",
+      PU_CACHE);
+    vtint_t tint;
+
     memcpy(v_palette, gPaletteData, sizeof v_palette);
+    V_GetTint(&tint, base, pal);
 #if CGD_EXTRAS
-    V_BuildColorPalettes();
+    V_BuildColorPalettes(base, &tint, gamma);
 #endif
-    R_BuildLightTables(pal, gamma);
+    R_BuildLightTables(base, &tint, gamma);
     st_firsttime = true;
     v_palette_serial++;
   }

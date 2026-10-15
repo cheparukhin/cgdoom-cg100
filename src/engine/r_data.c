@@ -689,15 +689,19 @@ void R_InitColormaps (void)
 //
 // R_BuildLightTables
 // CGDoom: the RGB565 light tables. Map k < NUMCOLORMAPS (light level k, 0 =
-// brightest) is the palette with each channel scaled by (32-k)/32, then
-// gamma-corrected: the light falls off in RGB, with none of COLORMAP's
-// snapping to the palette's few dark shades. The other maps (the
-// invulnerability map 32) are COLORMAP's, through the palette.
+// brightest) is the base palette with each channel scaled by (32-k)/32,
+// then tinted by the current palette (damage, bonus, radiation suit: after
+// the light, so that a flash shows in dark places too, as in the 8-bit
+// build), then gamma-corrected, rounded to the nearest RGB565: the light
+// falls off in RGB, with none of COLORMAP's snapping to the palette's few
+// dark shades. The other maps (the invulnerability map 32) are COLORMAP's,
+// through the palette.
 // CGD_TrueColorExact uses COLORMAP for every map: then a frame is the 8-bit
 // build's frame through its palette, except under spectres (r_draw.c
 // FUZZDARK), which the tests compare.
 //
-void R_BuildLightTables (const byte *palette, const byte *gamma)
+void R_BuildLightTables (const byte *base, const vtint_t *tint,
+  const byte *gamma)
 {
   lighttable_t *t = (lighttable_t *)colormaps;
   int k, c;
@@ -713,10 +717,11 @@ void R_BuildLightTables (const byte *palette, const byte *gamma)
     }
     for (c = 0; c < 256; c++)
     {
-      int r = gamma[palette[3*c] * (NUMCOLORMAPS-k) / NUMCOLORMAPS];
-      int g = gamma[palette[3*c+1] * (NUMCOLORMAPS-k) / NUMCOLORMAPS];
-      int b = gamma[palette[3*c+2] * (NUMCOLORMAPS-k) / NUMCOLORMAPS];
-      t[c] = (lighttable_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+      int l = NUMCOLORMAPS - k, half = NUMCOLORMAPS / 2;
+      t[c] = V_TintedRGB565 (tint, gamma,
+        (base[3*c] * l + half) / NUMCOLORMAPS,
+        (base[3*c+1] * l + half) / NUMCOLORMAPS,
+        (base[3*c+2] * l + half) / NUMCOLORMAPS);
     }
   }
 #ifdef CGD_SH4

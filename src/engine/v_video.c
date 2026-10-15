@@ -52,36 +52,81 @@ pixel_t* screens[SCREEN_COUNT];
 uint16_t v_palette[256];
 int v_palette_serial;
 #endif
+#if CGD_TRUECOLOR
+void V_GetTint (vtint_t *t, const byte *base, const byte *pal)
+{
+  for (int c = 0; c < 3; c++)
+  {
+    int range = base[12+c] - base[c];
+    t->scale[c] = range > 0 ? ((pal[12+c] - pal[c]) * 256 + range/2) / range
+      : 256;
+    t->offset[c] = pal[c] - ((base[c] * t->scale[c] + 128) >> 8);
+  }
+}
+
+uint16_t V_TintedRGB565 (const vtint_t *t, const byte *gamma, int r, int g,
+  int b)
+{
+  int v[3] = { r, g, b };
+
+  for (int c = 0; c < 3; c++)
+  {
+    v[c] = ((v[c] * t->scale[c] + 128) >> 8) + t->offset[c];
+    v[c] = gamma[v[c] < 0 ? 0 : v[c] > 255 ? 255 : v[c]];
+  }
+  return (uint16_t)((((v[0]*31 + 127) / 255) << 11)
+    | (((v[1]*63 + 127) / 255) << 5) | ((v[2]*31 + 127) / 255));
+}
+#endif
+
 #if CGD_EXTRAS && CGD_TRUECOLOR
 const uint16_t *v_patchpal = v_palette;
 uint16_t v_crpalette[CR_COUNT][256];
 
-/* The recoloured palettes (v_video.h), from v_palette: a colour whose red
-   is more than twice its green and its blue keeps its brightness (red)
-   and its whiteness (the larger of green and blue) in the new colour */
-void V_BuildColorPalettes (void)
+/* The recoloured palettes (v_video.h). The status bar's digits (STTNUM*,
+   STTPRCNT, STTMINUS) use the red ramp 176-191 and the dark reds 44, 45 and
+   47 (their gray shadow is 109): those entries become green, gold, blue or
+   gray, from the base palette (brightness = red, whiteness = the larger of
+   green and blue), then take the current tint, so that the numbers flash
+   with the rest of the bar. The other entries are v_palette's. */
+static boolean V_IsDigitRed (int c)
+{
+  return (c >= 176 && c <= 191) || c == 44 || c == 45 || c == 47;
+}
+
+void V_BuildColorPalettes (const byte *base, const vtint_t *tint,
+  const byte *gamma)
 {
   for (int c = 0; c < 256; c++)
   {
-    uint16_t p = v_palette[c];
-    int r = (p >> 11) << 3, g = ((p >> 5) & 63) << 2, b = (p & 31) << 3;
-    int w = g > b ? g : b;
+    int r = base[3*c], w = base[3*c+1] > base[3*c+2] ? base[3*c+1]
+      : base[3*c+2];
 
     for (int k = 0; k < CR_COUNT; k++)
     {
-      int nr = r, ng = g, nb = b;
-      if (r > 2*g && r > 2*b)
+      if (!V_IsDigitRed (c))
       {
-        switch (k)
-        {
-        case CR_GREEN: nr = w; ng = r; nb = w; break;
-        case CR_GOLD:  nr = r; ng = (r*13 + w*3) / 16; nb = w; break;
-        case CR_BLUE:  nr = w; ng = w; nb = r; break;
-        case CR_GRAY:  nr = ng = nb = (r*5 + w*3) / 8; break;
-        }
+        v_crpalette[k][c] = v_palette[c];
+        continue;
       }
-      v_crpalette[k][c] = (uint16_t)(((nr >> 3) << 11) | ((ng >> 2) << 5)
-        | (nb >> 3));
+      switch (k)
+      {
+      case CR_GREEN:
+        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, w, r, w);
+        break;
+      case CR_GOLD:
+        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, r,
+          (r*13 + w*3) / 16, w);
+        break;
+      case CR_BLUE:     /* a light blue: navy was darker than the bar */
+        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, w + (r - w)/4,
+          w + (r - w)/2, r);
+        break;
+      case CR_GRAY:     /* light: a dark gray vanished on the gray bar */
+        v_crpalette[k][c] = V_TintedRGB565 (tint, gamma, (r*7 + w)/8,
+          (r*7 + w)/8, (r*7 + w)/8);
+        break;
+      }
     }
   }
 }

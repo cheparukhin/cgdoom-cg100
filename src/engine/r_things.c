@@ -533,13 +533,14 @@ static void R_DrawVisSprite( vissprite_t* vis)
 #if CGD_EXTRAS && CGD_TRUECOLOR
 //
 // CGDoom: the things drawn see-through (CGD_FEAT_TRANSLUCENT): Crispy
-// Doom's choice of missiles, puffs, fog and power-up spheres. A table by
-// type, not a mobj flag: the flags are game state.
+// Doom's choice of missiles, puffs and fog. A table by type, not a mobj
+// flag: the flags are game state. (Not Crispy's power-up spheres: see
+// through, they lost their outline and face on the small screen.)
 //
 static const mobjtype_t tl_types[] = {
   MT_FIRE, MT_SMOKE, MT_FATSHOT, MT_BRUISERSHOT, MT_SPAWNFIRE, MT_TROOPSHOT,
   MT_HEADSHOT, MT_PLASMA, MT_BFG, MT_ARACHPLAZ, MT_PUFF, MT_TFOG, MT_IFOG,
-  MT_EXTRABFG, MT_MISC12, MT_INV, MT_INS, MT_MEGA,
+  MT_EXTRABFG,
 };
 
 static boolean R_IsTranslucent (mobjtype_t type)
@@ -816,13 +817,14 @@ static void R_DrawPSprite (pspdef_t* psp)
   // store information in a vissprite
   vis = &avis;
   vis->mobjflags = 0;
-  /* CGDoom: the gun flash is see-through (CGD_FEAT_TRANSLUCENT, as Crispy
-     Doom) */
+  /* CGDoom: the gun flash glows over the scene (CGD_FEAT_TRANSLUCENT):
+     added, which keeps its white core (laid over at 21/32 it was duller
+     than the opaque flash) */
   vis->tl = TL_NONE;
 #if CGD_EXTRAS && CGD_TRUECOLOR
   if ((CGD_Features & CGD_FEAT_TRANSLUCENT)
     && psp == &viewplayer->psprites[ps_flash])
-    vis->tl = TL_OVER;
+    vis->tl = TL_ADD;
 #endif
   vis->texturemid = (BASEYCENTER<<FRACBITS)+FRACUNIT/2-(psp->sy-spritetopoffset[lump])
     + pspriteshift;
