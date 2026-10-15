@@ -52,6 +52,15 @@ extern fixed_t		centerxfrac;
 extern fixed_t		centeryfrac;
 extern fixed_t		projection;
 extern int		viewwidth_nonwide;
+/* CGDoom: the vertical focal length: projection, or with the aspect-ratio
+   correction (CGD_FEAT_ASPECT) ASPECT_NUM/ASPECT_DEN of it. DOOM's 320x200
+   was shown on 4:3 monitors, where its pixels were 6/5 taller than wide; on
+   the calculator's square pixels the 3D view is scaled by 6/5 vertically
+   instead (walls, sprites, flats, sky and weapon), so that it has the
+   shapes it was drawn for. */
+extern fixed_t		projectiony;
+#define ASPECT_NUM		6
+#define ASPECT_DEN		5
 
 extern int		validcount;
 

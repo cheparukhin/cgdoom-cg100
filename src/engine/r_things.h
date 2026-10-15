@@ -50,6 +50,12 @@ extern fixed_t		sprtopscreen;
 
 extern fixed_t		pspritescale;
 extern fixed_t		pspriteiscale;
+/* CGDoom: their vertical versions (aspect-ratio correction, r_main.h) */
+extern fixed_t		pspritescaley;
+extern fixed_t		pspriteiscaley;
+/* CGDoom: added to the weapon's texturemid so that it shows the rows it
+   shows in vanilla's view of the same size (0 in the 320x200 build) */
+extern fixed_t		pspriteshift;
 
 
 void R_DrawMaskedColumn (const column_t* column);

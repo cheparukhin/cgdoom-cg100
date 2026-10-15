@@ -138,7 +138,10 @@ extern int CGD_PlayDemoOnly;
    in the HD build (CGD_FEATURES_DEFAULT), off in the others. None changes
    game state, so demos stay in sync either way. Set before D_DoomMain (host
    -features); the names are for the host's option. */
-#define CGD_FEATURE_COUNT 0
+#define CGD_FEAT_ASPECT   0x01  /* aspect-ratio correction: the 3D view
+                                   scaled 6/5 vertically, as DOOM's 320x200
+                                   looked on a 4:3 monitor (r_main.c) */
+#define CGD_FEATURE_COUNT 1
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
 #if CGD_HD

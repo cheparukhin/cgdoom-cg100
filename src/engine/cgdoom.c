@@ -68,6 +68,7 @@ int CGD_RecordDemoSlot = -1;
 int CGD_PlayDemoOnly = 0;
 int CGD_Features = CGD_FEATURES_DEFAULT;
 const char *const CGD_FeatureNames[CGD_FEATURE_COUNT + 1] = {
+	"aspect",
 	NULL,
 };
 int CGD_TrueColorExact = 0;

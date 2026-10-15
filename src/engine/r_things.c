@@ -72,6 +72,9 @@ typedef struct
 //
 fixed_t		pspritescale;
 fixed_t		pspriteiscale;
+fixed_t		pspritescaley;
+fixed_t		pspriteiscaley;
+fixed_t		pspriteshift;
 
 const lighttable_t**	spritelights;
 
@@ -477,7 +480,7 @@ static void R_DrawVisSprite( vissprite_t* vis)
     dc_translation = translationtables - 256 + ( (vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT-8) );
   }
 
-  dc_iscale = abs(vis->xiscale)>>detailshift;
+  dc_iscale = vis->yiscale>>detailshift;
   dc_texturemid = vis->texturemid;
   frac = vis->startfrac;
   spryscale = vis->scale;
@@ -518,6 +521,7 @@ static void R_ProjectSprite (mobj_t* thing)
   fixed_t		tz;
 
   fixed_t		xscale;
+  fixed_t		yscale;
 
   int			x1;
   int			x2;
@@ -550,6 +554,8 @@ static void R_ProjectSprite (mobj_t* thing)
     return;
 
   xscale = FixedDiv(projection, tz);
+  /* CGDoom: the vertical scale (aspect-ratio correction, r_main.h) */
+  yscale = projectiony == projection ? xscale : FixedDiv(projectiony, tz);
 
   gxt = -FixedMul(tr_x,viewsin); 
   gyt = FixedMul(tr_y,viewcos); 
@@ -606,7 +612,7 @@ static void R_ProjectSprite (mobj_t* thing)
   // store information in a vissprite
   vis = R_NewVisSprite ();
   vis->mobjflags = thing->flags;
-  vis->scale = xscale<<detailshift;
+  vis->scale = yscale<<detailshift;
   vis->gx = thing->x;
   vis->gy = thing->y;
   vis->gz = thing->z;
@@ -626,6 +632,8 @@ static void R_ProjectSprite (mobj_t* thing)
     vis->startfrac = 0;
     vis->xiscale = iscale;
   }
+
+  vis->yiscale = yscale == xscale ? iscale : FixedDiv (FRACUNIT, yscale);
 
   if (vis->x1 > x1)
     vis->startfrac += vis->xiscale*(vis->x1-x1);
@@ -651,7 +659,7 @@ static void R_ProjectSprite (mobj_t* thing)
   else
   {
     // diminished light
-    index = xscale>>(LIGHTSCALESHIFT-detailshift);
+    index = yscale>>(LIGHTSCALESHIFT-detailshift);
 
     if (index >= MAXLIGHTSCALE) 
       index = MAXLIGHTSCALE-1;
@@ -749,10 +757,12 @@ static void R_DrawPSprite (pspdef_t* psp)
   // store information in a vissprite
   vis = &avis;
   vis->mobjflags = 0;
-  vis->texturemid = (BASEYCENTER<<FRACBITS)+FRACUNIT/2-(psp->sy-spritetopoffset[lump]);
+  vis->texturemid = (BASEYCENTER<<FRACBITS)+FRACUNIT/2-(psp->sy-spritetopoffset[lump])
+    + pspriteshift;
   vis->x1 = x1 < 0 ? 0 : x1;
   vis->x2 = x2 >= viewwidth ? viewwidth-1 : x2;	
-  vis->scale = pspritescale<<detailshift;
+  vis->scale = pspritescaley<<detailshift;
+  vis->yiscale = pspriteiscaley;
 
   if (flip)
   {

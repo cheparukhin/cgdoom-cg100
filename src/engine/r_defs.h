@@ -400,6 +400,9 @@ typedef struct vissprite_s
 
   // negative if flipped
   fixed_t		xiscale;	
+  // CGDoom: texture rows per screen row (abs(xiscale) without the
+  // aspect-ratio correction)
+  fixed_t		yiscale;
 
   fixed_t		texturemid;
   int			patch;

@@ -70,6 +70,7 @@ fixed_t						projection;
    screen shows more of the scene to the sides at the same scale. In the
    320-wide build it equals viewwidth. */
 int						viewwidth_nonwide;
+fixed_t						projectiony;
 
 // just for profiling purposes
 int							framecount;	
@@ -433,7 +434,7 @@ fixed_t R_ScaleFromGlobalAngle (angle_t visangle)
   // both sines are allways positive
   sinea = finesine[anglea>>ANGLETOFINESHIFT];	
   sineb = finesine[angleb>>ANGLETOFINESHIFT];
-  num = FixedMul(projection,sineb)<<detailshift;
+  num = FixedMul(projectiony,sineb)<<detailshift;
   den = FixedMul(rw_distance,sinea);
 
   if (den > num>>16)
@@ -643,6 +644,8 @@ void R_ExecuteSetViewSize (void)
   centerxfrac = centerx<<FRACBITS;
   centeryfrac = centery<<FRACBITS;
   projection = (viewwidth_nonwide/2)<<FRACBITS;
+  projectiony = (CGD_Features & CGD_FEAT_ASPECT)
+    ? projection*ASPECT_NUM/ASPECT_DEN : projection;
 
   /* Drawer selection: the ONE place that picks the column/span drawers.
      Low detail uses Chocolate Doom's drawers (fuzz and translated included,
@@ -690,6 +693,24 @@ void R_ExecuteSetViewSize (void)
   // psprite scales
   pspritescale = FRACUNIT*viewwidth_nonwide/ORIGWIDTH;
   pspriteiscale = FRACUNIT*ORIGWIDTH/viewwidth_nonwide;
+  pspritescaley = projectiony == projection ? pspritescale
+    : FRACUNIT*viewwidth_nonwide*ASPECT_NUM/(ORIGWIDTH*ASPECT_DEN);
+  pspriteiscaley = projectiony == projection ? pspriteiscale
+    : FRACUNIT*ORIGWIDTH*ASPECT_DEN/(viewwidth_nonwide*ASPECT_NUM);
+
+  /* CGDoom: the weapon is drawn around centery; it shows the same rows
+     (down to the bottom of the view) as in vanilla's view of this size,
+     whose height is vheight, with the vanilla scale: in vanilla, the weapon
+     rows below BASEYCENTER that fit are (vheight/2) / scale; here
+     (viewheight-centery) / scaley. Moved by the difference (0 when the
+     screen and scales are vanilla's). */
+  {
+    int vheight = setblocks >= 11 ? ORIGHEIGHT
+      : (setblocks*(ORIGHEIGHT-SBARHEIGHT)/10)&~7;
+    pspriteshift = FixedDiv ((vheight/2)<<FRACBITS, pspritescale<<detailshift)
+      - FixedDiv ((viewheight-centery)<<FRACBITS,
+        pspritescaley<<detailshift);
+  }
 
   // thing clipping
   for (i=0 ; i<viewwidth ; i++)
@@ -700,7 +721,7 @@ void R_ExecuteSetViewSize (void)
   {
     dy = ((i-viewheight/2)<<FRACBITS)+FRACUNIT/2;
     dy = abs(dy);
-    yslope[i] = FixedDiv ( (viewwidth_nonwide<<detailshift)/2*FRACUNIT, dy);
+    yslope[i] = FixedDiv ( projectiony<<detailshift, dy);
   }
 
   for (i=0 ; i<viewwidth ; i++)
@@ -716,7 +737,14 @@ void R_ExecuteSetViewSize (void)
     startmap = ((LIGHTLEVELS-1-i)*2)*NUMCOLORMAPS/LIGHTLEVELS;
     for (j=0 ; j<MAXLIGHTSCALE ; j++)
     {
-      level = startmap - j*ORIGWIDTH/(viewwidth_nonwide<<detailshift)/DISTMAP;
+      /* CGDoom: j is a vertical scale, larger by ASPECT_NUM/ASPECT_DEN
+         with the aspect-ratio correction: the same light at the same
+         distance */
+      if (projectiony == projection)
+        level = startmap - j*ORIGWIDTH/(viewwidth_nonwide<<detailshift)/DISTMAP;
+      else
+        level = startmap - j*ORIGWIDTH*ASPECT_DEN
+          /((viewwidth_nonwide<<detailshift)*ASPECT_NUM)/DISTMAP;
 
       if (level < 0)
         level = 0;
