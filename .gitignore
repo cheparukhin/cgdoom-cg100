@@ -1,6 +1,6 @@
 # Build outputs
 /build-*/
-/CGDoom.g3a
+/CGDoom*.g3a
 /dist/
 *.o
 *.d

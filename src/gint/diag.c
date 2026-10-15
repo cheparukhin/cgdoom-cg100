@@ -82,7 +82,7 @@ static uint32_t read_64k(void const *p)
 	return sum;
 }
 
-static void run_bench_once(bench_t *b, uint8_t const *fb)
+static void run_bench_once(bench_t *b, pl_pixel_t const *fb)
 {
 	memset(b, 0, sizeof *b);
 	b->clock = gclk_current();
@@ -107,8 +107,9 @@ static void run_bench_once(bench_t *b, uint8_t const *fb)
 		free(ram);
 	}
 
-	/* One 320x200 push with the game's display path: the async DMA, or
-	   CPU writes without the frame buffer (the page says which) */
+	/* One frame push (the game's size and format) with the game's display
+	   path: the async DMA, or CPU writes without the frame buffer (the page
+	   says which) */
 	if(fb) {
 		gvid_clear_lcd();
 		b->push_us = prof_exec({ gvid_push_test(fb); });
@@ -123,18 +124,23 @@ static void run_bench(void)
 	if(!gtime_prof_ok())
 		return;
 
-	/* Gradient test frame and palette */
-	uint8_t *fbraw = malloc(320 * 200 + 32);
-	uint8_t *fb = NULL;
+	/* Gradient test frame (and palette, in 8-bit) */
+	pl_pixel_t *fbraw = malloc(SCREENWIDTH * SCREENHEIGHT
+		* sizeof(pl_pixel_t) + 32);
+	pl_pixel_t *fb = NULL;
 	if(fbraw) {
-		fb = (uint8_t *)(((uintptr_t)fbraw + 31) & ~(uintptr_t)31);
-		for(int y = 0; y < 200; y++)
-		for(int x = 0; x < 320; x++)
-			fb[320 * y + x] = (uint8_t)(x + y);
+		fb = (pl_pixel_t *)(((uintptr_t)fbraw + 31) & ~(uintptr_t)31);
 		uint16_t pal[256];
 		for(int i = 0; i < 256; i++)
 			pal[i] = C_RGB(i >> 3, (i >> 2) & 31, 31 - (i >> 3));
+		for(int y = 0; y < SCREENHEIGHT; y++)
+		for(int x = 0; x < SCREENWIDTH; x++)
+#if CGD_TRUECOLOR
+			fb[SCREENWIDTH * y + x] = pal[(x + y) & 0xff];
+#else
+			fb[SCREENWIDTH * y + x] = (uint8_t)(x + y);
 		PL_SetPalette(pal);
+#endif
 	}
 
 	gclk_apply(GCLK_OFF);
@@ -353,7 +359,8 @@ static void page_bench(void)
 		LINE("-- %s --", gclk_name(b->clock));
 		LINE("64 KiB read: flash P1 %u us, SDRAM P1 %u us (cold)",
 			(unsigned)b->flash_us, (unsigned)b->sdram_us);
-		LINE("Push 320x200 (%s): %u us", gvid_dma_available() ? "DMA"
+		LINE("Push %dx%d (%s): %u us", SCREENWIDTH, SCREENHEIGHT,
+			gvid_dma_available() ? "DMA"
 			: "CPU, no DMA frame buffer", (unsigned)b->push_us);
 	}
 	if(!gtime_prof_ok())

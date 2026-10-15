@@ -1,7 +1,8 @@
 # CGDoom for the fx-CG100 / Graph Math+ (MPM 1.1 + gint).
 #
 #   export PATH=$PWD/toolchain/bin:$PATH
-#   fxsdk build-cg            -> CGDoom.g3a (and build-cg/cgdoom.bin)
+#   fxsdk build-cg            -> CGDoom.g3a and CGDoomHD.g3a (and
+#                                build-cg/cgdoom.bin, build-cg/cgdoom-hd.bin)
 #
 # Development loop with MPM >= 1.1: press SETTINGS in the MPM menu, then
 #   fxlink -pw build-cg/cgdoom.bin
@@ -36,20 +37,42 @@ file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/gint/*.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/gint/*.S")
 
-add_executable(cgdoom
-  ${ENGINE_SOURCES} ${ENGINE_SH4_C} ${ENGINE_ASM} ${PLATFORM_SOURCES})
+# One add-in per screen format (src/platform/cgd_config.h), from the same
+# sources: CGDoom.g3a (320x200, 8-bit) and CGDoomHD.g3a (396x224, true
+# colour, CGD_HD). -DCGDOOM_WIDE_G3A=ON also builds CGDoomW.g3a (396x224,
+# 8-bit), to compare the costs of the two HD parts on the calculator.
+option(CGDOOM_WIDE_G3A "Also build CGDoomW.g3a (widescreen, 8-bit)" OFF)
 
-target_include_directories(cgdoom PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/engine"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/gint")
+function(cgdoom_addin target defines g3a name icon_uns icon_sel)
+  add_executable(${target}
+    ${ENGINE_SOURCES} ${ENGINE_SH4_C} ${ENGINE_ASM} ${PLATFORM_SOURCES})
 
-# -O2 (gpSP measured -O3 slower on CG100 hardware: I-cache), RANGECHECK off
-# (not defined), no strict aliasing (DOOM type-puns), sections for --gc.
-target_compile_options(cgdoom PRIVATE
-  $<$<COMPILE_LANGUAGE:C>:-std=gnu11>
-  -O2 -fno-strict-aliasing -ffunction-sections -fdata-sections
-  -Wall -Wextra)
+  target_include_directories(${target} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/engine"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gint")
+  target_compile_definitions(${target} PRIVATE ${defines})
+
+  # -O2 (gpSP measured -O3 slower on CG100 hardware: I-cache), RANGECHECK off
+  # (not defined), no strict aliasing (DOOM type-puns), sections for --gc.
+  target_compile_options(${target} PRIVATE
+    $<$<COMPILE_LANGUAGE:C>:-std=gnu11>
+    -O2 -fno-strict-aliasing -ffunction-sections -fdata-sections
+    -Wall -Wextra)
+
+  target_link_options(${target} PRIVATE
+    -Wl,--gc-sections
+    "-Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/${target}.map"
+    # Link-time guard on .data+.bss vs. gint's pre-main allocations
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gint/uram_check.ld")
+  set_target_properties(${target} PROPERTIES
+    LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/gint/uram_check.ld")
+
+  target_link_libraries(${target} Gint::Gint)
+
+  generate_g3a(TARGET ${target} OUTPUT "${g3a}" NAME "${name}"
+    ICONS ${icon_uns} ${icon_sel})
+endfunction()
 
 # DOOM/CGDoom code triggers these a lot (same set as the host Makefile)
 set_source_files_properties(${ENGINE_SOURCES} ${ENGINE_SH4_C} PROPERTIES
@@ -63,15 +86,11 @@ set_source_files_properties(${ENGINE_SOURCES} ${ENGINE_SH4_C} PROPERTIES
 set_source_files_properties(${ENGINE_ASM} PROPERTIES
   COMPILE_DEFINITIONS "CGD_SH4_DSP_MNEMONICS")
 
-target_link_options(cgdoom PRIVATE
-  -Wl,--gc-sections
-  "-Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/cgdoom.map"
-  # Link-time guard on .data+.bss vs. gint's pre-main allocations
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/gint/uram_check.ld")
-set_target_properties(cgdoom PROPERTIES
-  LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/gint/uram_check.ld")
-
-target_link_libraries(cgdoom Gint::Gint)
-
-generate_g3a(TARGET cgdoom OUTPUT "CGDoom.g3a" NAME "CGDoom"
-  ICONS assets/icon-uns.png assets/icon-sel.png)
+cgdoom_addin(cgdoom "" "CGDoom.g3a" "CGDoom"
+  assets/icon-uns.png assets/icon-sel.png)
+cgdoom_addin(cgdoom-hd "CGD_HD=1" "CGDoomHD.g3a" "CGDoom HD"
+  assets/icon-hd-uns.png assets/icon-hd-sel.png)
+if(CGDOOM_WIDE_G3A)
+  cgdoom_addin(cgdoom-wide "CGD_WIDESCREEN=1" "CGDoomW.g3a" "CGDoom W"
+    assets/icon-hd-uns.png assets/icon-hd-sel.png)
+endif()

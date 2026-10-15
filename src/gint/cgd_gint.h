@@ -372,8 +372,9 @@ void gvid_release(void);
 void gvid_note_os_activity(void);
 /* Clear the whole LCD to black (CPU writes) */
 void gvid_clear_lcd(void);
-/* Push one frame and wait for its DMA (diagnostics benchmark) */
-void gvid_push_test(uint8_t const *fb);
+/* Push one frame (the engine's format, SCREENWIDTH x SCREENHEIGHT) and wait
+   for its DMA (diagnostics benchmark) */
+void gvid_push_test(pl_pixel_t const *fb);
 
 /* Replaceable 8-bit -> RGB565 expansion. The presenter uses the _p32
    entry with a persistent 1 KiB table built by cgd_expand_build_pal32()
