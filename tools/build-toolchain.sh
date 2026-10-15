@@ -16,7 +16,7 @@ SYSROOT="$PREFIX/share/fxsdk/sysroot"
 JOBS="${CGDOOM_BUILD_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"
 
 BINUTILS_VERSION=2.42
-GCC_VERSION=14.1.0
+GCC_VERSION=16.2.0
 
 export PATH="$PREFIX/bin:$PATH"
 export PKG_CONFIG_PATH="/opt/homebrew/opt/ncurses/lib/pkgconfig:/opt/homebrew/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
@@ -65,7 +65,6 @@ step_gcc() {
   cd "$WORK"
   if [[ ! -d gcc-$GCC_VERSION ]]; then
     tar -xf "$a"
-    patch -u -N -p0 < "$SRC/sh-elf-gcc/patches/gcc-14.1.0-libgcc-use-soft-fp.patch"
     (cd gcc-$GCC_VERSION && ./contrib/download_prerequisites)
   fi
   mkdir -p "$SYSROOT/sh3eb-elf/bin"

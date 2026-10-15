@@ -5,9 +5,9 @@
 *.o
 *.d
 
-# Built toolchain and its work tree (tools/build-toolchain.sh)
+# Built toolchain, its work tree (tools/build-toolchain.sh) and side-by-side copies
 /toolchain/
-/toolchain-build/
+/toolchain-*/
 
 # Upstream clones (pinned revisions: docs/DEVELOPMENT.md, "3. Builds")
 /ref/

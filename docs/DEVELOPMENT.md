@@ -400,8 +400,9 @@ the WAD is loaded; by calculation the packed shareware WAD still fits in RAM. Th
 
 **Toolchain.** This needs cmake, libpng, libusb, ncurses and Python 3 with Pillow.
 `tools/build-toolchain.sh` was written for macOS with Homebrew (its library paths are Homebrew's; on Linux
-it may need adjusting). It builds sh-elf binutils 2.42, GCC 14.1, OpenLibm, fxlibc, gint (pinned source
-plus this project's OS compatibility patch) and the fxSDK into `toolchain/`, from clones in `ref/`.
+it may need adjusting). It builds sh-elf binutils 2.42, stock GCC 16.2 (its SH libgcc already uses soft-fp,
+which the fxSDK patches into 14.1), OpenLibm, fxlibc, gint (pinned source plus this project's OS compatibility
+patch) and the fxSDK into `toolchain/`, from clones in `ref/`.
 `ref/`, `toolchain/`, `test-wads/` and the build directories are gitignored.
 
 ```sh
@@ -419,7 +420,6 @@ The release builds use these upstream revisions. The gint step exports its pinne
 | `ref/gint` | `git.planet-casio.com/Lephenixnoir/gint` (dev) | `463f180ffb71ccdcef05c928ad19f2a480b14bc1` |
 | `ref/fxlibc` | `git.planet-casio.com/Vhex-Kernel-Core/fxlibc` (dev) | `a6903066cf4777aa96556a6da9699d4704867185` |
 | `ref/OpenLibm` | `git.planet-casio.com/Lephenixnoir/OpenLibm` | `9828d2e3f265a882af6a5bba8ffe6a00c3eeb8d7` |
-| `ref/sh-elf-gcc` | `git.planet-casio.com/Lephenixnoir/sh-elf-gcc` | `fdbc1be7a84e88f45f9b768b7428ff33b77eb9bb` |
 | `ref/sh-elf-binutils` | `git.planet-casio.com/Lephenixnoir/sh-elf-binutils` | `a963554d12c0236ee10c7545daa4c422bf107de6` |
 | `ref/CGDoom` | `git.planet-casio.com/Lephenixnoir/CGDoom` (upstream engine) | `8516c16d9d3c65b45882433b74abdef171265c99` |
 | MPM (built by casio-mpm-220) | `git.planet-casio.com/PlaneteCasio/mpm` (`mpm.bin` 1.1) | `cbd1a414d96b55e14adc20a88e2140f2c8723b5a` |

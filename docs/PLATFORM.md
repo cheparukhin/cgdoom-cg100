@@ -272,7 +272,7 @@ Physical layout as matrix codes `(row << 4) | (7 − col)` [V `src/gint/keymaps.
 - **fxSDK:** no fx-CG100 target; the `fxsdk build-cg` g3a runs on both models and gint tells them apart at
   run time (`gint[HWCALC] == HWCALC_FXCG100`). Flags `-m4-nofpu -mb -fno-builtin -nostdlib -Wa,--dsp`, gint's
   `fxcg50.ld` [V `cmake/FXCG50.cmake`]. `-fno-builtin` sends `memcpy`/`memset` to fxlibc's assembly.
-  `generate_g3a()` also writes the header-less `build-cg/<target>.bin` for MPM's push. sh-elf-gcc 14.1 has
+  `generate_g3a()` also writes the header-less `build-cg/<target>.bin` for MPM's push. sh-elf-gcc 16.2 has
   the `.` and `m4-nofpu` multilibs; pass `-m4a-nofpu` at compile time only [V].
 - **gint** is used from its dev branch (no release in a long time [F]). Any gint add-in needs
   `tools/gint/cgdoom-compat.patch` for OS 02.20 and the new LCD; casio-mpm-220's README points to it.
