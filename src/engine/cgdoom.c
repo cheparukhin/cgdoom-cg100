@@ -69,7 +69,6 @@ int CGD_PlayDemoOnly = 0;
 int CGD_Features = CGD_FEATURES_DEFAULT;
 const char *const CGD_FeatureNames[CGD_FEATURE_COUNT + 1] = {
 	"aspect",
-	"translucent",
 	"colornums",
 	"crosshair",
 	"automap",

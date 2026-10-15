@@ -226,8 +226,6 @@ root. With the packed shareware WAD they take about 4.1 MB, which may not leave 
 - **DOOM's proportions.** DOOM was drawn for 4:3 monitors, where its pixels were taller than wide. The
   view is stretched by 6/5 vertically, so rooms, monsters and weapons have the shapes they were drawn
   with.
-- **See-through effects.** Fireballs, plasma, BFG blasts, bullet puffs, smoke and teleport fog are
-  translucent: an explosion in your face no longer hides the monster behind it. Fire and plasma glow.
 - **Coloured numbers** on the status bar: health is red below 25%, gold below 50%, green up to 100% and
   blue above; armour is green or blue by armour type; ammo is red when low and gold below half; all
   three are gray in god mode.

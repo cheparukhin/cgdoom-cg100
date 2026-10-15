@@ -479,12 +479,6 @@ static void R_DrawVisSprite( vissprite_t* vis)
     colfunc = transcolfunc;
     dc_translation = translationtables - 256 + ( (vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT-8) );
   }
-#if CGD_EXTRAS && CGD_TRUECOLOR
-  else if (vis->tl == TL_ADD)
-    colfunc = detailshift ? R_DrawTLAddColumnLow : R_DrawTLAddColumn;
-  else if (vis->tl == TL_OVER)
-    colfunc = detailshift ? R_DrawTLOverColumnLow : R_DrawTLOverColumn;
-#endif
 
   dc_iscale = vis->yiscale>>detailshift;
   dc_texturemid = vis->texturemid;
@@ -509,34 +503,6 @@ static void R_DrawVisSprite( vissprite_t* vis)
 }
 
 
-
-#if CGD_EXTRAS && CGD_TRUECOLOR
-//
-// CGDoom: the things drawn see-through (CGD_FEAT_TRANSLUCENT): Crispy
-// Doom's choice of missiles, puffs and fog. A table by type, not a mobj
-// flag: the flags are game state. (Not Crispy's power-up spheres: see
-// through, they lost their outline and face on the small screen.)
-//
-static const mobjtype_t tl_types[] = {
-  MT_FIRE, MT_SMOKE, MT_FATSHOT, MT_BRUISERSHOT, MT_SPAWNFIRE, MT_TROOPSHOT,
-  MT_HEADSHOT, MT_PLASMA, MT_BFG, MT_ARACHPLAZ, MT_PUFF, MT_TFOG, MT_IFOG,
-  MT_EXTRABFG,
-};
-
-static boolean R_IsTranslucent (mobjtype_t type)
-{
-  static byte tl[NUMMOBJTYPES];
-  static boolean ready = false;
-
-  if (!ready)
-  {
-    for (unsigned i = 0; i < sizeof tl_types / sizeof *tl_types; i++)
-      tl[tl_types[i]] = 1;
-    ready = true;
-  }
-  return tl[type];
-}
-#endif
 
 //
 // R_ProjectSprite
@@ -646,12 +612,6 @@ static void R_ProjectSprite (mobj_t* thing)
   // store information in a vissprite
   vis = R_NewVisSprite ();
   vis->mobjflags = thing->flags;
-  /* CGDoom: glowing (fullbright) frames are added, the others laid over */
-  vis->tl = TL_NONE;
-#if CGD_EXTRAS && CGD_TRUECOLOR
-  if ((CGD_Features & CGD_FEAT_TRANSLUCENT) && R_IsTranslucent (thing->type))
-    vis->tl = (thing->frame & FF_FULLBRIGHT) ? TL_ADD : TL_OVER;
-#endif
   vis->scale = yscale<<detailshift;
   vis->gx = thing->x;
   vis->gy = thing->y;
@@ -797,10 +757,6 @@ static void R_DrawPSprite (pspdef_t* psp)
   // store information in a vissprite
   vis = &avis;
   vis->mobjflags = 0;
-  /* CGDoom: the weapon and its flash stay opaque, as in vanilla
-     (translucent, the flash was duller laid over, or tinted the walls
-     behind it added) */
-  vis->tl = TL_NONE;
   vis->texturemid = (BASEYCENTER<<FRACBITS)+FRACUNIT/2-(psp->sy-spritetopoffset[lump])
     + pspriteshift;
   vis->x1 = x1 < 0 ? 0 : x1;

@@ -142,29 +142,25 @@ extern int CGD_PlayDemoOnly;
 #define CGD_FEAT_ASPECT   0x01  /* aspect-ratio correction: the 3D view
                                    scaled 6/5 vertically, as DOOM's 320x200
                                    looked on a 4:3 monitor (r_main.c) */
-#define CGD_FEAT_TRANSLUCENT 0x02 /* see-through fireballs, plasma, BFG,
-                                   puffs and fog; true colour only
-                                   (r_things.c) */
-#define CGD_FEAT_COLORNUMS 0x04 /* status-bar health, armour and ammo
+#define CGD_FEAT_COLORNUMS 0x02 /* status-bar health, armour and ammo
                                    coloured by level; true colour only
                                    (st_stuff.c) */
-#define CGD_FEAT_CROSSHAIR 0x08 /* a small yellow cross at the centre of
+#define CGD_FEAT_CROSSHAIR 0x04 /* a small yellow cross at the centre of
                                    the view (r_main.c) */
-#define CGD_FEAT_AUTOMAP  0x10  /* automap: the map key also gives an
+#define CGD_FEAT_AUTOMAP  0x08  /* automap: the map key also gives an
                                    overlay that turns with the player;
                                    kills, items, secrets and time shown
                                    (am_map.c) */
-#define CGD_FEAT_FULLHUD  0x20  /* the largest view size shows health,
+#define CGD_FEAT_FULLHUD  0x10  /* the largest view size shows health,
                                    armour, ammo and keys over the view
                                    (st_stuff.c) */
-#define CGD_FEATURE_COUNT 6
+#define CGD_FEATURE_COUNT 5
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
 #if CGD_EXTRAS && CGD_TRUECOLOR
 #define CGD_FEATURES_ALL ((1 << CGD_FEATURE_COUNT) - 1)
 #elif CGD_EXTRAS
-#define CGD_FEATURES_ALL (((1 << CGD_FEATURE_COUNT) - 1) \
-  & ~(CGD_FEAT_TRANSLUCENT | CGD_FEAT_COLORNUMS))
+#define CGD_FEATURES_ALL (((1 << CGD_FEATURE_COUNT) - 1) & ~CGD_FEAT_COLORNUMS)
 #else
 #define CGD_FEATURES_ALL 0
 #endif
