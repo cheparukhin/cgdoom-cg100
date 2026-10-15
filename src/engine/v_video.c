@@ -267,8 +267,7 @@ void V_DrawPatch(int x,int y,int scrn,const patch_t* patch)
 //
 // V_DrawFullscreenPatch
 // CGDoom: Draws a full-screen patch (title, help, intermission pictures).
-// This used to read fragmented lumps pixel by pixel from flash; the heap is
-// large enough now, so the lump is simply cached and drawn.
+// The whole lump is cached (the heap holds it) and drawn as a patch.
 //
 void V_DrawFullscreenPatch(int scrn, const char *lumpname)
 {

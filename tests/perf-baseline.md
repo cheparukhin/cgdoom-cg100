@@ -156,7 +156,8 @@ None of these is done; the figures are for the current code.
    `R_DrawMaskedColumn` call. It is 0.5% of e1m1 and 0.7% of demo1, so the gain is a fraction of that.
 5. **Re-scheduled column loops for 3-cycle loads** (README §9): worth doing only if hardware timing shows GCC's
    "gcc" latencies.
-6. **Inlining `R_PointOnSide`**: about 1.5k instructions per frame, below the noise. Not worth doing on its own.
+
+Ideas measured and left out are listed in [`docs/DEVELOPMENT.md` §5.1](../docs/DEVELOPMENT.md#51-where-the-speed-comes-from).
 
 ## How to reproduce
 

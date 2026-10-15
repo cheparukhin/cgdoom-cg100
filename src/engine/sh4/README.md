@@ -128,12 +128,12 @@ static inline void     cgd_pref(const void *p);
   - The frac→`mul.l`→prologue chain goes first.
   - The checks branch to C (after popping saved registers) before any store.
   - The column and low-column set-up (with the 1-pixel dispatch) is ordered under the 4-byte pairing rule (`--pairing aligned`, the default), with the dispatch branch marked `/* barrier: r1 r2 ... */`: such a branch is scheduled as early as possible, keeps everything before it, and lets nothing that writes the listed registers move above it. The 1-pixel blocks are hand-scheduled.
-  - The span set-up blocks were ordered with `--pairing any` and an older group model (`mul.l`, `sts` and `ldrs`/`ldre` as CO), so they are not optimal under the current model; re-ordering them may save up to about 4 cycles per call.
+  - The span set-up blocks were ordered with `--pairing any` and a group model that treats `mul.l`, `sts` and `ldrs`/`ldre` as CO, so they are not optimal under the model above; re-ordering them may save up to about 4 cycles per call.
 
 ## 3. Pipeline model and loop schedules
 
-The model (`test/pipesim.py`) is a documented guess. There is no hardware, and the GDB simulator has no
-SH-4A timing.
+The model (`test/pipesim.py`) is a documented guess. No drawer has been timed on hardware yet, and the GDB
+simulator has no SH-4A timing.
 - **Groups**, from the Renesas *SH4AL-DSP Software Manual* (Rev. 1.50) table 4.2:
   - LS: memory, `pref`, `movca`, `ocb*`, `mova`, `ldrs`/`ldre`, `lds`/`sts` between Rn and MACH/MACL/PR.
   - EX: ALU, shifts, `dt`, `cmp/*`, `tst`, `clrt`/`sett`, `xtrct`, `swap`, `ext*`, `mul.l` (2 execution cycles).
@@ -479,9 +479,9 @@ Design tools in `test/`:
 ## 9. Further work (not done)
 
 - **Register-argument entry points. Recommended next step.**
-  - The globals cost about 27 loads and stores per call, about 45–50 cycles of set-up. In sprite-heavy scenes most calls are tiny: in demo1, 77% of column calls are ≤ 8 px and half are 1 px, so set-up is still about half of all asm column cycles (≈160k cycles per frame, §3).
+  - The globals cost about 27 loads and stores per call, about 45–50 cycles of set-up. In sprite-heavy scenes most calls are tiny (in demo1, 58% of the column calls are 1 or 2 pixels), so set-up weighs heavily there.
   - A `R_DrawColumn_SH4_args(dest, src, cmrot, count, frac9, step9)` called from `R_RenderSegLoop` and `R_DrawMaskedColumn`, which already hold these values in registers, would cut the set-up to about 12 cycles.
-  - That saves about 40 cycles per multi-pixel call and about 20 per 1-pixel call: ≈115k cycles per frame in demo1 (1.9k + 1.9k calls).
+  - That saves about 40 cycles per multi-pixel call and about 20 per 1-pixel call: with the current call mix, about 25k cycles per frame in e1m1 and 83k in demo1 ([`tests/perf-baseline.md`](../../../tests/perf-baseline.md), "Remaining levers").
   - The SH ABI passes only 4 arguments in registers (r4–r7). Six would spill two to the stack, so pack count/frac/step or pass a pointer to a small struct.
 - **Owning the `dc_*`/`ds_*` globals in one asm block.** The engine would declare them `extern`. One base literal plus `@(disp,Rn)` loads would replace 10 literal loads per call.
 - **R_DrawColumn under "gcc" latencies:** 10 → 8 cycles per 2 px is possible with a three-stage pipeline (`modsched.py col max`, §3). Only worth it if hardware timing shows 3-cycle loads.

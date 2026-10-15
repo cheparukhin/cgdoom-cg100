@@ -229,12 +229,31 @@ because reading `CGDOOM.CFG` is itself a world switch, and pinning must happen b
 
 The speed-ups are in [§5.1](#51-where-the-speed-comes-from). The other changes are below.
 
+**Structure.** CGDoom's engine files called the Casio OS (`Bfile_*`, `Bdisp_*`, ...) directly, with an
+SDL2 emulation of those calls for the PC build, and read the WAD through their own flash-fragment code
+(`cgdoom-frag.c`). Here the engine is portable C behind `PL_*` (§2.1): the OS calls, the flash mapping and
+the WAD back-ends are in `src/gint`, and `src/host` runs the same engine headless for the tests.
+
+**CGDoom bugs fixed:**
+
+- `I_Error` returned to its caller, which then carried on with a NULL block or a −1 lump. It now ends in
+  `PL_Fatal`.
+- `W_InitMultipleFiles` ran twice and leaked the first lump directory.
+- `I_GetTime` counted at 64 Hz instead of 35 Hz.
+- `R_GenerateLookup` counted patches in a 320-byte stack array, which textures wider than 320 overflowed;
+  the array now grows to the texture's width.
+- Full-screen pictures (title, help, finale) were read from flash fragment by fragment, with a post
+  offset that shifted their lower part by a row. They are now cached and drawn with `V_DrawPatch`.
+- The aligned-lump test checked 2-byte alignment where 4 bytes are needed.
+- Savegames were built in the screen buffer; they now have their own 176 KiB zone buffer.
+
 **Vanilla parity.** CGDoom's arithmetic and parts of its game logic differed from linuxdoom-1.10, so
 id's demos desynced. The engine now matches linuxdoom tic by tic on DEMO1-3 of the shareware DOOM v1.9
 `doom1.wad` (`make test-demosync`):
 
 - `FixedMul` was a bit-serial loop that rounded toward zero, and `FixedDiv` never computed the last
-  quotient bit. Both are now vanilla's (rules in §2.1).
+  quotient bit: about 47% of opposite-sign `FixedMul` pairs and 34–37% of `FixedDiv` pairs gave
+  non-vanilla results. Both are now vanilla's (rules in §2.1).
 - CGDoom removed three `P_Random` calls along with the sound code: the sound picks in `A_Look`, `A_Chase`
   and `A_Scream`. It also zeroed the sound fields of `info.c`. Both are back (`sounds.h` holds linuxdoom's
   sound numbers), but still no sound is played.
@@ -249,7 +268,8 @@ id's demos desynced. The engine now matches linuxdoom tic by tic on DEMO1-3 of t
 
 **Renderer:**
 
-- renderer limits raised, with the arrays allocated from the zone so that `.bss` stays small:
+- renderer limits raised (complex views overflowed vanilla's), with the arrays allocated from the zone
+  because static RAM is the scarcest budget:
 
   | Array | Vanilla | Grows by | Hard limit |
   |---|---|---|---|
@@ -273,7 +293,9 @@ id's demos desynced. The engine now matches linuxdoom tic by tic on DEMO1-3 of t
   (at most N times in a row), and the lag is capped at N tics, so after a stall the game slows down instead
   of fast-forwarding. Game logic and demos are unaffected;
 - the `PL_WadIsSlow` policy: when WAD pointers are in flash, lumps are copied into the zone (and the level
-  precached) until a reserve of max(25% of the zone, 256 KiB) is left.
+  precached) until a reserve of max(25% of the zone, 256 KiB) is left;
+- a lump is referenced in place only if it and the `W_LUMP_PAD` bytes after it lie inside the WAD;
+  otherwise it is copied with a zero-filled pad, so the renderer never reads past the WAD.
 
 **Robustness.** Vanilla trusted its savegames and demos:
 
@@ -287,7 +309,12 @@ id's demos desynced. The engine now matches linuxdoom tic by tic on DEMO1-3 of t
 - A recording takes no ticcmd while the menu pauses the level, and a recording that never began is not
   saved.
 - Fast monsters follow the skill of a loaded save.
-- Save-name entry: digits with ALPHA, and empty slots pre-filled with the map name.
+- Save-name entry: empty slots are pre-filled with the map name (`E1M3`, `MAP07`), digits and space can be
+  typed, a letter or digit counts only when its own key goes down (they share keys through ALPHA), and the
+  presses of the scan that opens or closes the entry are not typed into the name.
+- `CGDOOM.CFG` is parsed strictly: exact key names, numbers of 1–9 digits within the line, and
+  `Keymap.<action>=NONE` unbinds an action. Unknown keys and malformed values are ignored; an empty or
+  wrong `Version` rejects the file.
 
 ## 3. Builds
 
@@ -491,9 +518,10 @@ the engine just before it.
 | The keymap decode is skipped when the key scan has not changed | `cgdoom-kbd.c` | about 10k |
 | **`R_RenderSegLoop` loop state in locals.** GCC no longer reloads and stores the globals around every column call | `r_segs.c` | −1.4% |
 | **Visplane hashing** (64 buckets) | `r_plane.c` | `R_FindPlane` from 17k instructions per frame to almost nothing in demo1; ±0.2% overall; the gain grows with the plane count |
-| **SH4 drawers** (columns, spans, low detail, fuzz, translated, palette expansion) | `src/engine/sh4` | −15% (demo1) to −29% against the C drawers; 2.4–3.2× in modelled hardware cycles |
+| **SH4 drawers** (columns, spans, low detail, fuzz, translated, palette expansion) | `src/engine/sh4` | −15% (demo1) to −29% against the C drawers |
 | **Empty wall columns skipped.** A single-sided wall no longer calls `R_GetColumn` and the drawer when `yh < yl` (26% of the column calls in e1m1). Lighting and the `dc_iscale` division are computed only before the first tier a column draws | `r_segs.c` | −0.8% (map01) to −5.8% (e1m1); libgcc division −34% in e1m1 |
 | **`R_DrawMaskedColumn` loop state in locals.** Only drawn posts store the `dc_*` globals | `r_things.c` | −21% of the function in demo1 |
+| **No repeated sight check.** In single player, vanilla's `P_LookForPlayers` loop comes back to player 0 and checks sight again when the first look fails (about 45% of the `P_CheckSight` calls in id's demos). A player already looked at in the call is skipped; the loop variables and the result advance exactly as in vanilla | `p_enemy.c` | −0.6% in demo1 |
 
 Tried and left out:
 
@@ -521,8 +549,6 @@ Diagnostics → Benchmarks measures the last two.
 | Decision | Why | Where |
 |---|---|---|
 | Portable engine behind `PL_*`; host and sim platforms | Golden-frame testing and bit-exact asm verification without hardware | `platform.h`, §2.1 |
-| Vanilla-exact `FixedMul`/`FixedDiv` | CGDoom's versions were slower and gave non-vanilla results for about 47% of opposite-sign `FixedMul` pairs and 34–37% of `FixedDiv` pairs | `m_fixed.h`, `m_fixed.c` |
-| Renderer limits raised, arrays from the zone | Complex views overflowed vanilla limits; static RAM is the scarcest budget | `r_plane.c`, `r_bsp.c`, `r_things.c` |
 | Copy the WAD to RAM (minus sounds), with the block map as fallback | NOR line fills are much slower than SDRAM, and the overclock does not speed them up ([PLATFORM.md](PLATFORM.md)) | `wad.c` |
 | All storage writes deferred to exit; `PL_WadClose` first | A write moves flash records and invalidates the block map | `cgdoom.h`, `files.c` |
 | A file of the same size is overwritten in place, a file of another size is replaced by remove + create + write. Either way the old file is kept in RAM first and written back if the new one does not fit | create + rename would need room for both copies when storage is nearly full, and `BFile_Rename` would be one more OS entry point never tested on hardware. Without memory for the backup, the replacement still goes ahead, so a failure then loses the old file. There is no safe free-space call, so failures are reported at exit rather than prevented | `files.c` (`os_flush`) |
@@ -574,7 +600,7 @@ assumptions (cache geometry, flash timing, the stock clock) are marked [G] in [P
 
 **Results so far:** on an fx-CG100 with the new display and OS 02.20, CGDoom starts, loads
 DOOM1.WAD, plays normally and exits to the MPM menu. The probes above have not been recorded yet, and the
-old display, OS 02.00, saves written and reloaded, and relaunch are untried.
+title-screen demos, the old display, OS 02.00, saves written and reloaded, and relaunch are untried.
 
 ### 7.2 Hardware test: step by step
 

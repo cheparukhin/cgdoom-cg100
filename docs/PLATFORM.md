@@ -16,8 +16,9 @@ here; **[G]** guess or estimate.
 - [HW] CGDoom starts, loads DOOM1.WAD, plays normally and exits to the MPM menu on an fx-CG100 with the new
   display (bootcode DateA `2025.0304.1404`), OS 02.20 and casio-mpm-220's MPM, at F4 with the DMA presenter.
 - [HW, anecdotal] At the OS clock (safe start) it still held its 35 fps cap; the places were not recorded.
-- Not observed yet: the old display, OS 02.00, saves and settings written and reloaded, relaunching, and
-  every Diagnostics value (clock registers, r15, arenas, block-map statistics, flash and push timings).
+- Not observed yet: the title-screen demos, the old display, OS 02.00, saves and settings written and
+  reloaded, relaunching, and every Diagnostics value (clock registers, r15, arenas, block-map statistics,
+  flash and push timings).
 
 ## 2. CPU, clocks and on-chip resources
 
