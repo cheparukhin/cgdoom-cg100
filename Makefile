@@ -261,7 +261,10 @@ test-tc-exact:
 	@sh $(ROOT)/tests/tc-exact.sh -bin8 $(ROOT)/build-host-wide/cgdoom-host \
 	  -bintc $(ROOT)/build-host-hd/cgdoom-host
 
-test-variants: test-tc-exact test-quicksave
+# (one after the other: each builds build-host-hd, which -j must not race)
+test-variants:
+	@$(MAKE) --no-print-directory test-tc-exact
+	@$(MAKE) --no-print-directory test-quicksave
 	@$(MAKE) --no-print-directory VARIANT=wide test-host
 	@$(MAKE) --no-print-directory VARIANT=hd test-host
 	@$(MAKE) --no-print-directory VARIANT=wide host-asan
