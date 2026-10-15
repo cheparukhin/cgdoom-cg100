@@ -375,7 +375,6 @@ None changes game state, so demos and savegames stay compatible.
 | 0x10 | `crosshair` | A yellow cross at the centre of the view | `r_main.c` |
 | 0x20 | `automap` | The Map key's second press: the map over the view, turned with the player; kills, items, secrets and time | `am_map.c` |
 | 0x40 | `fullhud` | At the largest view size: ammo, health, armour and keys over the view, with a shadow | `st_stuff.c` |
-| 0x80 | `brightmaps` | Crispy Doom's brightmaps for the shareware textures and sprites: their lit pixels at full brightness | `r_bmaps.c` |
 
 The HD add-in also has quicksave and quickload (`M_QuickSave`, `M_QuickLoad`; TOOLS and SETTINGS in both
 presets), which need two more keymap entries (`CGDOOM_KEYMAP_SIZE`).
@@ -792,9 +791,8 @@ it (storage permitting), then:
 2. In a game: the picture fills the screen with no border, tearing or garbage; dark areas, damage and
    pickup flashes, the gamma levels (Brightness key) and invulnerability look right; menus, help screens,
    the intermission and the E1 text screen are centred.
-3. The extras: translucent fireballs and gun flash, brightmapped switches in the dark, coloured status-bar
-   numbers, the crosshair, the full-screen HUD at the largest view size, the automap overlay (the Map key
-   twice) and its statistics.
+3. The extras: translucent fireballs and gun flash, coloured status-bar numbers, the crosshair, the
+   full-screen HUD at the largest view size, the automap overlay (the Map key twice) and its statistics.
 4. Quicksave (TOOLS) to a new slot, play on, quickload (SETTINGS), quit: the slot's file is written, and
    loads in `CGDoom.g3a` too.
 5. Level changes with the wipe (it needs about 350 KB of the malloc reserve for its duration).

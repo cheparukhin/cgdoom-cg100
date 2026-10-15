@@ -160,12 +160,7 @@ extern int CGD_PlayDemoOnly;
 #define CGD_FEAT_FULLHUD  0x40  /* the largest view size shows health,
                                    armour, ammo and keys over the view
                                    (st_stuff.c) */
-#define CGD_FEAT_BRIGHTMAPS 0x80 /* brightmaps: the lights of switches,
-                                   computer walls and floors, signs,
-                                   barrels, some pickups and the firing BFG
-                                   at full brightness in the dark
-                                   (r_bmaps.c) */
-#define CGD_FEATURE_COUNT 8
+#define CGD_FEATURE_COUNT 7
 extern int CGD_Features;
 extern const char *const CGD_FeatureNames[];
 #if CGD_EXTRAS && CGD_TRUECOLOR
