@@ -151,7 +151,7 @@ typedef struct menu_s
     short		numitems;	// # of menu items
     struct menu_s*	prevMenu;	// previous menu
     menuitem_t*		menuitems;	// menu items
-    void		(*routine)();	// draw routine
+    void		(*routine)(void);	// draw routine
     short		x;
     short		y;		// x,y of menu (CGDoom: in the 320x200 layout)
     short		lastOn;		// last item user was on in menu
@@ -1081,7 +1081,7 @@ int M_StringWidth(char* string)
     int             w = 0;
     int             c;
 	
-    for (i = 0;i < strlen(string);i++)
+    for (i = 0;i < (int)strlen(string);i++)
     {
 	c = toupper_int(string[i]) - HU_FONTSTART;
 	if (c < 0 || c >= HU_FONTSIZE)
@@ -1105,7 +1105,7 @@ int M_StringHeight(char* string)
     int             height = SHORT(hu_font[0]->height);
 	
     h = height;
-    for (i = 0;i < strlen(string);i++)
+    for (i = 0;i < (int)strlen(string);i++)
 	if (string[i] == '\n')
 	    h += height;
 		
@@ -1409,7 +1409,7 @@ void M_Drawer (void)
     y = (short)(100 - M_StringHeight(messageString)/2);
     while(*(messageString+start))
     {
-      for (i = 0;i < strlen(messageString+start);i++)
+      for (i = 0;i < (int)strlen(messageString+start);i++)
         if (*(messageString+start+i) == '\n')
         {
           memset(string,0,40);
@@ -1418,7 +1418,7 @@ void M_Drawer (void)
           break;
         }
 
-      if (i == strlen(messageString+start))
+      if (i == (int)strlen(messageString+start))
       {
         strcpy(string,messageString+start);
         start += i;

@@ -66,7 +66,7 @@ boolean  W_WadSlow = false;
 // (PL_WadOpen) through PL_WadRead.
 //
 
-static int W_AddFile ()
+static int W_AddFile (void)
 {
   wadinfo_t  header;
   lumpinfo_t*  lump_p;

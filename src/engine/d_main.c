@@ -378,7 +378,7 @@ int episode = 1;
 int map = 1;    //HACK
 /* CGDoom: start skill 0..4 (sk_baby..sk_nightmare), default sk_hard; may be
    set by the platform before D_DoomMain() */
-int skill = 3;
+int startskillnum = 3;
 
 /* The demo lump G_DeferedPlayDemo() was given (g_game.c) */
 extern char* defdemoname;
@@ -475,7 +475,7 @@ void D_StartTitle (void)
 //
 // D_DoomMain
 //
-void D_DoomMain()
+void D_DoomMain(void)
 {
   int ok_wad=0;
 //  int selected=1;
@@ -558,11 +558,11 @@ void D_DoomMain()
     devparm = 0;
 
     // get skill / episode / map from parms // DON'T, LEFT IN UNTIL OPCHECK
-    if(skill==0)  startskill = sk_baby;
-    else if(skill==1) startskill = sk_easy;
-    else if(skill==2) startskill = sk_medium;
-    else if(skill==3) startskill = sk_hard;
-    else if(skill==4) startskill = sk_nightmare;
+    if(startskillnum==0)  startskill = sk_baby;
+    else if(startskillnum==1) startskill = sk_easy;
+    else if(startskillnum==2) startskill = sk_medium;
+    else if(startskillnum==3) startskill = sk_hard;
+    else if(startskillnum==4) startskill = sk_nightmare;
 
     // init subsystems
     printf ("V_Init: Allocate screens\n");

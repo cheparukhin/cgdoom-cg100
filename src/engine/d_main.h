@@ -41,11 +41,11 @@
 void D_DoomMain (void);
 
 /* CGDoom: start parameters, set by the platform before D_DoomMain().
-   skill is 0..4 (sk_baby..sk_nightmare); autostart skips the title screen
+   startskillnum is 0..4 (sk_baby..sk_nightmare); autostart skips the title screen
    and starts startepisode/startmap. */
 extern int startepisode;
 extern int startmap;
-extern int skill;
+extern int startskillnum;
 extern boolean autostart;
 
 // Called by IO functions when input is detected.

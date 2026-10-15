@@ -109,6 +109,7 @@ void T_PlatRaise(plat_t* plat)
       else
         plat->status = down;
     }
+    FALLTHROUGH;
   case	in_stasis:
     break;
   }

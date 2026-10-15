@@ -467,7 +467,7 @@ int P_FindMinSurroundingLight( sector_t*	sector, int	max )
 void P_CrossSpecialLine( int linenum, int side, mobj_t*	thing )
 {
   line_t*	line;
-  int		ok;
+  int		allowed;
 
   line = &lines[linenum];
 
@@ -489,7 +489,7 @@ void P_CrossSpecialLine( int linenum, int side, mobj_t*	thing )
     default: break;
     }
 
-    ok = 0;
+    allowed = 0;
     switch(line->special)
     {
     case 39:	// TELEPORT TRIGGER
@@ -499,10 +499,10 @@ void P_CrossSpecialLine( int linenum, int side, mobj_t*	thing )
     case 4:	// RAISE DOOR
     case 10:	// PLAT DOWN-WAIT-UP-STAY TRIGGER
     case 88:	// PLAT DOWN-WAIT-UP-STAY RETRIGGER
-      ok = 1;
+      allowed = 1;
       break;
     }
-    if (!ok)
+    if (!allowed)
       return;
   }
 
@@ -929,20 +929,20 @@ void P_CrossSpecialLine( int linenum, int side, mobj_t*	thing )
 //
 void P_ShootSpecialLine( mobj_t*	thing,  line_t*	line )
 {
-  int		ok;
+  int		allowed;
 
   //	Impacts that other things can activate.
   if (!thing->player)
   {
-    ok = 0;
+    allowed = 0;
     switch(line->special)
     {
     case 46:
       // OPEN DOOR IMPACT
-      ok = 1;
+      allowed = 1;
       break;
     }
-    if (!ok)
+    if (!allowed)
       return;
   }
 

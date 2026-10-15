@@ -955,6 +955,7 @@ void G_WorldDone (void)
     case 31:
       if (!secretexit)
         break;
+      FALLTHROUGH;
     case 6:
     case 11:
     case 20:

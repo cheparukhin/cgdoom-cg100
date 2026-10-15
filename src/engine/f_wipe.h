@@ -40,7 +40,7 @@ enum
 
 
 #ifdef ENABLE_F_WIPE
-int wipe_StartScreen ();
+int wipe_StartScreen (void);
 int wipe_EndScreen( int x,int y, int width, int	height );
 int wipe_ScreenWipe ( int wipeno, int width, int height, int ticks );
 #else 

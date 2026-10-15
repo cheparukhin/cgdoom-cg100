@@ -411,7 +411,7 @@ void R_DrawMaskedColumn (const column_t* column)
   const fixed_t		basetexturemid = dc_texturemid;
   const int		topscreen0 = sprtopscreen;
   const fixed_t		scale = spryscale;
-  const int		floorclip = mfloorclip[dc_x];
+  const int		bottomclip = mfloorclip[dc_x];
   const int		ceilclip = mceilingclip[dc_x];
   void		(* const draw) (void) = colfunc;
   int			topdelta;
@@ -426,8 +426,8 @@ void R_DrawMaskedColumn (const column_t* column)
     int		yl = (topscreen+FRACUNIT-1)>>FRACBITS;
     int		yh = (bottomscreen-1)>>FRACBITS;
 
-    if (yh >= floorclip)
-      yh = floorclip-1;
+    if (yh >= bottomclip)
+      yh = bottomclip-1;
     if (yl <= ceilclip)
       yl = ceilclip+1;
 

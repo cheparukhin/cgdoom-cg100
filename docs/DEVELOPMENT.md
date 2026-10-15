@@ -21,6 +21,7 @@ The HD add-in ([§2.7](#27-screen-formats-and-the-hd-add-in)) has not run on har
 ```
 CMakeLists.txt         calculator build (fxsdk build-cg -> CGDoom.g3a + CGDoomHD.g3a, build-cg/*.bin)
 Makefile               host and simulator builds and tests (includes src/sim/cgdoom.mk)
+warnings.mk            the test builds' warning flags, as errors (§4)
 src/platform/platform.h  the PL_* platform API: the only interface between engine and platform
 src/platform/cgd_config.h  build switches: screen size, extras (§2.7)
 src/engine/            portable DOOM engine (CGDoom's cgdoom/ + vanilla fixes); includes only platform.h
@@ -496,7 +497,7 @@ Hardware runs are manual, so automated correctness rests on three things:
 | `make test-timedemo` | `-timedemo` reports every demo of `freedoom1.wad` with one frame per tic of the demo. Also part of `test-unit`; `test-asan` runs it under ASan. |
 | `make test-map-limit` | `-warp 33` on `freedoom2.wad` starts MAP32: `G_InitNew` limits a Doom II map to 32, since the engine's HUD titles, par times and intermission names end there. Also part of `test-unit`; `test-asan` runs it under ASan. |
 | `make test-robust` | `tests/save-demo-robustness.sh`: damaged, foreign and oversized savegames and damaged demos fail cleanly, with no access outside a buffer under ASan (`test-asan`). Loads of a savegame patched by `tests/savetool.py` (which reads the record layout from `cgdoom-host -savelayout`): a bad header is refused before the current game is touched; a truncation, an index out of range or another level layout is a "Bad savegame" error. A save in a generated copy of `freedoom2.wad` whose MAP02 has 3000 extra things is refused ("level too large") and keeps the slot's previous save. Demos that are too short, have a bad console player or player set, or lack their end marker (played like the marker), from a file, a lump and the title loop. |
-| `make check-sh` | Every engine file compiles with sh-elf-gcc |
+| `make check-sh` | Every engine file compiles with sh-elf-gcc, without warnings (the test builds' set, below) |
 | `make test-demosync` | Optional. DEMO1-3 of the shareware DOOM v1.9 `doom1.wad` named by `CGD_DOOM1_WAD` must play in sync: the per-tic game-state traces are compared with `tests/demosync/*.ckpt`, which were checked tic by tic against linuxdoom-1.10. Skipped when the variable is not set. `make test-demosync-sim` runs it in the simulator. |
 | `make -C src/engine/sh4/test run` | Asm vs the C reference: randomized and bit-exact, with stray-write, stack-canary and calling-convention checks; `asmcheck` |
 | `sh tests/gint-host/run.sh` | 11 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: sys (model/OS/API gate, table reset and open wrapper), expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification). The platform sources have `CGD_HOST_TEST` seams (OS string in `sys.c`, image size in `memory.c`, KIUDATA in `input.c`); some suites `#include` the `.c` under test, and `test_files` interposes `malloc`. |
@@ -504,6 +505,13 @@ Hardware runs are manual, so automated correctness rests on three things:
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
 | `make test-sim-full` | All 35 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |
+
+**Warnings.** The test builds (host, ASan, unit tests, `check-sh`, simulator, the SH4 test harness, the
+gint-host tests) use one warning set, `warnings.mk`'s `CGD_WARN`, as errors: `-Wall -Wextra` plus `-Wshadow`,
+`-Wstrict-prototypes`, `-Wimplicit-fallthrough` (an intended fall-through is marked `FALLTHROUGH`,
+`doomdef.h`), `-Wformat=2`, `-Wvla`, `-Wundef`, `-Wpointer-arith` and `-Wdouble-promotion`. The calculator
+build keeps its own flags without `-Werror`, so that a newer compiler's new warning does not stop it;
+`check-sh` compiles the same engine with the same compiler and the strict set.
 
 Other targets:
 

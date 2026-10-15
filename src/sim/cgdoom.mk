@@ -29,7 +29,7 @@
 CGSIM_SH4      ?= 1
 CGSIM_ILRAM    ?= 0
 CGSIM_ELF      := $(SIM_BUILD)/cgdoom-sim.elf
-CGSIM_CFLAGS   := $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host \
+CGSIM_CFLAGS   := $(SIM_CFLAGS) $(CGD_WARN) -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host \
                   $(VARIANT_DEFS)
 ifeq ($(CGSIM_SH4),0)
 CGSIM_ASM_SRC  :=

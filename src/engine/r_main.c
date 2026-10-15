@@ -601,7 +601,7 @@ void CGD_SetViewSize (int blocks)
   R_SetViewSize (screenblocks, detailLevel);
 }
 
-void V_Clear();
+void V_Clear(void);
 
 //
 // R_ExecuteSetViewSize

@@ -17,7 +17,10 @@ OUT=${OUT:-${TMPDIR:-/tmp}/cgd-gint-host}
 CC=${CC:-cc}
 mkdir -p "$OUT"
 
-CFLAGS="-std=gnu11 -O1 -g -Wall -Wextra -Wno-unused-parameter -DCGD_HOST_TEST \
+# The warning set of the test builds, as errors (CGD_WARN, read from warnings.mk)
+WARN=$(printf 'include %s/warnings.mk\nall:;@echo $(CGD_WARN)\n' "$ROOT" | MAKEFLAGS= make -s -f -) ||
+	{ echo "run.sh: cannot read CGD_WARN from $ROOT/warnings.mk" >&2; exit 1; }
+CFLAGS="-std=gnu11 -O1 -g $WARN -DCGD_HOST_TEST \
  -I$HERE/stub -I$ROOT/src/gint -I$ROOT/src/platform -I$ROOT/src/engine"
 if [ "${SANITIZE:-1}" != 0 ]; then
 	CFLAGS="$CFLAGS -fsanitize=address,undefined -fno-sanitize-recover=all \

@@ -88,6 +88,9 @@ typedef enum
 //
 #include "cgd_config.h"
 
+/* CGDoom: ends a switch case that falls through to the next on purpose */
+#define FALLTHROUGH __attribute__((fallthrough))
+
 #define ORIGWIDTH		320
 #define ORIGHEIGHT		200
 #define WIDESCREENDELTA		((SCREENWIDTH - ORIGWIDTH) / 2)

@@ -162,7 +162,7 @@ void P_LoadSegs (int lump)
   const mapseg_t*	ml;
   seg_t*		li;
   line_t*		ldef;
-  int			linedef;
+  int			linedefnum;
   int			side;
   int         sidenum;
 
@@ -180,8 +180,8 @@ void P_LoadSegs (int lump)
 
     li->angle = (SHORT(ml->angle))<<16;
     li->offset = (SHORT(ml->offset))<<16;
-    linedef = SHORT(ml->linedef);
-    ldef = &lines[linedef];
+    linedefnum = SHORT(ml->linedef);
+    ldef = &lines[linedefnum];
     li->linedef = ldef;
     side = SHORT(ml->side);
     li->sidedef = &sides[ldef->sidenum[side]];

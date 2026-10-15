@@ -39,7 +39,7 @@ CONFIG_H  := $(ROOT)/src/platform/cgd_config.h
 
 # Same flags as the calculator build for the assembly (fxSDK: -m4-nofpu -mb -Wa,--dsp)
 ASFLAGS_SH4 := $(SIM_ARCH) -Wa,--dsp -I$(SH4) -I$(ROOT)/src/platform $(TVDEFS)
-TCFLAGS   := $(SIM_CFLAGS) -I$(ROOT)/src/platform $(TVDEFS)
+TCFLAGS   := $(SIM_CFLAGS) $(CGD_WARN) -I$(ROOT)/src/platform $(TVDEFS)
 
 SH4_S     := r_draw_sh4 expand_sh4
 SH4_OBJS  := $(SH4_S:%=$(OBJ)/%.o) $(OBJ)/r_draw_sh4_c.o
@@ -89,7 +89,7 @@ $(ELF_P1): $(P1_OBJS) $(TEST_OBJS) $(SIM_RUNTIME_OBJS)
 # and give exactly the section bytes and relocations of the DSP-mnemonic form
 # (-DCGD_SH4_DSP_MNEMONICS -Wa,--dsp, what the CMake and sim game builds assemble), in both
 # section layouts and at every screen size. sh4_asm.h encodes ldrs/ldre/ldrc as raw opcodes for this.
-CGSIM_FLAGS_COPY := $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host
+CGSIM_FLAGS_COPY := $(SIM_CFLAGS) $(CGD_WARN) -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host
 ASMCHECK := $(SIM_BUILD)/sh4test/asmcheck
 asmcheck: $(SH4_S:%=$(SH4)/%.S) $(SH4)/sh4_asm.h $(CONFIG_H)
 	@mkdir -p $(ASMCHECK)

@@ -58,10 +58,13 @@ SIM_LIBS      ?= -Wl,--start-group -lc -lopenlibm -lgcc -Wl,--end-group
 
 SIM_RUNTIME_OBJS := $(SIM_OBJ)/crt0.o $(SIM_OBJ)/syscalls.o $(SIM_OBJ)/libc-glue.o
 
+# The test builds' warnings, as errors (CGD_WARN)
+include $(SIM_ROOT)/warnings.mk
+
 # $(call sim-cc,<src.c>,<out.o>)
 define sim-cc
 @mkdir -p $(dir $(2))
-$(SIM_CC) $(SIM_CFLAGS) -MMD -MP -c $(1) -o $(2)
+$(SIM_CC) $(SIM_CFLAGS) $(CGD_WARN) -MMD -MP -c $(1) -o $(2)
 endef
 
 # $(call sim-as,<src.s>,<out.o>)

@@ -461,12 +461,13 @@ static void test_counters(void)
 	volatile int x = 0;
 	for(int i = 0; i < 1000; i++) x += i;
 	sim_counters(&b);
+	(void)x;
 	printf("sim64 extension: available; 1000-iteration loop = %llu insts, %llu cycles\n",
 		(unsigned long long)(b.insts - a.insts), (unsigned long long)(b.cycles - a.cycles));
 	CHECK(b.insts - a.insts >= 5000 && b.insts - a.insts < 20000);
 	CHECK(b.cycles >= b.insts && a.cycles >= a.insts);       /* cycles = insts + branch penalties */
 	CHECK(sim_pcprof(1) == 0);
-	{ uint32_t m0 = sim_micros(); volatile int y = 0; for(int i = 0; i < 30000; i++) y += i; CHECK(sim_micros() - m0 >= 3); }
+	{ uint32_t m0 = sim_micros(); volatile int y = 0; for(int i = 0; i < 30000; i++) y += i; (void)y; CHECK(sim_micros() - m0 >= 3); }
 }
 
 /* ---- main -------------------------------------------------------------------------------------------- */

@@ -71,10 +71,8 @@ HOST_SRC    := $(wildcard $(ROOT)/src/host/*.c)
 
 HOST_CC     ?= clang
 HOST_INC    := -I$(ROOT)/src/platform -I$(ROOT)/src/engine -I$(ROOT)/src/host
-# CGDoom/DOOM code triggers these a lot; keep the rest of -Wall -Wextra
-HOST_WARN   := -Wall -Wextra -Wno-sign-compare -Wno-unused-parameter \
-               -Wno-unused-but-set-variable -Wno-unused-but-set-parameter \
-               -Wno-missing-field-initializers -Wno-deprecated-declarations
+include $(ROOT)/warnings.mk
+HOST_WARN   := $(CGD_WARN)
 HOST_CFLAGS := -std=gnu11 -O2 -g -DRANGECHECK $(HOST_WARN) $(HOST_INC) $(VARIANT_DEFS)
 HOST_LDFLAGS :=
 
@@ -293,7 +291,7 @@ SH_CHECK    := $(HOST_BUILD)/check-sh
 check-sh:
 	@mkdir -p $(SH_CHECK)
 	@fail=0; for f in $(ENGINE_SRC); do \
-	  $(SH_CC) -m4-nofpu -mb -O2 -std=gnu11 -fno-strict-aliasing -Wall \
+	  $(SH_CC) -m4-nofpu -mb -O2 -std=gnu11 -fno-strict-aliasing $(CGD_WARN) \
 	    $(VARIANT_DEFS) -I$(ROOT)/src/platform -I$(ROOT)/src/engine \
 	    -c $$f -o $(SH_CHECK)/`basename $$f .c`.o || fail=1; \
 	done; \
@@ -325,10 +323,10 @@ FIXED_SIM_OBJ          := $(ROOT)/build-sim/tests/fixed_exact.o $(ROOT)/build-si
 
 $(ROOT)/build-sim/tests/fixed_exact.o: $(ROOT)/tests/fixed_exact.c $(ROOT)/src/engine/m_fixed.h
 	@mkdir -p $(dir $@)
-	$(SIM_CC) $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -c $< -o $@
+	$(SIM_CC) $(SIM_CFLAGS) $(CGD_WARN) -I$(ROOT)/src/platform -I$(ROOT)/src/engine -c $< -o $@
 $(ROOT)/build-sim/tests/m_fixed.o: $(ROOT)/src/engine/m_fixed.c $(ROOT)/src/engine/m_fixed.h
 	@mkdir -p $(dir $@)
-	$(SIM_CC) $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -c $< -o $@
+	$(SIM_CC) $(SIM_CFLAGS) $(CGD_WARN) -I$(ROOT)/src/platform -I$(ROOT)/src/engine -c $< -o $@
 $(FIXED_SIM_ELF): $(FIXED_SIM_OBJ) $(SIM_RUNTIME_OBJS) $(SIM_DIR)/sim.ld
 	$(call sim-link,$@,$(FIXED_SIM_OBJ))
 
@@ -344,7 +342,7 @@ DIV_SIM_OBJ   := $(ROOT)/build-sim/tests/div_exact.o
 
 $(DIV_SIM_OBJ): $(ROOT)/tests/div_exact.c $(ROOT)/src/engine/m_fixed.h
 	@mkdir -p $(dir $@)
-	$(SIM_CC) $(SIM_CFLAGS) -Wall -I$(ROOT)/src/platform -I$(ROOT)/src/engine -c $< -o $@
+	$(SIM_CC) $(SIM_CFLAGS) $(CGD_WARN) -I$(ROOT)/src/platform -I$(ROOT)/src/engine -c $< -o $@
 $(DIV_SIM_ELF): $(DIV_SIM_OBJ) $(SIM_RUNTIME_OBJS) $(SIM_DIR)/sim.ld
 	$(call sim-link,$@,$(DIV_SIM_OBJ))
 

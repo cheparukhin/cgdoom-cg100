@@ -141,6 +141,7 @@ boolean P_GiveAmmo ( player_t* player, ammotype_t ammo, int num )
       if (player->weaponowned[wp_missile])
         player->pendingweapon = wp_missile;
     }
+    FALLTHROUGH;
   default:
     break;
   }

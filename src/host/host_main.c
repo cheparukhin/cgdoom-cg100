@@ -553,7 +553,7 @@ int main(int argc, char **argv)
     CGD_WADFileName = wadname ? wadname : wad_basename(iwad);
     CGD_RecordDemoSlot = record_slot;
 
-    skill = skill_arg - 1;
+    startskillnum = skill_arg - 1;
     if(warp_map > 0) {
         startepisode = warp_episode;
         startmap = warp_map;

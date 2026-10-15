@@ -80,8 +80,6 @@ void ref_R_DrawFuzzColumn (void)
 {
   int			count;
   byte*		dest;
-  fixed_t		frac;
-  fixed_t		fracstep;
 
   if (!dc_yl)
     dc_yl = 1;
@@ -91,15 +89,12 @@ void ref_R_DrawFuzzColumn (void)
   if (count < 0)
     return;
   dest = ylookup[dc_yl] + columnofs[dc_x];
-  fracstep = dc_iscale;
-  frac = dc_texturemid + (dc_yl-centery)*fracstep;
   do
   {
     *dest = colormaps[6*256+dest[fuzzoffset[fuzzpos]]];
     if (++fuzzpos == FUZZTABLE)
       fuzzpos = 0;
     dest += SCREENWIDTH;
-    frac += fracstep;
   } while (count--);
 }
 

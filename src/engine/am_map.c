@@ -723,6 +723,7 @@ boolean AM_Responder ( event_t* ev )
       AM_clearMarks();
       plr->message = AMSTR_MARKSCLEARED;
       break;*/
+      FALLTHROUGH;
     default:
       rc = false;
     }

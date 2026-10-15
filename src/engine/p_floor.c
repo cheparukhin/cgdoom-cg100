@@ -209,6 +209,7 @@ void T_MoveFloor(floormove_t* floor)
       case donutRaise:
         floor->sector->special = (short)floor->newspecial;
         floor->sector->floorpic = floor->texture;
+        FALLTHROUGH;
       default:
         break;
       }
@@ -220,6 +221,7 @@ void T_MoveFloor(floormove_t* floor)
       case lowerAndChange:
         floor->sector->special = (short)floor->newspecial;
         floor->sector->floorpic = floor->texture;
+        FALLTHROUGH;
       default:
         break;
       }
@@ -288,6 +290,7 @@ int EV_DoFloor( line_t*	line, floor_e	floortype )
 
     case raiseFloorCrush:
       floor->crush = true;
+      FALLTHROUGH;
     case raiseFloor:
       floor->direction = 1;
       floor->sector = sec;
@@ -408,6 +411,7 @@ int EV_DoFloor( line_t*	line, floor_e	floortype )
           }
         }
       }
+      FALLTHROUGH;
     default:
       break;
     }
@@ -428,7 +432,7 @@ int EV_BuildStairs( line_t*	line,  stair_e	type )
   int			i;
   int			newsecnum;
   int			texture;
-  int			ok;
+  int			found;
   int			rtn;
 
   sector_t*		sec;
@@ -479,7 +483,7 @@ int EV_BuildStairs( line_t*	line,  stair_e	type )
     // 2.	Other side is the next sector to raise
     do
     {
-      ok = 0;
+      found = 0;
       for (i = 0;i < sec->linecount;i++)
       {
         if ( !((sec->lines[i])->flags & ML_TWOSIDED) )
@@ -514,10 +518,10 @@ int EV_BuildStairs( line_t*	line,  stair_e	type )
         floor->sector = sec;
         floor->speed = speed;
         floor->floordestheight = height;
-        ok = 1;
+        found = 1;
         break;
       }
-    } while(ok);
+    } while(found);
   }
   return rtn;
 }

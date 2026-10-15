@@ -11,7 +11,7 @@
      PL_WadOpen(path);                     // the engine reads lumps via PL_Wad*
      CGD_WADFileName = "doom1";            // WAD base name: saves DOOM1_<n>.DSG,
                                            // demos DOOM1D<nn>.LMP (8.3 names)
-     startepisode/startmap/skill/autostart (d_main.h), CGD_Frameskip, ...
+     startepisode/startmap/startskillnum/autostart (d_main.h), CGD_Frameskip, ...
      D_DoomMain();                         // returns when the game quits
      PL_WadClose();                        // first: see below
      CGD_FlushDelayedWrites();             // write pending saves/demos
