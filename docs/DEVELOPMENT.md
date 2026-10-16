@@ -29,7 +29,7 @@ src/engine/sh4/        SH4AL-DSP assembly: column/span drawers, palette expansio
 src/gint/              fx-CG100 platform on gint: launcher, video, input, time, files, WAD, memory, UTLB
 src/host/              headless macOS/clang platform; also compiled for the simulator with -DPL_SIM
 src/sim/               GDB SH simulator harness: crt0, linker script, trap syscalls, libc glue, profilers
-tools/                 build-toolchain.sh, gint/cgdoom-compat.patch, wadtool.py, demosync-oracle/
+tools/                 build-toolchain.sh, gint/source.env, wadtool.py, demosync-oracle/
 tests/                 golden CRCs and scenarios, unit tests, tests/gint-host (platform logic on the host)
 assets/                g3a icons
 docs/                  user guide, developer guide, platform reference
@@ -375,23 +375,25 @@ heap for the WAD and the zones. By calculation the packed shareware WAD still fi
 **Toolchain.** This needs cmake, libpng, libusb, ncurses and Python 3 with Pillow.
 `tools/build-toolchain.sh` was written for macOS with Homebrew (its library paths are Homebrew's; on Linux
 it may need adjusting). It builds sh-elf binutils 2.42, stock GCC 16.2 (its SH libgcc already uses soft-fp,
-which the fxSDK patches into 14.1), OpenLibm, fxlibc, gint (pinned source plus this project's OS compatibility
-patch) and the fxSDK into `toolchain/`, from clones in `ref/`.
+which the fxSDK patches into 14.1), OpenLibm, fxlibc, the pinned CG100 gint fork,
+the SH simulator, and the fxSDK into `toolchain/`, from clones in `ref/`.
 `ref/`, `toolchain/`, `test-wads/` and the build directories are gitignored.
 
 ```sh
-tools/build-toolchain.sh            # everything (or one step: fxsdk binutils gcc openlibm fxlibc gint)
-tools/build-toolchain.sh sim        # optional: GDB's SH simulator, for the simulator tests
+tools/build-toolchain.sh            # everything (or one step: fxsdk binutils gcc openlibm fxlibc sim gint)
+tools/build-toolchain.sh sim        # build GDB's SH simulator before a standalone gint rebuild
 ```
 
-The release builds use these upstream revisions. The gint step exports its pinned commit and applies
-`tools/gint/cgdoom-compat.patch` without changing the clone. For fxsdk and fxlibc the script checks out
-`dev`; check out the listed commits to reproduce a release build exactly:
+The release builds use these revisions. The gint step fetches and exports the exact fork commit
+in `tools/gint/source.env`, builds it, and runs its GCC 16 startup regressions before installing.
+The default build includes the simulator; a standalone gint rebuild requires it to be installed first.
+No source patch is applied, and the upstream clone in `ref/gint` is left unchanged.
+For fxsdk and fxlibc the script checks out `dev`; check out the listed commits to reproduce a release build exactly:
 
 | Path | Repository | Commit |
 |---|---|---|
 | `ref/fxsdk` | `git.planet-casio.com/Lephenixnoir/fxsdk` (dev) | `a6e46eb6df060dc4e6e931521205e516c92b6c7f` |
-| `ref/gint` | `git.planet-casio.com/Lephenixnoir/gint` (dev) | `463f180ffb71ccdcef05c928ad19f2a480b14bc1` |
+| `ref/gint-cg100` | `github.com/cheparukhin/gint` (CG100 fork) | `89fdeb60246375384534a99c2690227c2517e2b9` |
 | `ref/fxlibc` | `git.planet-casio.com/Vhex-Kernel-Core/fxlibc` (dev) | `a6903066cf4777aa96556a6da9699d4704867185` |
 | `ref/OpenLibm` | `git.planet-casio.com/Lephenixnoir/OpenLibm` | `9828d2e3f265a882af6a5bba8ffe6a00c3eeb8d7` |
 | `ref/sh-elf-binutils` | `git.planet-casio.com/Lephenixnoir/sh-elf-binutils` | `a963554d12c0236ee10c7545daa4c422bf107de6` |
@@ -402,8 +404,8 @@ The release builds use these upstream revisions. The gint step exports its pinne
 
 One `CGDoom.g3a` runs on OS 02.00 and OS 02.20; there is no OS-specific build. gint picks its OS-call
 table at startup, and `sys.c` then accepts only the exact internal versions below. Stock gint has no
-OS 02.20 table, so `tools/build-toolchain.sh gint` exports gint `463f180` and applies
-`tools/gint/cgdoom-compat.patch` (the clone in `ref/gint` is left unchanged). The patch:
+OS 02.20 table, so `tools/build-toolchain.sh gint` uses the maintained
+[CG100 fork](https://github.com/cheparukhin/gint), pinned in `tools/gint/source.env`. The fork:
 
 - adds a fourth column to gint's OS-call table, with the OS 02.20 addresses (API 3);
 - selects API 2 and API 3 only on the exact strings `02.00.0000` and `02.20.0000` (stock gint accepts any
@@ -416,7 +418,11 @@ OS 02.20 table, so `tools/build-toolchain.sh gint` exports gint `463f180` and ap
   is at address 4 or above, so it ran that loop 2^30 times from address 0: a GCC 16 build stopped
   at launch with System ERROR, TLB ERROR, `TARGET=00001000`.
 
-CMake refuses a stock gint, and CGDoom links against a symbol only the patched gint exports. After
+The fork also materializes numeric linker values before startup loops and boundary calculations.
+Its 96 target startup cases cover empty/populated sections and tables, FX/CG/CP paths,
+optimization levels, and LTO. See its [audit](https://github.com/cheparukhin/gint/blob/main/docs/linker-symbol-audit.md).
+
+CMake refuses a stock gint, and CGDoom links against a symbol the CG100 fork exports. After
 updating an existing toolchain, run `tools/build-toolchain.sh gint` once.
 
 | User-visible OS | Internal string | CGDoom | MPM |
@@ -505,7 +511,7 @@ Hardware runs are manual, so automated correctness rests on three things:
 | `make test-demosync` | Optional. DEMO1-3 of the shareware DOOM v1.9 `doom1.wad` named by `CGD_DOOM1_WAD` must play in sync: the per-tic game-state traces are compared with `tests/demosync/*.ckpt`, which were checked tic by tic against linuxdoom-1.10. Skipped when the variable is not set. `make test-demosync-sim` runs it in the simulator. |
 | `make -C src/engine/sh4/test run` | Asm vs the C reference: randomized and bit-exact, with stray-write, stack-canary and calling-convention checks; `asmcheck` |
 | `sh tests/gint-host/run.sh` | 11 suites of src/gint logic with stub gint headers, built with ASan/UBSan (`SANITIZE=0` to disable); a suite that fails to build counts as failed: sys (model/OS/API gate, table reset and open wrapper), expand, files (delayed writes, rollback of failed replacements, RAM image, packed images, refusal counting), hints, input, keymaps, memory (OS heap arena, zones), names, time (idle and chord policy), tlb (pin/repair/unpin planning), wadmap (block map, verification). The platform sources have `CGD_HOST_TEST` seams (OS string in `sys.c`, image size in `memory.c`, KIUDATA in `input.c`); some suites `#include` the `.c` under test, and `test_files` interposes `malloc`. |
-| `python3 -m unittest discover -s tests -p 'test_gint_runtime.py' -v` | After rebuilding gint: exercises its actual patched OS selection and old/new LCD world-switch callbacks on the host |
+| `python3 -m unittest discover -s tests -p 'test_gint_runtime.py' -v` | After rebuilding gint: exercises the fork's actual OS selection and old/new LCD world-switch callbacks on the host |
 | `make test-sim` | The first 60 tics of e1m1, map01 and demo1 in the simulator vs the goldens (about 6 s) |
 | `make test-sim-full` | All 36 scenarios in the simulator vs the goldens (about 4 min) |
 | `fxsdk build-cg` | The calculator build, warning-free; `uram_check.ld` link guard |

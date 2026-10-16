@@ -18,8 +18,9 @@ and of nDoom.
 ## Platform and tools
 
 - **gint** (kernel, drivers, display, timers, DMA, USB) and the **fxSDK** (build system, `fxgxa`,
-  `fxconv`, `fxlink`): Lephenixnoir and contributors, Planète Casio. This port uses gint dev commit
-  `463f180` with `tools/gint/cgdoom-compat.patch` for the OS 2.20 call table and new LCD callbacks.
+  `fxconv`, `fxlink`): Lephenixnoir and contributors, Planète Casio. This port uses the
+  [CG100 gint fork](https://github.com/cheparukhin/gint),
+  pinned in `tools/gint/source.env`, for the OS 2.20 call table, new LCD callbacks, and startup fixes.
   The 2.20 addresses and LCD workaround originate from the companion `casio-mpm-220` project.
 - **fxlibc**, the C library: the Vhex-Kernel-Core project.
 - **OpenLibm**, built as part of the toolchain.

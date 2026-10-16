@@ -1,7 +1,7 @@
 """Behavioral tests of the runtime built by tools/build-toolchain.sh gint.
 
 No firmware or hardware is required. The build is a prerequisite so this tests
-our exported and patched upstream code rather than a duplicate implementation.
+the exported pinned fork code rather than a duplicate implementation.
 """
 import os
 import re
