@@ -393,7 +393,7 @@ For fxsdk and fxlibc the script checks out `dev`; check out the listed commits t
 | Path | Repository | Commit |
 |---|---|---|
 | `ref/fxsdk` | `git.planet-casio.com/Lephenixnoir/fxsdk` (dev) | `a6e46eb6df060dc4e6e931521205e516c92b6c7f` |
-| `ref/gint-cg100` | `github.com/cheparukhin/gint` (CG100 fork) | `89fdeb60246375384534a99c2690227c2517e2b9` |
+| `ref/gint-cg100` | `github.com/cheparukhin/gint` (CG100 fork) | `4562f2a76d1fd7556d3fa37bba1f05aa3670d751` |
 | `ref/fxlibc` | `git.planet-casio.com/Vhex-Kernel-Core/fxlibc` (dev) | `a6903066cf4777aa96556a6da9699d4704867185` |
 | `ref/OpenLibm` | `git.planet-casio.com/Lephenixnoir/OpenLibm` | `9828d2e3f265a882af6a5bba8ffe6a00c3eeb8d7` |
 | `ref/sh-elf-binutils` | `git.planet-casio.com/Lephenixnoir/sh-elf-binutils` | `a963554d12c0236ee10c7545daa4c422bf107de6` |
@@ -422,7 +422,8 @@ The fork also materializes numeric linker values before startup loops and bounda
 Its 96 target startup cases cover empty/populated sections and tables, FX/CG/CP paths,
 optimization levels, and LTO. See its [audit](https://github.com/cheparukhin/gint/blob/main/docs/linker-symbol-audit.md).
 
-CMake refuses a stock gint, and CGDoom links against a symbol the CG100 fork exports. After
+CMake requires `GINT_CG100_OS_COMPAT`, and the link requires
+`gint_cg100_get_CASIOWIN_API()` from the same CG100 runtime. After
 updating an existing toolchain, run `tools/build-toolchain.sh gint` once.
 
 | User-visible OS | Internal string | CGDoom | MPM |

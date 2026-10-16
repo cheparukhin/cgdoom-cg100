@@ -4,7 +4,7 @@ Facts about the fx-CG100 / Graph Math+ / fx-1AU Graph, the MPM add-in loader and
 on, and that any other add-in for this calculator needs. What CGDoom builds on them (memory budget, UTLB
 pinning, WAD back-ends, exit path, OS gate) is in [DEVELOPMENT.md](DEVELOPMENT.md).
 
-Revisions: [gint CG100 fork](https://github.com/cheparukhin/gint) `89fdeb6`
+Revisions: [gint CG100 fork](https://github.com/cheparukhin/gint) `4562f2a`
 ([pin](../tools/gint/source.env)), based on upstream `463f180`; fxSDK
 `a6e46eb`, MPM `cbd1a41` (`mpm.bin` 1.1, which the private casio-mpm-220 project builds on). Source paths
 are in those trees.
