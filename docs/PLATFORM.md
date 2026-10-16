@@ -275,7 +275,8 @@ Physical layout as matrix codes `(row << 4) | (7 − col)` [V `src/gint/keymaps.
   `generate_g3a()` also writes the header-less `build-cg/<target>.bin` for MPM's push. sh-elf-gcc 16.2 has
   the `.` and `m4-nofpu` multilibs; pass `-m4a-nofpu` at compile time only [V].
 - **gint** is used from its dev branch (no release in a long time [F]). Any gint add-in needs
-  `tools/gint/cgdoom-compat.patch` for OS 02.20 and the new LCD.
+  `tools/gint/cgdoom-compat.patch` for OS 02.20 and the new LCD, and also with GCC 16 for gint's startup
+  ([DEVELOPMENT.md §3](DEVELOPMENT.md#os-compatibility)).
 - **Prior art** [F]:
   - gpSP-sh4-jit (GBA emulator, gint): `-O3` on hot files ran slower than `-O2` on hardware (I-cache);
     large DMA strips from X/Y RAM beat 4-row strips and per-scanline streaming; the block-map rules of §6.

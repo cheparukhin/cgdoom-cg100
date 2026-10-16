@@ -410,7 +410,11 @@ OS 02.20 table, so `tools/build-toolchain.sh gint` exports gint `463f180` and ap
   `02.00` prefix);
 - skips gint's LCD window save and restore during world switches on the new display controllers (IDs
   `0x32` and `0x52`). gint wrote the old controller's registers 0x210-0x213, which are other commands on
-  the new one. OS 02.20 sets its own window before every screen update, so nothing needs restoring.
+  the new one. OS 02.20 sets its own window before every screen update, so nothing needs restoring;
+- compiles gint's startup relocation of permanently mapped code (`start.c`) for the fx-9860G only, as its
+  comment intends. `fxcg50.ld` sets `_lreloc` and `_sreloc` to 0, and GCC 16 assumes a 4-aligned object
+  is at address 4 or above, so it ran that loop 2^30 times from address 0: a GCC 16 build stopped
+  at launch with System ERROR, TLB ERROR, `TARGET=00001000`.
 
 CMake refuses a stock gint, and CGDoom links against a symbol only the patched gint exports. After
 updating an existing toolchain, run `tools/build-toolchain.sh gint` once.
