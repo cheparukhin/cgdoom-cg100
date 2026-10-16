@@ -384,10 +384,8 @@ tools/build-toolchain.sh            # everything (or one step: fxsdk binutils gc
 tools/build-toolchain.sh sim        # build GDB's SH simulator before a standalone gint rebuild
 ```
 
-The release builds use these revisions. The gint step fetches and exports the exact fork commit
-in `tools/gint/source.env`, builds it, and runs its GCC 16 startup regressions before installing.
-The default build includes the simulator; a standalone gint rebuild requires it to be installed first.
-No source patch is applied, and the upstream clone in `ref/gint` is left unchanged.
+The gint step builds an export of the fork commit pinned in `tools/gint/source.env` and installs it only
+after the fork's GCC 16 startup regressions pass in the simulator. The release builds use these revisions.
 For fxsdk and fxlibc the script checks out `dev`; check out the listed commits to reproduce a release build exactly:
 
 | Path | Repository | Commit |

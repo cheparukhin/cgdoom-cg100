@@ -129,7 +129,7 @@ step_gint() {
   if ! git -C "$repo" cat-file -e "$GINT_COMMIT^{commit}" 2>/dev/null; then
     git -C "$repo" fetch --no-tags "$GINT_REPOSITORY" "$GINT_COMMIT"
   fi
-  # Export an exact commit. Neither the fork cache nor ref/gint is patched.
+  # Export the exact commit; the clone itself is never checked out or patched.
   rm -rf "$source" "$build"
   mkdir -p "$source"
   git -C "$repo" archive "$GINT_COMMIT" | tar -x -C "$source"
