@@ -2,7 +2,7 @@
 
    One build accepts OS 02.00.0000 (API 2) and 02.20.0000 (API 3).
    User-visible 02.00.0202/2202 and 02.20.0202 use these internal strings.
-   The pinned runtime patch in tools/gint selects the table before main(),
+   The pinned CG100 runtime in tools/gint selects the table before main(),
    and handles the new LCD controllers during world switches. OS 2.20 needs
    the casio-mpm-220 MPM; it plays on an fx-CG100 with the new display.
 
@@ -21,8 +21,8 @@ gos_api_t   g_os;
 uint32_t    g_entry_r15 = 0;
 static bool g_supported = false;
 
-/* This alias also makes linking against an unpatched gint fail. */
-extern int gint_cgdoom_get_CASIOWIN_API(void);
+/* The CG100 capability alias also rejects an incompatible library at link time. */
+extern int gint_cg100_get_CASIOWIN_API(void);
 
 /* Bfile_GetBlockAddress on OS 02.00 */
 #define OS200_BFILE_BLOCK       0x80333cf2u
@@ -53,10 +53,10 @@ void gsys_init(void)
 	memset(&g_os, 0, sizeof g_os);
 	g_supported = gint[HWCALC] == HWCALC_FXCG100
 		&& !memcmp(g_os_version, "02.00.0000", 10)
-		&& gint_cgdoom_get_CASIOWIN_API() == 2;
+		&& gint_cg100_get_CASIOWIN_API() == 2;
 	bool os220 = gint[HWCALC] == HWCALC_FXCG100
 		&& !memcmp(g_os_version, "02.20.0000", 10)
-		&& gint_cgdoom_get_CASIOWIN_API() == 3;
+		&& gint_cg100_get_CASIOWIN_API() == 3;
 	g_supported = g_supported || os220;
 	if(!g_supported)
 		return;

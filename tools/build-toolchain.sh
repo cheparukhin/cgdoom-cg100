@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the SuperH toolchain + fxSDK + fxlibc + pinned gint with CGDoom's
-# OS compatibility patch into ./toolchain, without touching the system.
+# Builds the SuperH toolchain + fxSDK + fxlibc + pinned CG100 gint fork
+# into ./toolchain, without touching the system.
 #
 #   tools/build-toolchain.sh            # everything
 #   tools/build-toolchain.sh gint       # rebuild just one step
@@ -111,21 +111,37 @@ step_fxlibc() {
 }
 
 step_gint() {
-  log "gint (pinned, CGDoom OS 2.00/2.20 compatibility)"
-  local commit=463f180ffb71ccdcef05c928ad19f2a480b14bc1
+  log "gint (pinned CG100 fork)"
+  source "$ROOT/tools/gint/source.env"
+  [[ "$GINT_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "GINT_COMMIT must be a full commit hash" >&2; exit 1;
+  }
+  local repo="$SRC/gint-cg100"
   local source="$WORK/gint-cgdoom-src"
   local build="$WORK/gint-cgdoom-build"
-  git -C "$SRC/gint" cat-file -e "$commit^{commit}"
-  # Export the pinned source; never patch or change the upstream checkout.
+  [[ -x "$PREFIX/bin/sh-elf-run" ]] || {
+    echo "Run tools/build-toolchain.sh sim first; gint startup tests are required" >&2
+    exit 1
+  }
+  if [[ ! -d "$repo/.git" ]]; then
+    git clone --no-checkout "$GINT_REPOSITORY" "$repo"
+  fi
+  if ! git -C "$repo" cat-file -e "$GINT_COMMIT^{commit}" 2>/dev/null; then
+    git -C "$repo" fetch --no-tags "$GINT_REPOSITORY" "$GINT_COMMIT"
+  fi
+  # Export the exact commit; the clone itself is never checked out or patched.
   rm -rf "$source" "$build"
   mkdir -p "$source"
-  git -C "$SRC/gint" archive "$commit" | tar -x -C "$source"
-  patch -F0 -p1 -d "$source" < "$ROOT/tools/gint/cgdoom-compat.patch"
+  git -C "$repo" archive "$GINT_COMMIT" | tar -x -C "$source"
   cmake -S "$source" -B "$build" \
     -DCMAKE_TOOLCHAIN_FILE="$PREFIX/lib/cmake/fxsdk/FXCG50.cmake" \
     -DCMAKE_MODULE_PATH="$PREFIX/lib/cmake/fxsdk" \
-    -DFXSDK_CMAKE_MODULE_PATH="$PREFIX/lib/cmake/fxsdk"
+    -DFXSDK_CMAKE_MODULE_PATH="$PREFIX/lib/cmake/fxsdk" \
+    -DGINT_GIT_HASH="${GINT_COMMIT:0:7}" \
+    -DGINT_GIT_VERSION="$GINT_VERSION"
   cmake --build "$build" -j"$JOBS"
+  python3 "$source/tests/startup/run.py" \
+    --cc "$PREFIX/bin/sh-elf-gcc" --sim "$PREFIX/bin/sh-elf-run"
   cmake --install "$build"
 }
 
@@ -146,7 +162,7 @@ step_sim() {
   install -m755 sim/sh/run "$PREFIX/bin/sh-elf-run"
 }
 
-STEPS=(fxsdk binutils gcc openlibm fxlibc gint)
+STEPS=(fxsdk binutils gcc openlibm fxlibc sim gint)
 [[ $# -gt 0 ]] && STEPS=("$@")
 for s in "${STEPS[@]}"; do "step_$s"; done
 log "done"

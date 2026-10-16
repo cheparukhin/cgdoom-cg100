@@ -11,7 +11,7 @@ char gsys_test_version[10];
 static int api, calls;
 static uint16_t const *opened_path;
 static int opened_mode;
-int gint_cgdoom_get_CASIOWIN_API(void) { return api; }
+int gint_cg100_get_CASIOWIN_API(void) { return api; }
 
 int BFile_Open(uint16_t const *p, int m)
 { calls++; opened_path = p; opened_mode = m; return 42; }

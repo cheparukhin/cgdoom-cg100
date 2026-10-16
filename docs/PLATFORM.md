@@ -4,7 +4,8 @@ Facts about the fx-CG100 / Graph Math+ / fx-1AU Graph, the MPM add-in loader and
 on, and that any other add-in for this calculator needs. What CGDoom builds on them (memory budget, UTLB
 pinning, WAD back-ends, exit path, OS gate) is in [DEVELOPMENT.md](DEVELOPMENT.md).
 
-Revisions: gint `463f180` plus [`tools/gint/cgdoom-compat.patch`](../tools/gint/cgdoom-compat.patch), fxSDK
+Revisions: [gint CG100 fork](https://github.com/cheparukhin/gint) `4562f2a`
+([pin](../tools/gint/source.env)), based on upstream `463f180`; fxSDK
 `a6e46eb`, MPM `cbd1a41` (`mpm.bin` 1.1, which the private casio-mpm-220 project builds on). Source paths
 are in those trees.
 
@@ -274,8 +275,9 @@ Physical layout as matrix codes `(row << 4) | (7 − col)` [V `src/gint/keymaps.
   `fxcg50.ld` [V `cmake/FXCG50.cmake`]. `-fno-builtin` sends `memcpy`/`memset` to fxlibc's assembly.
   `generate_g3a()` also writes the header-less `build-cg/<target>.bin` for MPM's push. sh-elf-gcc 16.2 has
   the `.` and `m4-nofpu` multilibs; pass `-m4a-nofpu` at compile time only [V].
-- **gint** is used from its dev branch (no release in a long time [F]). Any gint add-in needs
-  `tools/gint/cgdoom-compat.patch` for OS 02.20 and the new LCD.
+- **gint:** this project pins the [CG100 fork](https://github.com/cheparukhin/gint), based on upstream
+  dev, for OS 02.20, the new LCD, and GCC 16 startup fixes
+  ([DEVELOPMENT.md §3](DEVELOPMENT.md#os-compatibility)).
 - **Prior art** [F]:
   - gpSP-sh4-jit (GBA emulator, gint): `-O3` on hot files ran slower than `-O2` on hardware (I-cache);
     large DMA strips from X/Y RAM beat 4-row strips and per-scanline streaming; the block-map rules of §6.
